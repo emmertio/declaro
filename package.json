@@ -1,0 +1,12 @@
+{
+  "name": "declaro",
+  "version": "1.0.0-beta.0",
+  "description": "Declarative Business Application Framework",
+  "main": "index.js",
+  "repository": "git@github.com:emmertio/declaro.git",
+  "author": "Robby Emmert <robby@emmert.io>",
+  "license": "MIT",
+  "dependencies": {
+    "lerna": "^7.0.2"
+  }
+}

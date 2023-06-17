@@ -6,7 +6,13 @@
   "repository": "git@github.com:emmertio/declaro.git",
   "author": "Robby Emmert <robby@emmert.io>",
   "license": "MIT",
-  "dependencies": {
+  "workspaces": [
+    "lib/*",
+    "examples/*"
+  ],
+  "devDependencies": {
+    "@tsconfig/node18": "^2.0.1",
     "lerna": "^7.0.2"
-  }
+  },
+  "private": true
 }

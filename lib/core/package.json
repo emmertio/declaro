@@ -15,7 +15,12 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^0.32.2",
+    "json-schema-library": "^7.4.8",
     "vite-plugin-dts": "^2.3.0",
     "vitest": "^0.32.2"
+  },
+  "dependencies": {
+    "change-case": "^4.1.2",
+    "pluralize": "^8.0.0"
   }
 }

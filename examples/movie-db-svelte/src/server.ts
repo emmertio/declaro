@@ -1,3 +1,5 @@
+import { startServer } from '@declaro/core';
+
 export default startServer((context) => {
 	// Provide a server
 	context.use(expressMiddleware());

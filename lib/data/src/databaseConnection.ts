@@ -2,9 +2,10 @@ import { IDatastoreProvider } from '@declaro/core'
 import { EntityManager } from '@mikro-orm/core'
 import { EntityRepository } from '@mikro-orm/postgresql'
 import { BaseModel } from './baseModel'
-type ModelClass = new (...args: any[]) => BaseModel;
+import type { BaseModelClass } from './baseModel'
 
-export class DatabaseConnection implements IDatastoreProvider<[ModelClass], BaseModel> {
+
+export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], BaseModel> {
 
     private repository : EntityRepository<any>
 
@@ -16,7 +17,7 @@ export class DatabaseConnection implements IDatastoreProvider<[ModelClass], Base
         this.em = em.fork();
     }
 
-    setup(model: ModelClass) {
+    setup(model: BaseModelClass) {
         this.repository = this.em.getRepository(model);
     }
 

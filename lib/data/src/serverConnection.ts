@@ -1,15 +1,14 @@
 import { IDatastoreProviderWithFetch } from '@declaro/core'
 import { BaseModel } from './baseModel'
 import type { FetchFunc } from '@declaro/core'
+import type { BaseModelClass } from './baseModel'
 
-type ModelClass = new (...args: any[]) => BaseModel;
-
-export class ServerConnection implements IDatastoreProviderWithFetch<[ModelClass], BaseModel> {
+export class ServerConnection implements IDatastoreProviderWithFetch<[BaseModelClass], BaseModel> {
 
     private fetch: FetchFunc;
-    private model: ModelClass;
+    private model: BaseModelClass;
 
-    setup(model: ModelClass) {
+    setup(model: BaseModelClass) {
         this.model = model;
     }
 

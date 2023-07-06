@@ -11,9 +11,9 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/index.ts'),
-            name: 'DeclaroDB',
+            name: 'DeclaroData',
             formats: ['es', 'cjs'],
-            fileName: (format) => `declaro-db.${extensions[format]}`,
+            fileName: (format) => `declaro-data.${extensions[format]}`,
         },
     },
     plugins: [dts()],

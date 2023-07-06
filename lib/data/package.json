@@ -1,9 +1,9 @@
 {
-  "name": "@declaro/db",
+  "name": "@declaro/data",
   "version": "1.0.0-beta.0",
   "description": "Database utils",
-  "main": "dist/declaro-db.cjs",
-  "module": "dist/declaro-db.mjs",
+  "main": "dist/declaro-data.cjs",
+  "module": "dist/declaro-data.mjs",
   "types": "dist/index.d.ts",
   "author": "Emmert Technology LLC",
   "license": "MIT",

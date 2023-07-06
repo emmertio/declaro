@@ -1,0 +1,36 @@
+{
+  "name": "@declaro/data",
+  "version": "1.0.0-beta.0",
+  "description": "Database utils",
+  "main": "dist/declaro-data.cjs",
+  "module": "dist/declaro-data.mjs",
+  "types": "dist/index.d.ts",
+  "author": "Emmert Technology LLC",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@declaro/core": "^1.0.0-alpha.0",
+    "@vitest/coverage-v8": "^0.32.2",
+    "vite-plugin-dts": "^2.3.0",
+    "vitest": "^0.32.2"
+  },
+  "dependencies": {
+    "@mikro-orm/core": "^5.7.12",
+    "@mikro-orm/postgresql": "^5.7.12",
+    "pg-format": "^1.0.4",
+    "uuid": "^9.0.0"
+  },
+  "peerDependencies": {
+    "@declaro/core": "^1.0.0-alpha.0",
+    "@mikro-orm/cli": "^5.2.1",
+    "@mikro-orm/core": "^5.2.1",
+    "@mikro-orm/migrations": "^5.2.1",
+    "@mikro-orm/postgresql": "^5.2.1",
+    "@mikro-orm/seeder": "^5.2.1"
+  }
+}

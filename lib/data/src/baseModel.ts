@@ -1,5 +1,5 @@
 export abstract class BaseModel {
-    protected constructor() {}
+    public constructor() {}
 
     abstract id: string|number;
 }

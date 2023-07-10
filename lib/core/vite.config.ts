@@ -13,7 +13,7 @@ export default defineConfig({
             entry: resolve(__dirname, 'src/index.ts'),
             name: 'Declaro',
             formats: ['es', 'cjs'],
-            fileName: (format) => `declaro-core.${extensions[format]}`,
+            fileName: (format) => `pkg.${extensions[format]}`,
         },
         write: true,
     },

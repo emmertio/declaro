@@ -6,6 +6,7 @@
   "module": "dist/pkg.mjs",
   "types": "dist/index.d.ts",
   "author": "Emmert Technology LLC",
+  "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",

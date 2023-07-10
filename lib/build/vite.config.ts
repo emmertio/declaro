@@ -1,6 +1,7 @@
 import { resolve } from 'path'
 import { defineConfig } from 'vitest/config'
 import dts from 'vite-plugin-dts'
+import { node } from './node-build'
 
 const extensions = {
     es: 'mjs',
@@ -16,7 +17,7 @@ export default defineConfig({
             fileName: (format) => `pkg.${extensions[format]}`,
         },
     },
-    plugins: [dts()],
+    plugins: [node(), dts()],
     optimizeDeps: {
         include: ['src/**/*'],
     },

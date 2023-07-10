@@ -1,7 +1,7 @@
 {
-  "name": "@declaro/core",
+  "name": "@declaro/build",
   "version": "1.0.0-beta.0",
-  "description": "Declarative Business Module Definition",
+  "description": "Build extendible business applications",
   "main": "dist/declaro-core.cjs",
   "module": "dist/declaro-core.mjs",
   "types": "dist/index.d.ts",

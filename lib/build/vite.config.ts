@@ -13,9 +13,8 @@ export default defineConfig({
             entry: resolve(__dirname, 'src/index.ts'),
             name: 'Declaro',
             formats: ['es', 'cjs'],
-            fileName: (format) => `declaro-core.${extensions[format]}`,
+            fileName: (format) => `declaro-build.${extensions[format]}`,
         },
-        write: true,
     },
     plugins: [dts()],
     optimizeDeps: {

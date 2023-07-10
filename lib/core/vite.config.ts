@@ -15,6 +15,7 @@ export default defineConfig({
             formats: ['es', 'cjs'],
             fileName: (format) => `declaro-core.${extensions[format]}`,
         },
+        write: true,
     },
     plugins: [dts()],
     optimizeDeps: {

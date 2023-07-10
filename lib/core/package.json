@@ -8,7 +8,7 @@
   "author": "Emmert Technology LLC",
   "license": "MIT",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite build --watch",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest"

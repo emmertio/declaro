@@ -1,1 +1,6 @@
 export * from './plugin'
+export * from './filesystem/file-manager'
+export * from './config/plugin-config'
+export * from './models/model-manager'
+export * from './models/model-generator'
+export * from './models/class-generator'

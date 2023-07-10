@@ -2,6 +2,8 @@ import { Plugin } from 'vite'
 import { nodeExternals } from 'rollup-plugin-node-externals'
 import MagicString from 'magic-string'
 
+// Note: See https://dev.to/rxliuli/developing-and-building-nodejs-applications-with-vite-311n for more info
+
 export function externals(): Plugin {
     return {
         ...nodeExternals(),

@@ -1,13 +1,12 @@
 import fs from 'fs'
 import { resolve } from 'path'
 import { PluginConfig } from '../config/plugin-config'
+import { FilterPattern, createFilter } from 'vite'
 
 export class FileManager {
     static inject = ['PluginConfig'] as const
-
-    protected readonly projectDirectory: string
-    protected readonly companionDirectory: string
-
+    readonly projectDirectory: string
+    readonly companionDirectory: string
     constructor(protected readonly config: PluginConfig) {
         this.projectDirectory = config.viteConfig.root
         this.companionDirectory = resolve(config.viteConfig.root, '.declaro')
@@ -15,16 +14,12 @@ export class FileManager {
 
     async prepareFilesystem() {
         await this.prepareCompanionDirectory()
-
         await Promise.all([this.prepareAssetDirectory('models')])
     }
 
     async prepareCompanionDirectory() {
         if (!fs.existsSync(this.companionDirectory)) {
-            console.log('Creating companion directory')
             fs.mkdirSync(this.companionDirectory)
-        } else {
-            console.log('Companion directory already exists')
         }
     }
 
@@ -33,5 +28,12 @@ export class FileManager {
         if (!fs.existsSync(assetDirectory)) {
             fs.mkdirSync(assetDirectory)
         }
+    }
+
+    pathMatches(needle: string, haystack: FilterPattern) {
+        const filter = createFilter(haystack, null, {
+            resolve: this.projectDirectory,
+        })
+        return filter(needle)
     }
 }

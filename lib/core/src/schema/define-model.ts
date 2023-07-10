@@ -3,6 +3,7 @@ import { OpenAPIV3_1 } from 'openapi-types'
 export type Model = {
     name: string
     schema: OpenAPIV3_1.SchemaObject
+    isModel: true
 }
 
 export function defineModel(
@@ -12,5 +13,6 @@ export function defineModel(
     return {
         name,
         schema: doc,
+        isModel: true,
     }
 }

@@ -38,6 +38,14 @@ export function merge(target: any, ...sources: any[]): any[] {
                 value = [existingValue, ...value].filter((item) => !!item)
             } else if (Array.isArray(existingValue) && !Array.isArray(value)) {
                 value = [...(existingValue ?? []), value]
+            } else if (
+                typeof value === 'object' &&
+                typeof existingValue === 'object'
+            ) {
+                value = {
+                    ...existingValue,
+                    ...value,
+                }
             }
 
             workingCopy[key] = value

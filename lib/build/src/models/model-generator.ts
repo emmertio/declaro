@@ -1,5 +1,11 @@
 import { Model } from '@declaro/core'
 
+export type ModelConfig = {
+    outputDirectory: string
+    paths: string[]
+    generators: IModelGenerator[]
+}
+
 export type IModelGenerator = {
-    generateModel(model: Model): Promise<string>
+    generateModels(models: Model[], config: ModelConfig): Promise<any>
 }

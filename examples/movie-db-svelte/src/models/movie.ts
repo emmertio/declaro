@@ -1,5 +1,30 @@
 import { defineModel } from '@declaro/core';
 
+export const Person = defineModel('Person', {
+	type: 'object',
+	properties: {
+		name: {
+			type: 'string'
+		},
+		movies: {
+			$ref: '$models/Movie',
+			format: 'one-to-many'
+			// mappedBy: 'director'
+		}
+	}
+});
+
+/**
+ * Known filters
+ * - $eq
+ * - $ne
+ * - $gt
+ * - ...etc
+ * - startsWith
+ * - endsWith
+ * - contains
+ */
+
 export const Movie = defineModel('Movie', {
 	type: 'object',
 	properties: {
@@ -16,6 +41,10 @@ export const Movie = defineModel('Movie', {
 			type: 'integer',
 			format: 'int32',
 			title: 'Year'
+		},
+		director: {
+			$ref: '$models/Person',
+			format: 'many-to-one'
 		}
 	},
 	required: ['title', 'year']

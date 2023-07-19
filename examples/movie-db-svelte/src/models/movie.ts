@@ -4,7 +4,8 @@ export const Person = defineModel('Person', {
 	type: 'object',
 	properties: {
 		name: {
-			type: 'string'
+			type: 'string',
+			title: 'Name'
 		},
 		movies: {
 			$ref: '$models/Movie',

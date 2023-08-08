@@ -17,8 +17,8 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
     getAll(): Promise<any> {
         return this.fetch(`/store/${this.model.name}/getAll`).then(r => {
             return r.json().then((objs: any[]) => {
-                let a = objs.map(o => Object.assign(new this.model(), o));
-                return a;
+                // turn results back into objects of the correct type
+                return objs.map(o => Object.assign(new this.model(), o));
             });
         });
     }

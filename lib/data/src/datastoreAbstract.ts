@@ -64,18 +64,29 @@ export abstract class AbstractStore<T extends BaseModel<any>> {
         this.set(v);
     }
 
-    async upsert(model: T): Promise<T> {
+    async upsert(model: T, optimistic: boolean = false): Promise<T> {
         const obj = Object.assign(new this.model(), model);
-        const updated = await this.connection.upsert(obj);
-        this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-
-        const exists = this.value.some((i: T) => i.id === updated.id);
-        if (exists) {
-            this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-        } else {
-            this.set([...this.value, updated]);
+        if (optimistic) {
+            this.insertIntoStore(obj);
         }
 
+        const updated: T = await new Promise((resolve, reject) => {
+            this.connection.upsert(obj).then((updated) => {
+                resolve(updated);
+            });
+        });
+
+        this.insertIntoStore(updated);
+
         return updated;
+    }
+
+    insertIntoStore(obj: T) {
+        const exists = this.value.some((i: T) => i.id === obj.id);
+        if (exists) {
+            this.set(this.value.map((i: T) => i.id === obj.id ? obj : i));
+        } else {
+            this.set([...this.value, obj]);
+        }
     }
 }

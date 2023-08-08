@@ -1,5 +1,4 @@
-import type { IDatastoreProvider, IDatastoreProviderWithFetch } from '@declaro/core';
-import type { BaseModel } from './baseModel';
+import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core';
 import type { FetchFunc } from '@declaro/core';
 
 export abstract class AbstractStore<T extends BaseModel> {

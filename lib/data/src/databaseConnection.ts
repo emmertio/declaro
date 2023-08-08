@@ -1,8 +1,6 @@
-import { IDatastoreProvider } from '@declaro/core'
+import { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/core'
 import { EntityManager } from '@mikro-orm/core'
 import { EntityRepository } from '@mikro-orm/postgresql'
-import { BaseModel } from './baseModel'
-import type { BaseModelClass } from './baseModel'
 
 
 export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], BaseModel> {

@@ -1,5 +1,5 @@
 import { Context } from '../context/context'
-import { Validator, validate, validateAny } from '../validation'
+import { type Validator, validate, validateAny } from '../validation'
 
 export class ContextValidator {
     static all(...validators: Validator<Context>[]) {

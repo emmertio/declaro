@@ -1,4 +1,4 @@
-import { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/core'
+import { type IDatastoreProvider, BaseModel, type BaseModelClass } from '@declaro/core'
 import { EntityManager } from '@mikro-orm/core'
 import { EntityRepository } from '@mikro-orm/postgresql'
 

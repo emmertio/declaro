@@ -1,6 +1,6 @@
 import fetch from 'node-fetch'
 type FetchFunc = typeof fetch;
-import { BaseModelClass } from '../typescript'
+import { type BaseModelClass } from '../typescript'
 
 export interface IDatastoreProvider<TModel> {
     getAll() : Promise<any>

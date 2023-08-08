@@ -1,4 +1,4 @@
-import { Model } from '.'
+import type { Model } from '.'
 import { TypescriptMap } from './supported-types'
 
 export function transformModel(model: Model) {

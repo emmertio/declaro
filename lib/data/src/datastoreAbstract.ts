@@ -43,7 +43,6 @@ export abstract class AbstractStore<T extends BaseModel<any>> {
     }
 
     get(id: string|number, field?: string) {
-        console.log(this.value);
         if (typeof this.value == 'undefined') {
             return null;
         }

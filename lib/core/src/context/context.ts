@@ -1,4 +1,4 @@
-import { validate, validateAny, Validator } from '../validation'
+import { validate, validateAny, type Validator } from '../validation'
 import { EventManager } from '../events/event-manager'
 import { ContextConsumer } from './context-consumer'
 import { merge } from '../dataflow'

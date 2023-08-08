@@ -1,14 +1,16 @@
-import type { IDatastoreProvider, IDatastoreProviderWithFetch } from '@declaro/core';
-import type { BaseModel } from './baseModel';
+import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core';
 import type { FetchFunc } from '@declaro/core';
 
-export abstract class AbstractStore<T extends BaseModel> {
+export abstract class AbstractStore<T extends BaseModel<any>> {
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 
-    protected abstract model: new (...args: any[]) => T;
-
-    protected constructor(protected connection: IDatastoreProvider<any[], T>) {}
+    protected constructor(
+        protected connection: IDatastoreProvider<T>,
+        protected model: BaseModelClass<T>)
+    {
+        this.connection.setup(this.model);
+    }
 
     subscribe(subscription: (value: T[]) => void): (() => void) {
         // Add the new subscriber to the subscribers array
@@ -25,7 +27,7 @@ export abstract class AbstractStore<T extends BaseModel> {
     }
 
     setFetch(fetch: FetchFunc) {
-        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<any[], T>;
+        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<T>;
 
         if (connectionWithFetch.setFetch) {
             connectionWithFetch.setFetch(fetch);
@@ -41,7 +43,6 @@ export abstract class AbstractStore<T extends BaseModel> {
     }
 
     get(id: string|number, field?: string) {
-        console.log(this.value);
         if (typeof this.value == 'undefined') {
             return null;
         }
@@ -63,18 +64,29 @@ export abstract class AbstractStore<T extends BaseModel> {
         this.set(v);
     }
 
-    async upsert(model: T): Promise<T> {
+    async upsert(model: T, optimistic: boolean = false): Promise<T> {
         const obj = Object.assign(new this.model(), model);
-        const updated = await this.connection.upsert(obj);
-        this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-
-        const exists = this.value.some((i: T) => i.id === updated.id);
-        if (exists) {
-            this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-        } else {
-            this.set([...this.value, updated]);
+        if (optimistic) {
+            this.insertIntoStore(obj);
         }
 
+        const updated: T = await new Promise((resolve, reject) => {
+            this.connection.upsert(obj).then((updated) => {
+                resolve(updated);
+            });
+        });
+
+        this.insertIntoStore(updated);
+
         return updated;
+    }
+
+    insertIntoStore(obj: T) {
+        const exists = this.value.some((i: T) => i.id === obj.id);
+        if (exists) {
+            this.set(this.value.map((i: T) => i.id === obj.id ? obj : i));
+        } else {
+            this.set([...this.value, obj]);
+        }
     }
 }

@@ -1,7 +1,7 @@
-export abstract class BaseModel {
+export abstract class BaseModel<TId> {
     public constructor() {}
 
-    abstract id: string|number;
+    abstract id: TId;
 }
 
-export type BaseModelClass = new (...args: any[]) => BaseModel;
+export type BaseModelClass<T> = new (values?: Partial<T>) => T;

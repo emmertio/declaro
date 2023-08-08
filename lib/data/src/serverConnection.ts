@@ -1,12 +1,12 @@
 import type { IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core'
 import type { FetchFunc } from '@declaro/core'
 
-export class ServerConnection implements IDatastoreProviderWithFetch<[BaseModelClass], BaseModel> {
+export class ServerConnection<T extends BaseModel<any>> implements IDatastoreProviderWithFetch<T> {
 
     private fetch: FetchFunc;
-    private model: BaseModelClass;
+    private model: BaseModelClass<T>;
 
-    setup(model: BaseModelClass) {
+    setup(model: BaseModelClass<T>) {
         this.model = model;
     }
 
@@ -23,7 +23,7 @@ export class ServerConnection implements IDatastoreProviderWithFetch<[BaseModelC
         });
     }
 
-    upsert(model: BaseModel): Promise<any> {
+    upsert(model: T): Promise<any> {
         return this.fetch(
             `/store/${this.model.name}/upsert`,
             {

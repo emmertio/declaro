@@ -3,7 +3,7 @@ import { EntityManager } from '@mikro-orm/core'
 import { EntityRepository } from '@mikro-orm/postgresql'
 
 
-export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], BaseModel> {
+export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreProvider<T> {
 
     private repository : EntityRepository<any>
 
@@ -15,7 +15,7 @@ export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], 
         this.em = em.fork();
     }
 
-    setup(model: BaseModelClass) {
+    setup(model: BaseModelClass<T>) {
         this.repository = this.em.getRepository(model);
     }
 
@@ -25,7 +25,7 @@ export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], 
         })
     }
 
-    upsert(model: BaseModel) {
+    upsert(model: T) {
         let p;
         if (typeof model.id === 'undefined') {
             p = this.em.insert(model).then(id => {

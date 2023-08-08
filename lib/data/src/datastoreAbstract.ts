@@ -1,13 +1,16 @@
 import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core';
 import type { FetchFunc } from '@declaro/core';
 
-export abstract class AbstractStore<T extends BaseModel> {
+export abstract class AbstractStore<T extends BaseModel<any>> {
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 
-    protected abstract model: new (...args: any[]) => T;
-
-    protected constructor(protected connection: IDatastoreProvider<any[], T>) {}
+    protected constructor(
+        protected connection: IDatastoreProvider<T>,
+        protected model: BaseModelClass<T>)
+    {
+        this.connection.setup(this.model);
+    }
 
     subscribe(subscription: (value: T[]) => void): (() => void) {
         // Add the new subscriber to the subscribers array
@@ -24,7 +27,7 @@ export abstract class AbstractStore<T extends BaseModel> {
     }
 
     setFetch(fetch: FetchFunc) {
-        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<any[], T>;
+        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<T>;
 
         if (connectionWithFetch.setFetch) {
             connectionWithFetch.setFetch(fetch);

@@ -24,15 +24,25 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
     }
 
     upsert(model: T): Promise<any> {
+        return this._callStoreMethod('upsert', 'POST', model);
+    }
+
+    _callStoreMethod(method: string, httpMethod: string, payload: any = null): Promise<any> {
+        let headers = {};
+
+        if (payload) {
+            headers['Content-Type'] = 'application/json;'
+        }
+
         return this.fetch(
-            `/store/${this.model.name}/upsert`,
+            `/store/${this.model.name}/${method}`,
             {
-                method: 'POST',
-                body: JSON.stringify(model),
-                headers: {
-                    "Content-Type": "application/json",
-                }
+                method: httpMethod,
+                body: JSON.stringify(payload),
+                headers
             }
-        );
+        ).then(r => {
+            return r.json();
+        });
     }
 }

@@ -90,3 +90,8 @@ export abstract class AbstractStore<T extends BaseModel<any>> {
         }
     }
 }
+
+// this is useful for dynamic references to methods on concrete extensions of this class
+export type ActionableStore = AbstractStore<BaseModel<never>> & {
+    [key: string]: (...args: any[]) => any;
+};

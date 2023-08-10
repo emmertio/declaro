@@ -70,12 +70,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> {
             this.insertIntoStore(obj);
         }
 
-        const updated: T = await new Promise((resolve, reject) => {
-            this.connection.upsert(obj).then((updated) => {
-                resolve(updated);
-            });
-        });
-
+        const updated: T = await this.connection.upsert(obj);
         this.insertIntoStore(updated);
 
         return updated;

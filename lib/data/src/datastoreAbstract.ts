@@ -1,7 +1,7 @@
-import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core';
+import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass, IStore } from "@declaro/core";
 import type { FetchFunc } from '@declaro/core';
 
-export abstract class AbstractStore<T extends BaseModel<any>> {
+export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 

@@ -32,6 +32,7 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
 
         if (payload) {
             headers['Content-Type'] = 'application/json;'
+            headers['Accept'] = 'application/json;'
         }
 
         return this.fetch(
@@ -41,8 +42,13 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
                 body: JSON.stringify(payload),
                 headers
             }
-        ).then(r => {
-            return r.json();
+        ).then(async r => {
+            const data = await r.json();
+            if (!r.ok) {
+                throw Error(data.message);
+            } else {
+                return data;
+            }
         });
     }
 }

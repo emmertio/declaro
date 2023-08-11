@@ -32,6 +32,7 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
 
         if (payload) {
             headers['Content-Type'] = 'application/json;'
+            headers['Accept'] = 'application/json;'
         }
 
         return this.fetch(

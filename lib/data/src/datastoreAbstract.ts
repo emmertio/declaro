@@ -2,11 +2,16 @@ import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseMo
 import type { FetchFunc } from '@declaro/core';
 import { RequestErrorStore } from "./errorStore";
 
-export type TrackedPayload<T extends BaseModel<any>> = {
+export type TrackedPayload<T extends JSONified<BaseModel<any>>> = {
     model: T,
     requestId: string,
     optimistic?: boolean
 }
+
+export type JSONified<T> = {
+    [P in keyof T]: T[P] extends BaseModel<any> ? T[P]['id'] : T[P];
+};
+
 
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     private value: T[] = [];
@@ -80,7 +85,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         this.set(v);
     }
 
-    async upsert(model: T, optimistic: boolean = false): Promise<T> {
+    async upsert(model: JSONified<T>, optimistic: boolean = false): Promise<T> {
         const obj = Object.assign(new this.model(), model);
         if (optimistic) {
             this.insertIntoStore(obj);
@@ -92,7 +97,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         return updated;
     }
 
-    async trackedUpsert(payload: TrackedPayload<T>): Promise<T> {
+    async trackedUpsert(payload: TrackedPayload<JSONified<T>>): Promise<T> {
         try {
             return await this.upsert(payload.model);
         } catch (e) {

@@ -12,7 +12,6 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
 
     private em: EntityManager;
     private hydrator: Hydrator;
-    private model: BaseModelClass<T>;
 
     constructor(em : EntityManager, reference: typeof Reference) {
         this.em = em.fork();
@@ -20,7 +19,6 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
     }
 
     setup(model: BaseModelClass<T>) {
-        this.model = model;
         this.repository = this.em.getRepository(model);
     }
 
@@ -30,9 +28,18 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         })
     }
 
-    upsert(data: T) {
-        const entity = this.hydrator.hydrateEntity<T>(this.model, data);
-        return this.repository.upsert(entity).then((o) => {
+    upsert<T extends BaseModel<any>>(data: T) {
+        let p;
+        const entity = this.hydrator.hydrateEntity<T>(data);
+
+        if (typeof entity.id === 'undefined') {
+            p = this.em.insert(entity).then(id => {
+                return this.repository.findOne(id);
+            });
+        } else {
+            p = this.repository.upsert(entity);
+        }
+        return p.then((o: T) => {
             return this.em.flush().then(() => {
                 return o;
             });

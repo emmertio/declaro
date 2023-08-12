@@ -1,11 +1,10 @@
 import { merge } from '@declaro/core'
 import {
+    loadConfigFromFile,
+    parseConfig,
     type Config,
     type IConfigLoader,
     type PluginConfig,
-    type StaticConfig,
-    loadConfigFromFile,
-    parseConfig,
 } from './plugin-config'
 
 export type LoadConfig = {
@@ -32,6 +31,7 @@ export class FileConfigLoader implements IConfigLoader {
     }
     static getDefaultConfig(): PluginConfig {
         return {
+            declaroDirectory: '.declaro',
             models: {
                 outputDirectory: 'models',
                 paths: ['**/*.model.ts', 'src/models/*.ts', '**/models/*.ts'],

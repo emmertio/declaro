@@ -11,7 +11,7 @@ export class ClassModelGenerator implements IModelGenerator {
         await Promise.all(
             models.map(async (model) => {
                 const outputFile = resolve(
-                    '.declaro',
+                    options.declaroDirectory,
                     options.models?.outputDirectory,
                     `${pascalCase(model.name)}.ts`,
                 )

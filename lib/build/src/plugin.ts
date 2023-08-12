@@ -1,9 +1,9 @@
-import { type Plugin } from 'vite'
+import { type Plugin, type PluginOption } from 'vite'
 import { FileConfigLoader } from './config/config-loader'
 import { type Config, type IConfigLoader } from './config/plugin-config'
 import { baseInjector, getInjector } from './di_container'
 
-export async function declaro(options?: Config) {
+export async function declaro(options?: Config): Promise<any> {
     const customInjector = baseInjector.provideValue(
         'ConfigLoader',
         new FileConfigLoader({

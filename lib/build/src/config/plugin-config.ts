@@ -7,6 +7,7 @@ import { resolve } from 'path'
 
 export type PluginConfig = {
     configFile?: string
+    declaroDirectory?: string
     viteConfig?: ResolvedConfig
     models: ModelConfig
 }

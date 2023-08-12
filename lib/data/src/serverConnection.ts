@@ -1,14 +1,12 @@
-import { IDatastoreProviderWithFetch } from '@declaro/core'
-import { BaseModel } from './baseModel'
+import type { IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core'
 import type { FetchFunc } from '@declaro/core'
-import type { BaseModelClass } from './baseModel'
 
-export class ServerConnection implements IDatastoreProviderWithFetch<[BaseModelClass], BaseModel> {
+export class ServerConnection<T extends BaseModel<any>> implements IDatastoreProviderWithFetch<T> {
 
     private fetch: FetchFunc;
-    private model: BaseModelClass;
+    private model: BaseModelClass<T>;
 
-    setup(model: BaseModelClass) {
+    setup(model: BaseModelClass<T>) {
         this.model = model;
     }
 
@@ -19,22 +17,38 @@ export class ServerConnection implements IDatastoreProviderWithFetch<[BaseModelC
     getAll(): Promise<any> {
         return this.fetch(`/store/${this.model.name}/getAll`).then(r => {
             return r.json().then((objs: any[]) => {
-                let a = objs.map(o => Object.assign(new this.model(), o));
-                return a;
+                // turn results back into objects of the correct type
+                return objs.map(o => Object.assign(new this.model(), o));
             });
         });
     }
 
-    upsert(model: BaseModel): Promise<any> {
+    upsert(model: T): Promise<any> {
+        return this._callStoreMethod('upsert', 'POST', model);
+    }
+
+    _callStoreMethod(method: string, httpMethod: string, payload: any = null): Promise<any> {
+        let headers = {};
+
+        if (payload) {
+            headers['Content-Type'] = 'application/json;'
+            headers['Accept'] = 'application/json;'
+        }
+
         return this.fetch(
-            `/store/${this.model.name}/upsert`,
+            `/store/${this.model.name}/${method}`,
             {
-                method: 'POST',
-                body: JSON.stringify(model),
-                headers: {
-                    "Content-Type": "application/json",
-                }
+                method: httpMethod,
+                body: JSON.stringify(payload),
+                headers
             }
-        );
+        ).then(async r => {
+            const data = await r.json();
+            if (!r.ok) {
+                throw Error(data.message);
+            } else {
+                return data;
+            }
+        });
     }
 }

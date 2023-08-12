@@ -1,14 +1,16 @@
-import fetch from 'node-fetch'
-type FetchFunc = typeof fetch;
+type FetchFunc = typeof globalThis.fetch;
+import { type BaseModelClass } from '../typescript'
 
-export interface IDatastoreProvider<TSetup extends any[], TModel> {
+export interface IDatastoreProvider<TModel> {
     getAll() : Promise<any>
 
-    setup: (...args: TSetup) => void;
+    setup: (modelClass: BaseModelClass<TModel>) => void;
 
     upsert: (model: TModel) => Promise<any>;
 }
 
-export interface IDatastoreProviderWithFetch<TSetup extends any[], TModel> extends IDatastoreProvider<TSetup, TModel> {
+export interface IDatastoreProviderWithFetch<TModel> extends IDatastoreProvider<TModel> {
     setFetch?: (fetch: FetchFunc) => void;
+
+    _callStoreMethod: (method: string, httpMethod: string, payload: any) => Promise<any>;
 }

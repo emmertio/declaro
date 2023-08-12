@@ -1,14 +1,30 @@
-import type { IDatastoreProvider, IDatastoreProviderWithFetch } from '@declaro/core';
-import type { BaseModel } from './baseModel';
+import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass, IStore } from "@declaro/core";
 import type { FetchFunc } from '@declaro/core';
+import { RequestErrorStore } from "./errorStore";
 
-export abstract class AbstractStore<T extends BaseModel> {
+export type TrackedPayload<T extends JSONified<BaseModel<any>>> = {
+    model: T,
+    requestId: string,
+    optimistic?: boolean
+}
+
+export type JSONified<T> = {
+    [P in keyof T]: T[P] extends BaseModel<any> ? T[P]['id'] : T[P];
+};
+
+
+export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 
-    protected abstract model: new (...args: any[]) => T;
+    public errors = new RequestErrorStore();
 
-    protected constructor(protected connection: IDatastoreProvider<any[], T>) {}
+    protected constructor(
+        protected connection: IDatastoreProvider<T>,
+        protected model: BaseModelClass<T>)
+    {
+        this.connection.setup(this.model);
+    }
 
     subscribe(subscription: (value: T[]) => void): (() => void) {
         // Add the new subscriber to the subscribers array
@@ -25,7 +41,7 @@ export abstract class AbstractStore<T extends BaseModel> {
     }
 
     setFetch(fetch: FetchFunc) {
-        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<any[], T>;
+        const connectionWithFetch = this.connection as IDatastoreProviderWithFetch<T>;
 
         if (connectionWithFetch.setFetch) {
             connectionWithFetch.setFetch(fetch);
@@ -40,18 +56,24 @@ export abstract class AbstractStore<T extends BaseModel> {
         this.subscribers.forEach(sub => sub(value));
     }
 
-    get(id: string|number, field?: string) {
-        console.log(this.value);
+    /**
+     * When only `value` is specified it will be compared to the `id` field
+     * and only a single result will be returned
+     */
+    get(value: string | number): T | null;
+    get(value: string | number, field: string): T[] | null;
+    get(value: string|number, field?: string) {
         if (typeof this.value == 'undefined') {
             return null;
         }
-        return this.value.filter((i: T) => {
+        const matches = this.value.filter((i: T) => {
             if (typeof field !== 'undefined' && (i as any)[field] !== undefined) {
-                return (i as any)[field] == id;
+                return (i as any)[field] == value;
             } else {
-                return i.id == id;
+                return i.id == value;
             }
         });
+        return field ? matches : matches[0];
     }
 
     getAll() {
@@ -63,18 +85,37 @@ export abstract class AbstractStore<T extends BaseModel> {
         this.set(v);
     }
 
-    async upsert(model: T): Promise<T> {
+    async upsert(model: JSONified<T>, optimistic: boolean = false): Promise<T> {
         const obj = Object.assign(new this.model(), model);
-        const updated = await this.connection.upsert(obj);
-        this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-
-        const exists = this.value.some((i: T) => i.id === updated.id);
-        if (exists) {
-            this.set(this.value.map((i: T) => i.id === updated.id ? updated : i));
-        } else {
-            this.set([...this.value, updated]);
+        if (optimistic) {
+            this.insertIntoStore(obj);
         }
+
+        const updated: T = await this.connection.upsert(obj);
+        this.insertIntoStore(updated);
 
         return updated;
     }
+
+    async trackedUpsert(payload: TrackedPayload<JSONified<T>>): Promise<T> {
+        try {
+            return await this.upsert(payload.model);
+        } catch (e) {
+            this.errors.push({ requestId: payload.requestId, message: e.message })
+        }
+    }
+
+    insertIntoStore(obj: T) {
+        const exists = this.value.some((i: T) => i.id === obj.id);
+        if (exists) {
+            this.set(this.value.map((i: T) => i.id === obj.id ? obj : i));
+        } else {
+            this.set([...this.value, obj]);
+        }
+    }
 }
+
+// this is useful for dynamic references to methods on concrete extensions of this class
+export type ActionableStore = AbstractStore<BaseModel<never>> & {
+    [key: string]: (...args: any[]) => any;
+};

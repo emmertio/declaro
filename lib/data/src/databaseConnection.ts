@@ -1,23 +1,24 @@
-import { IDatastoreProvider } from '@declaro/core'
-import { EntityManager } from '@mikro-orm/core'
-import { EntityRepository } from '@mikro-orm/postgresql'
-import { BaseModel } from './baseModel'
-import type { BaseModelClass } from './baseModel'
+import type { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/core'
+import type { EntityManager, Reference } from '@mikro-orm/core'
+import type { EntityRepository } from '@mikro-orm/postgresql'
+import { Hydrator } from "./hydrateEntity";
 
 
-export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], BaseModel> {
+export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreProvider<T> {
 
     private repository : EntityRepository<any>
 
-    public static inject = ['EntityManager'] as const;
+    public static inject = ['EntityManager', 'Reference'] as const;
 
     private em: EntityManager;
+    private hydrator: Hydrator;
 
-    constructor(em : EntityManager) {
+    constructor(em : EntityManager, reference: typeof Reference) {
         this.em = em.fork();
+        this.hydrator = new Hydrator(this.em, reference);
     }
 
-    setup(model: BaseModelClass) {
+    setup(model: BaseModelClass<T>) {
         this.repository = this.em.getRepository(model);
     }
 
@@ -27,16 +28,18 @@ export class DatabaseConnection implements IDatastoreProvider<[BaseModelClass], 
         })
     }
 
-    upsert(model: BaseModel) {
+    upsert<T extends BaseModel<any>>(data: T) {
         let p;
-        if (typeof model.id === 'undefined') {
-            p = this.em.insert(model).then(id => {
+        const entity = this.hydrator.hydrateEntity<T>(data);
+
+        if (typeof entity.id === 'undefined') {
+            p = this.em.insert(entity).then(id => {
                 return this.repository.findOne(id);
             });
         } else {
-            p = this.em.upsert(model);
+            p = this.repository.upsert(entity);
         }
-        return p.then((o) => {
+        return p.then((o: T) => {
             return this.em.flush().then(() => {
                 return o;
             });

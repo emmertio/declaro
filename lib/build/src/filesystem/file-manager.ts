@@ -1,7 +1,7 @@
 import fs from 'fs'
 import { resolve } from 'path'
+import { createFilter, type FilterPattern } from 'vite'
 import { type PluginConfig } from '../config/plugin-config'
-import { type FilterPattern, createFilter } from 'vite'
 
 export class FileManager {
     static inject = ['PluginConfig'] as const

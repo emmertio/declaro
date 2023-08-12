@@ -61,7 +61,7 @@ export class ModelManager {
     async generateModels(models: Model[]) {
         await Promise.all(
             this.modelGenerators.map(async (generator) => {
-                await generator.generateModels(models, this.config.models)
+                await generator.generateModels(models, this.config)
             }),
         )
     }

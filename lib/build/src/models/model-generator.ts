@@ -1,4 +1,5 @@
 import { type Model } from '@declaro/core'
+import type { PluginConfig } from '..'
 
 export type ModelConfig = {
     outputDirectory: string
@@ -7,5 +8,5 @@ export type ModelConfig = {
 }
 
 export type IModelGenerator = {
-    generateModels(models: Model[], config: ModelConfig): Promise<any>
+    generateModels(models: Model[], config: PluginConfig): Promise<any>
 }

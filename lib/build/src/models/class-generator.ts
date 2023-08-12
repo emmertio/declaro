@@ -4,14 +4,15 @@ import { type IModelGenerator, type ModelConfig } from './model-generator'
 import fs from 'fs'
 import { resolve } from 'path'
 import { pascalCase } from 'change-case'
+import type { PluginConfig } from '..'
 
 export class ClassModelGenerator implements IModelGenerator {
-    async generateModels(models: Model[], options: ModelConfig) {
+    async generateModels(models: Model[], options: PluginConfig) {
         await Promise.all(
             models.map(async (model) => {
                 const outputFile = resolve(
                     '.declaro',
-                    options.outputDirectory,
+                    options.models?.outputDirectory,
                     `${pascalCase(model.name)}.ts`,
                 )
 

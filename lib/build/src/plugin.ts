@@ -20,7 +20,6 @@ export async function declaro(options?: Config) {
     const injector = await getInjector(customInjector)
 
     const pluginConfig = injector.resolve('PluginConfig')
-    console.log('Config', pluginConfig)
 
     const plugin: Plugin = {
         name: 'declaro:dev',
@@ -57,7 +56,6 @@ export async function declaro(options?: Config) {
                 pluginConfig.models.paths ?? [],
                 (path) => server.ssrLoadModule(path),
             )
-            console.log('Found models', models)
             await modelManager.generateModels(models)
         },
     }

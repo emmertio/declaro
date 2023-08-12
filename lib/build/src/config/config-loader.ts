@@ -52,21 +52,6 @@ export class FileConfigLoader implements IConfigLoader {
 
         merge(this.config, defaultConfig, configFromArgs)
 
-        console.log('default', defaultConfig)
-        console.log('from args', configFromArgs)
-        console.log('merged', this.config)
-
-        // Object.assign(this.config, {
-        //     ...defaultConfig,
-        //     ...configFromArgs,
-        //     ...configFromFile,
-        //     model: {
-        //         ...defaultConfig?.models,
-        //         ...configFromArgs?.models,
-        //         ...configFromFile?.models,
-        //     },
-        // })
-
         return this.config
     }
 }

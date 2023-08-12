@@ -1,9 +1,9 @@
 import { merge } from '@declaro/core'
 import {
-    Config,
-    IConfigLoader,
-    PluginConfig,
-    StaticConfig,
+    type Config,
+    type IConfigLoader,
+    type PluginConfig,
+    type StaticConfig,
     loadConfigFromFile,
     parseConfig,
 } from './plugin-config'

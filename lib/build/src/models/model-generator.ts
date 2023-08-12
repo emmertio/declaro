@@ -1,4 +1,4 @@
-import { Model } from '@declaro/core'
+import { type Model } from '@declaro/core'
 
 export type ModelConfig = {
     outputDirectory: string

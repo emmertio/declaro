@@ -1,8 +1,8 @@
-import { Model } from '@declaro/core'
+import { type Model } from '@declaro/core'
 import { glob } from 'glob'
 import { resolve } from 'path'
-import { PluginConfig } from '../config/plugin-config'
-import { IModelGenerator } from './model-generator'
+import { type PluginConfig } from '../config/plugin-config'
+import { type IModelGenerator } from './model-generator'
 
 export class ModelManager {
     static inject = ['PluginConfig'] as const

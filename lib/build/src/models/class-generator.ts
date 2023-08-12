@@ -1,6 +1,6 @@
-import { Model } from '@declaro/core'
+import { type Model } from '@declaro/core'
 import { TypescriptMap } from '../utils/supported-types'
-import { IModelGenerator, ModelConfig } from './model-generator'
+import { type IModelGenerator, type ModelConfig } from './model-generator'
 import fs from 'fs'
 import { resolve } from 'path'
 import { pascalCase } from 'change-case'

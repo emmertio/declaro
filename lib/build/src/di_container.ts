@@ -1,6 +1,6 @@
 import { createInjector } from 'typed-inject'
 import { FileConfigLoader } from './config/config-loader'
-import { IConfigLoader } from './config/plugin-config'
+import { type IConfigLoader } from './config/plugin-config'
 import { FileManager } from './filesystem/file-manager'
 import { ModelManager } from './models/model-manager'
 

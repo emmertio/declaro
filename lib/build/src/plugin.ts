@@ -1,13 +1,7 @@
-import { Plugin } from 'vite'
-import {
-    Config,
-    IConfigLoader,
-    UserConfig,
-    parseConfig,
-} from './config/plugin-config'
-import { baseInjector, getInjector } from './di_container'
-import { createInjector } from 'typed-inject'
+import { type Plugin } from 'vite'
 import { FileConfigLoader } from './config/config-loader'
+import { type Config, type IConfigLoader } from './config/plugin-config'
+import { baseInjector, getInjector } from './di_container'
 
 export async function declaro(options?: Config) {
     const customInjector = baseInjector.provideValue(

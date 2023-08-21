@@ -8,7 +8,7 @@ export const Person = defineModel('Person', {
 			title: 'Name'
 		},
 		movies: {
-			$ref: '$models/Movie',
+			$ref: 'Movie',
 			format: 'one-to-many'
 			// mappedBy: 'director'
 		}
@@ -44,8 +44,8 @@ export const Movie = defineModel('Movie', {
 			title: 'Year'
 		},
 		director: {
-			$ref: '$models/Person',
-			format: 'many-to-one'
+			$ref: 'Person',
+			format: 'many-to-many'
 		}
 	},
 	required: ['title', 'year']

@@ -27,18 +27,17 @@ export declare namespace DeclaroSchema {
         items: ReferenceObject | SchemaObject
     }
 
-    interface MixedSchemaObject extends BaseSchemaObject {
-        type?: (ArraySchemaObjectType | NonArraySchemaObjectType)[]
-        items?: ReferenceObject | SchemaObject
-    }
+    // Open API supports mixed schema objects, but we strategically don't yet.
+    // This is because mixed schema objects are hard to introspect and type correctly, and can usually be described in other ways.
+    // interface MixedSchemaObject extends BaseSchemaObject {
+    //     type?: (ArraySchemaObjectType | NonArraySchemaObjectType)[]
+    //     items?: ReferenceObject | SchemaObject
+    // }
 
-    export type SchemaObject =
-        | ArraySchemaObject
-        | NonArraySchemaObject
-        | MixedSchemaObject
+    export type SchemaObject = ArraySchemaObject | NonArraySchemaObject
 
     export interface ReferenceObject {
         $ref: ModelNames
-        format?: string
+        format: string
     }
 }

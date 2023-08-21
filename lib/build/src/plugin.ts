@@ -30,9 +30,11 @@ export async function declaro(options?: Config): Promise<any> {
                 ])
             ) {
                 // TODO: make these globs configurable
-                const mod = await ctx.server.ssrLoadModule(ctx.file)
                 const modelManager = injector.resolve('ModelManager')
-                const models = await modelManager.scanModuleForModels(mod)
+                const models = await modelManager.scanModels(
+                    pluginConfig.models.paths ?? [],
+                    (path) => ctx.server.ssrLoadModule(path),
+                )
                 await modelManager.generateModels(models)
             }
         },

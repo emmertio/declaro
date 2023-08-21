@@ -12,13 +12,19 @@ export class ReferenceGenerator implements IModelGenerator {
             `reference.ts`,
         )
 
-        const entityNames = models
+        let entityNames = models
             .map((model) => {
                 return `'${pascalCase(model.name)}'`
             })
             .join(' | ')
 
-        const source = [`export type ModelNames = ${entityNames}`].join('\n\n')
+        if (entityNames.length === 0) {
+            entityNames = 'string'
+        }
+
+        const declaroSchema = `export type ModelNames = ${entityNames}`
+
+        const source = [declaroSchema].join('\n\n')
 
         await new Promise((resolve, reject) => {
             fs.writeFile(outputFile, source, (err) => {

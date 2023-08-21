@@ -3,15 +3,19 @@ import type { DeclaroSchema } from '@declaro/core/dist/schema/types'
 import { pascalCase } from 'change-case'
 import fs from 'fs'
 import { resolve } from 'path'
-import type { PluginConfig } from '..'
+import type { PluginConfig } from '../config/plugin-config'
 import { TypescriptMap } from '../utils/supported-types'
 import { type IModelGenerator } from './model-generator'
+
+export function formatClassName(name: string) {
+    return pascalCase(name) + 'DTO'
+}
 
 export function formatClassPath(name: string, options: PluginConfig) {
     return resolve(
         options.declaroDirectory,
         options.models?.outputDirectory,
-        `${pascalCase(name)}.ts`,
+        `${formatClassName(name)}.ts`,
     )
 }
 
@@ -22,9 +26,10 @@ export class ClassModelGenerator implements IModelGenerator {
                 const outputFile = formatClassPath(model.name, options)
 
                 const imports: string[] = []
+                const modelName = formatClassName(model.name)
 
                 const modelSource = [
-                    `export class ${model.name} {`,
+                    `export class ${modelName} {`,
                     ...Object.entries(model.schema.properties)
                         .map(([name, prop]) => {
                             const type = prop['type']
@@ -34,15 +39,15 @@ export class ClassModelGenerator implements IModelGenerator {
                             const refModel = models.find((m) => m.name === ref)
                             if (!!ref && !refModel) {
                                 throw new Error(
-                                    `Could not find model ${ref} referenced by ${model.name}.${name}`,
+                                    `Could not find model ${ref} referenced by ${modelName}.${name}`,
                                 )
                             }
                             if (typeof ref === 'string') {
-                                const relationName = pascalCase(refModel.name)
+                                const relationName = formatClassName(
+                                    refModel.name,
+                                )
                                 imports.push(
-                                    `import { ${pascalCase(
-                                        refModel.name,
-                                    )} } from '$models/${relationName}'`,
+                                    `import { ${relationName} } from './${relationName}'`,
                                 )
                                 const relationType = getReferenceType(
                                     prop.format ?? RelationFormat.ManyToMany,
@@ -54,9 +59,9 @@ export class ClassModelGenerator implements IModelGenerator {
                                 }
 
                                 if (relationType === 'object') {
-                                    return `    ${name}: ${relationName}`
+                                    return `    ${name}: ${relationName} = new ${relationName}()`
                                 } else {
-                                    return `    ${name}: ${relationName}[]`
+                                    return `    ${name}: ${relationName}[] = []`
                                 }
                             } else if (typeof prop['type'] === 'string') {
                                 return `    ${name}: ${tsType};`
@@ -78,6 +83,9 @@ export class ClassModelGenerator implements IModelGenerator {
                             resolve(undefined)
                         }
                     })
+                }).catch((err) => {
+                    console.error(`Failed to write ${outputFile}`)
+                    throw err
                 })
             }),
         )

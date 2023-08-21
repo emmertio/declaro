@@ -1,4 +1,4 @@
-import { defineModel } from '@declaro/core';
+import { RelationFormat, defineModel } from '@declaro/core';
 
 export const Person = defineModel('Person', {
 	type: 'object',
@@ -9,7 +9,7 @@ export const Person = defineModel('Person', {
 		},
 		movies: {
 			$ref: 'Movie',
-			format: 'one-to-many'
+			format: RelationFormat.OneToMany
 			// mappedBy: 'director'
 		}
 	}
@@ -45,7 +45,7 @@ export const Movie = defineModel('Movie', {
 		},
 		director: {
 			$ref: 'Person',
-			format: 'many-to-many'
+			format: RelationFormat.ManyToOne
 		}
 	},
 	required: ['title', 'year']

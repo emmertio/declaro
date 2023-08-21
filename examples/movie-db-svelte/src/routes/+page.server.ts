@@ -1,7 +1,7 @@
-import { Movie } from '$models/Movie';
+import { MovieDTO } from '$models/MovieDTO';
 
 export async function load() {
-	const movie = new Movie();
+	const movie = new MovieDTO();
 	movie.title = 'The Matrix';
 	movie.year = 1999;
 	movie.description =

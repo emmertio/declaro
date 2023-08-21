@@ -35,6 +35,7 @@ export async function declaro(options?: Config): Promise<any> {
                     pluginConfig.models.paths ?? [],
                     (path) => ctx.server.ssrLoadModule(path),
                 )
+                console.log('Found models', models)
                 await modelManager.generateModels(models)
             }
         },

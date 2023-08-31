@@ -1,5 +1,5 @@
 import type { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/core'
-import type { EntityManager, Reference } from '@mikro-orm/core'
+import type { EntityManager, FilterQuery, Reference } from "@mikro-orm/core";
 import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
 
@@ -24,6 +24,18 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
 
     getAll() {
         return this.repository.findAll().catch(e => {
+            console.log(e);
+        })
+    }
+
+    getWhere(filter?: FilterQuery<any>) {
+        return this.repository.find(filter).catch(e => {
+            console.log(e);
+        })
+    }
+
+    get(id: string | number) {
+        return this.repository.findOne(id).catch(e => {
             console.log(e);
         })
     }

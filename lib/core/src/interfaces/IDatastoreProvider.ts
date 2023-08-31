@@ -2,7 +2,7 @@ type FetchFunc = typeof globalThis.fetch;
 import { type BaseModelClass } from '../typescript'
 
 export interface IDatastoreProvider<TModel> {
-    getAll() : Promise<any>
+    getAll() : Promise<void | TModel[]>
 
     setup: (modelClass: BaseModelClass<TModel>) => void;
 

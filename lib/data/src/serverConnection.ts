@@ -39,7 +39,7 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
             `/store/${this.model.name}/${method}`,
             {
                 method: httpMethod,
-                body: JSON.stringify(payload),
+                body: payload ? JSON.stringify(payload) : null,
                 headers
             }
         ).then(async r => {

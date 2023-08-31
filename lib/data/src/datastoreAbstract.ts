@@ -1,6 +1,7 @@
 import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass, IStore } from "@declaro/core";
 import type { FetchFunc } from '@declaro/core';
 import { RequestErrorStore } from "./errorStore";
+import type { FilterQuery } from "@mikro-orm/core";
 
 export type TrackedPayload<T extends JSONified<BaseModel<any>>> = {
     model: T,
@@ -16,6 +17,8 @@ export type JSONified<T> = {
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
+
+    private hydrated = false;
 
     public errors = new RequestErrorStore();
 
@@ -80,9 +83,27 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         return this.value;
     }
 
-    async hydrate(): Promise<void> {
-        const v = await this.connection.getAll();
-        this.set(v);
+    async hydrate(id?: string | number, filter?: FilterQuery<any>): Promise<void> {
+        if (this.hydrated && !filter) {
+            return;
+        }
+        if (filter) {
+            const v = await this.connection.getWhere(filter);
+            if (v) {
+                this.set(v);
+            }
+        } else if (!id) {
+            const v = await this.connection.getAll();
+            if (v) {
+                this.set(v);
+            }
+        } else if (!filter) {
+            const v = await this.connection.get(id);
+            if (v) {
+                this.set([v]);
+            }
+        }
+        this.hydrated = true;
     }
 
     async upsert(model: JSONified<T>, optimistic: boolean = false): Promise<T> {

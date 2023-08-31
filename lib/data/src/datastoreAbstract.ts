@@ -59,27 +59,26 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         this.subscribers.forEach(sub => sub(value));
     }
 
-    /**
-     * When only `value` is specified it will be compared to the `id` field
-     * and only a single result will be returned
-     */
-    get(value: string | number): T | null;
-    get(value: string | number, field: string): T[] | null;
-    get(value: string|number, field?: string) {
+    async get(value: string | number) {
+        await this.hydrate(value)
+
         if (typeof this.value == 'undefined') {
             return null;
         }
+
         const matches = this.value.filter((i: T) => {
-            if (typeof field !== 'undefined' && (i as any)[field] !== undefined) {
-                return (i as any)[field] == value;
-            } else {
-                return i.id == value;
-            }
+            return i.id == value;
         });
-        return field ? matches : matches[0];
+        return matches[0];
     }
 
-    getAll() {
+    async getWhere(filter?: FilterQuery<any>) {
+        await this.hydrate(null, filter);
+        return this.value;
+    }
+
+    async getAll() {
+        await this.hydrate();
         return this.value;
     }
 

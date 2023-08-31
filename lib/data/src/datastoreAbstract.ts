@@ -23,8 +23,8 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     public errors = new RequestErrorStore();
 
     protected constructor(
-        protected connection: IDatastoreProvider<T>,
-        protected model: BaseModelClass<T>)
+      protected connection: IDatastoreProvider<T>,
+      protected model: BaseModelClass<T>)
     {
         this.connection.setup(this.model);
     }

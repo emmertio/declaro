@@ -10,7 +10,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
 
     public static inject = ['EntityManager', 'Reference'] as const;
 
-    private em: EntityManager;
+    public readonly em: EntityManager;
     private hydrator: Hydrator;
 
     constructor(em : EntityManager, reference: typeof Reference) {

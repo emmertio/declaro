@@ -25,7 +25,7 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
     }
 
     getWhere(filter?: FilterQuery<any>) {
-        return this.fetch(`/store/${this.model.name}/getWhere/options/${JSON.stringify(filter)}`).then(r => {
+        return this.fetch(`/store/${this.model.name}/getWhere/${JSON.stringify(filter)}`).then(r => {
             return r.json().then((objs: any[]) => {
                 // turn results back into objects of the correct type
                 return objs.map(o => Object.assign(new this.model(), o));

@@ -12,30 +12,32 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
 
     public readonly em: EntityManager;
     private hydrator: Hydrator;
+    private populate;
 
     constructor(em : EntityManager, reference: typeof Reference) {
         this.em = em.fork();
         this.hydrator = new Hydrator(this.em, reference);
     }
 
-    setup(model: BaseModelClass<T>) {
+    setup(model: BaseModelClass<T>, options) {
         this.repository = this.em.getRepository(model);
+        this.populate = options?.populate;
     }
 
     getAll() {
-        return this.repository.findAll().catch(e => {
+        return this.repository.findAll({populate: this.populate}).catch(e => {
             console.log(e);
         })
     }
 
     getWhere(filter?: FilterQuery<any>) {
-        return this.repository.find(filter).catch(e => {
+        return this.repository.find(filter, {populate: this.populate}).catch(e => {
             console.log(e);
         })
     }
 
     get(id: string | number) {
-        return this.repository.findOne(id).catch(e => {
+        return this.repository.findOne(id, {populate: this.populate}).catch(e => {
             console.log(e);
         })
     }

@@ -9,7 +9,7 @@ export interface IDatastoreProvider<TModel> {
 
     get(id: string | number) : Promise<void | TModel>
 
-    setup: (modelClass: BaseModelClass<TModel>) => void;
+    setup: (modelClass: BaseModelClass<TModel>, options?: any) => void;
 
     upsert: (model: TModel) => Promise<any>;
 }

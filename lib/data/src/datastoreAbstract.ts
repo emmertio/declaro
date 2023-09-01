@@ -19,9 +19,10 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
 
     protected constructor(
       protected connection: IDatastoreProvider<T>,
-      protected model: BaseModelClass<T>)
+      protected model: BaseModelClass<T>,
+      protected options?: any)
     {
-        this.connection.setup(this.model);
+        this.connection.setup(this.model, options);
     }
 
     subscribe(subscription: (value: T[]) => void): (() => void) {

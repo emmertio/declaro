@@ -1,9 +1,9 @@
 import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass, IStore } from "@declaro/core";
 import type { FetchFunc } from '@declaro/core';
-import { RequestErrorStore } from "./errorStore";
+import { TrackedStatusStore } from "./trackedStatus";
 import type { FilterQuery } from "@mikro-orm/core";
 
-export type TrackedPayload<T extends BaseModel<any>> = {
+export type TrackedPayload<T> = {
     model: T,
     requestId: string,
     optimistic?: boolean
@@ -15,7 +15,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
 
     private hydrated = false;
 
-    public errors = new RequestErrorStore();
+    public trackedStatus = new TrackedStatusStore();
 
     protected constructor(
       protected connection: IDatastoreProvider<T>,
@@ -115,9 +115,12 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
 
     async trackedUpsert(payload: TrackedPayload<T>): Promise<T> {
         try {
-            return await this.upsert(payload.model);
+            const ret = await this.upsert(payload.model);
+            console.log(payload.requestId);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Completely successfully' })
+            return ret;
         } catch (e) {
-            this.errors.push({ requestId: payload.requestId, message: e.message })
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message })
         }
     }
 

@@ -6,6 +6,8 @@
         "target": "ESNext",
         "moduleResolution": "bundler",
         "esModuleInterop": true,
-        "noImplicitAny": false
+        "noImplicitAny": false,
+        "verbatimModuleSyntax": true,
+        "sourceMap": true
     }
 }

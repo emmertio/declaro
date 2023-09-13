@@ -14,6 +14,8 @@
 		"format": "prettier --plugin-search-dir . --write ."
 	},
 	"devDependencies": {
+		"@declaro/build": "1.0.0-beta.0",
+		"@declaro/core": "1.0.0-beta.0",
 		"@playwright/test": "^1.28.1",
 		"@sveltejs/adapter-auto": "^2.0.0",
 		"@sveltejs/kit": "^1.5.0",
@@ -24,9 +26,7 @@
 		"tslib": "^2.4.1",
 		"typescript": "^5.0.0",
 		"vite": "^4.3.0",
-		"vitest": "^0.25.3",
-		"@declaro/core": "1.0.0-beta.0"
+		"vitest": "^0.25.3"
 	},
-	"dependencies": {},
 	"type": "module"
 }

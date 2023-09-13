@@ -20,7 +20,6 @@ describe('Transform models', async () => {
         })
 
         const typescript = transformModel(movie).toTypescript()
-        console.log(typescript)
 
         expect(typescript).toBe(
             `export class Movie {

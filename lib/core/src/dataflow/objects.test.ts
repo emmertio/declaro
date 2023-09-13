@@ -1,5 +1,5 @@
 import { merge } from './objects'
-import { describe, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 describe('Object manipulation tests', () => {
     it('Should merge objects', ({ expect }) => {
@@ -31,30 +31,30 @@ describe('Object manipulation tests', () => {
         expect(objectA['p']).toBe('O')
     })
 
-    // it('Should deep merge objects', () => {
-    //     const objectA = {
-    //         d: {
-    //             r: 2,
-    //         },
-    //         characters: ['Luke', 'Leia'],
-    //     }
+    it('Should deep merge objects', () => {
+        const objectA = {
+            d: {
+                r: 2,
+            },
+            characters: ['Luke', 'Leia'],
+        }
 
-    //     const objectB = {
-    //         d: {
-    //             d: 2,
-    //         },
-    //         characters: ['Han', 'Chewie'],
-    //     }
+        const objectB = {
+            d: {
+                d: 2,
+            },
+            characters: ['Han', 'Chewie'],
+        }
 
-    //     const output = merge(objectA, objectB)
+        const output = merge(objectA, objectB)
 
-    //     expect(output.d.r).toBe(2)
-    //     expect(output.d.d).toBe(2)
-    //     expect(output.characters[0]).toBe('Luke')
-    //     expect(output.characters[1]).toBe('Leia')
-    //     expect(output.characters[2]).toBe('Han')
-    //     expect(output.characters[3]).toBe('Chewie')
-    // })
+        expect(output.d.r).toBe(2)
+        expect(output.d.d).toBe(2)
+        expect(output.characters[0]).toBe('Luke')
+        expect(output.characters[1]).toBe('Leia')
+        expect(output.characters[2]).toBe('Han')
+        expect(output.characters[3]).toBe('Chewie')
+    })
 
     it('Should add non-array items to matching arrays', ({ expect }) => {
         const a = {

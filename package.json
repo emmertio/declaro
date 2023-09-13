@@ -6,6 +6,9 @@
   "repository": "git@github.com:emmertio/declaro.git",
   "author": "Robby Emmert <robby@emmert.io>",
   "license": "MIT",
+  "scripts": {
+    "dev": "yarn lerna run dev --parallel"
+  },
   "workspaces": {
     "packages": [
       "examples/*",
@@ -16,5 +19,6 @@
     "@tsconfig/node16": "^1.0.4",
     "lerna": "^7.0.2"
   },
-  "private": true
+  "private": true,
+  "packageManager": "yarn@3.6.1"
 }

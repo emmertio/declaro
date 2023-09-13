@@ -5,6 +5,8 @@
 		"checkJs": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
+		"strictPropertyInitialization": false,
+		"importsNotUsedAsValues": "remove",
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,

@@ -1,12 +1,12 @@
 import type { IStore } from "@declaro/core";
 
-export type RequestError = { requestId: string, message: string }
+export type RequestStatus = { requestId: string, error: boolean, message: string }
 
-export class RequestErrorStore implements IStore {
-  private value: { [key: string]: RequestError } = {};
-  private subscribers: Array<(value: { [key: string]: RequestError }) => void> = [];
+export class TrackedStatusStore implements IStore {
+  private value: { [key: string]: RequestStatus } = {};
+  private subscribers: Array<(value: { [key: string]: RequestStatus }) => void> = [];
 
-  subscribe(subscription: (value: { [key: string]: RequestError }) => void): (() => void) {
+  subscribe(subscription: (value: { [key: string]: RequestStatus }) => void): (() => void) {
     // Add the new subscriber to the subscribers array
     this.subscribers.push(subscription);
 
@@ -20,8 +20,8 @@ export class RequestErrorStore implements IStore {
     };
   }
 
-  public push(error: RequestError) {
-    this.value = { ...this.value, [error.requestId]: error };
+  public push(status: RequestStatus) {
+    this.value = { ...this.value, [status.requestId]: status };
 
     this.subscribers.forEach(sub => sub(this.value));
   }

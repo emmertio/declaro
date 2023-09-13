@@ -1,29 +1,28 @@
 import type { IDatastoreProvider, IDatastoreProviderWithFetch, BaseModel, BaseModelClass, IStore } from "@declaro/core";
 import type { FetchFunc } from '@declaro/core';
-import { RequestErrorStore } from "./errorStore";
+import { TrackedStatusStore } from "./trackedStatus";
+import type { FilterQuery } from "@mikro-orm/core";
 
-export type TrackedPayload<T extends JSONified<BaseModel<any>>> = {
+export type TrackedPayload<T> = {
     model: T,
     requestId: string,
     optimistic?: boolean
 }
 
-export type JSONified<T> = {
-    [P in keyof T]: T[P] extends BaseModel<any> ? T[P]['id'] : T[P];
-};
-
-
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 
-    public errors = new RequestErrorStore();
+    private hydrated = false;
+
+    public trackedStatus = new TrackedStatusStore();
 
     protected constructor(
-        protected connection: IDatastoreProvider<T>,
-        protected model: BaseModelClass<T>)
+      protected connection: IDatastoreProvider<T>,
+      protected model: BaseModelClass<T>,
+      protected options?: any)
     {
-        this.connection.setup(this.model);
+        this.connection.setup(this.model, options);
     }
 
     subscribe(subscription: (value: T[]) => void): (() => void) {
@@ -56,36 +55,53 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         this.subscribers.forEach(sub => sub(value));
     }
 
-    /**
-     * When only `value` is specified it will be compared to the `id` field
-     * and only a single result will be returned
-     */
-    get(value: string | number): T | null;
-    get(value: string | number, field: string): T[] | null;
-    get(value: string|number, field?: string) {
+    async get(value: string | number) {
+        await this.hydrate(value)
+
         if (typeof this.value == 'undefined') {
             return null;
         }
+
         const matches = this.value.filter((i: T) => {
-            if (typeof field !== 'undefined' && (i as any)[field] !== undefined) {
-                return (i as any)[field] == value;
-            } else {
-                return i.id == value;
-            }
+            return i.id == value;
         });
-        return field ? matches : matches[0];
+        return matches[0];
     }
 
-    getAll() {
+    async getWhere(filter?: FilterQuery<any>) {
+        await this.hydrate(null, filter);
         return this.value;
     }
 
-    async hydrate(): Promise<void> {
-        const v = await this.connection.getAll();
-        this.set(v);
+    async getAll() {
+        await this.hydrate();
+        return this.value;
     }
 
-    async upsert(model: JSONified<T>, optimistic: boolean = false): Promise<T> {
+    async hydrate(id?: string | number, filter?: FilterQuery<any>): Promise<void> {
+        if (this.hydrated && !filter) {
+            return;
+        }
+        if (filter) {
+            const v = await this.connection.getWhere(filter);
+            if (v) {
+                this.set(v);
+            }
+        } else if (!id) {
+            const v = await this.connection.getAll();
+            if (v) {
+                this.set(v);
+            }
+        } else if (!filter) {
+            const v = await this.connection.get(id);
+            if (v) {
+                this.set([v]);
+            }
+        }
+        this.hydrated = true;
+    }
+
+    async upsert(model: T, optimistic: boolean = false): Promise<T> {
         const obj = Object.assign(new this.model(), model);
         if (optimistic) {
             this.insertIntoStore(obj);
@@ -97,11 +113,14 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         return updated;
     }
 
-    async trackedUpsert(payload: TrackedPayload<JSONified<T>>): Promise<T> {
+    async trackedUpsert(payload: TrackedPayload<T>): Promise<T> {
         try {
-            return await this.upsert(payload.model);
+            const ret = await this.upsert(payload.model);
+            console.log(payload.requestId);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Completely successfully' })
+            return ret;
         } catch (e) {
-            this.errors.push({ requestId: payload.requestId, message: e.message })
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message })
         }
     }
 

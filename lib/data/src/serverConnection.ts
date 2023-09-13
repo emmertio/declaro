@@ -1,5 +1,6 @@
 import type { IDatastoreProviderWithFetch, BaseModel, BaseModelClass } from '@declaro/core'
 import type { FetchFunc } from '@declaro/core'
+import type { FilterQuery } from "@mikro-orm/core";
 
 export class ServerConnection<T extends BaseModel<any>> implements IDatastoreProviderWithFetch<T> {
 
@@ -23,6 +24,21 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
         });
     }
 
+    getWhere(filter?: FilterQuery<any>) {
+        return this.fetch(`/store/${this.model.name}/getWhere/${JSON.stringify(filter)}`).then(r => {
+            return r.json().then((objs: any[]) => {
+                // turn results back into objects of the correct type
+                return objs.map(o => Object.assign(new this.model(), o));
+            });
+        });
+    }
+
+    get(id: string | number): Promise<any> {
+        return this.fetch(`/store/${this.model.name}/get/${id}`).then(r => {
+            return r.json();
+        })
+    }
+
     upsert(model: T): Promise<any> {
         return this._callStoreMethod('upsert', 'POST', model);
     }
@@ -39,7 +55,7 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
             `/store/${this.model.name}/${method}`,
             {
                 method: httpMethod,
-                body: JSON.stringify(payload),
+                body: payload ? JSON.stringify(payload) : null,
                 headers
             }
         ).then(async r => {

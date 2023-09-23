@@ -283,7 +283,7 @@
   resolved "https://registry.yarnpkg.com/@microsoft/tsdoc/-/tsdoc-0.14.2.tgz#c3ec604a0b54b9a9b87e9735dfc59e1a5da6a5fb"
   integrity sha512-9b8mPpKrfeGRuhFH5iO1iwCLeIIsV6+H1sRfxbkoGXIyQE2BTsPd9zqSqQJ+pv5sJ/hT5M1zvOFL02MnEezFug==
 
-"@mikro-orm/core@~5.7.14":
+"@mikro-orm/core@^5.7.14":
   version "5.7.14"
   resolved "https://registry.yarnpkg.com/@mikro-orm/core/-/core-5.7.14.tgz#25298e90a303ca79ba1295b5c63e917128bc87d1"
   integrity sha512-og2TJ4mRdGKF8ok/xSdGNbznm+WFF6VJosJnneulmY4VirRNfDfp7uNPBOinewigS4Q8Ntdirmponx4KrOoMBg==
@@ -305,7 +305,7 @@
     knex "2.5.1"
     sqlstring "2.3.3"
 
-"@mikro-orm/postgresql@~5.7.14":
+"@mikro-orm/postgresql@^5.7.14":
   version "5.7.14"
   resolved "https://registry.yarnpkg.com/@mikro-orm/postgresql/-/postgresql-5.7.14.tgz#630a8fbd3a1abc73625408cdd9593104cc6f662f"
   integrity sha512-3nF/UtUZ9a8jj0bD7ONeLRLg5MIHNKJngl7yR3c8sRz9yTAX6bT0lttbCxCeL4Q6/5XdcDtjgAQMUrYx1QVPhQ==

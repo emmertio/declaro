@@ -10,7 +10,7 @@ export type TrackedPayload<T> = {
 }
 
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
-    protected value: T[] = [];
+    private value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
 
     private hydrated = false;

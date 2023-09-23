@@ -22,8 +22,8 @@
     "vitest": "^0.32.2"
   },
   "dependencies": {
-    "@mikro-orm/core": "^5.7.14",
-    "@mikro-orm/postgresql": "^5.7.14",
+    "@mikro-orm/core": "~5.7.14",
+    "@mikro-orm/postgresql": "~5.7.14",
     "pg-format": "^1.0.4",
     "uuid": "^9.0.1"
   },

@@ -16,7 +16,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
     private populate;
 
     constructor(em : EntityManager, reference: typeof Reference) {
-        this.em = em.fork();
+        this.em = em;
         this.hydrator = new Hydrator(this.em, reference);
     }
 

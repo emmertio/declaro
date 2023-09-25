@@ -24,8 +24,7 @@
   "dependencies": {
     "@mikro-orm/core": "~5.7.14",
     "@mikro-orm/postgresql": "~5.7.14",
-    "pg-format": "^1.0.4",
-    "uuid": "^9.0.1"
+    "pg-format": "^1.0.4"
   },
   "peerDependencies": {
     "@declaro/core": "^1.0.0-alpha.0"

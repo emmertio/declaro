@@ -2,7 +2,12 @@ import type { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/cor
 import type { EntityManager, FilterQuery, Reference } from "@mikro-orm/core";
 import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
-import { v4 as uuidv4 } from 'uuid';
+import type { UpsertReturnType } from "./datastoreAbstract";
+
+export type DatabaseConnectionOptions = {
+    populate?: string[];
+    immutableFields?: string[];
+};
 
 
 export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreProvider<T> {
@@ -14,15 +19,19 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
     public readonly em: EntityManager;
     private hydrator: Hydrator;
     private populate;
+    private immutableFields = [];
 
     constructor(em : EntityManager, reference: typeof Reference) {
         this.em = em;
         this.hydrator = new Hydrator(this.em, reference);
     }
 
-    setup(model: BaseModelClass<T>, options) {
+    setup(model: BaseModelClass<T>, options: DatabaseConnectionOptions) {
         this.repository = this.em.getRepository(model);
         this.populate = options?.populate;
+        if (options?.immutableFields) {
+            this.immutableFields = options.immutableFields;
+        }
     }
 
     getAll() {
@@ -43,7 +52,22 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         })
     }
 
-    async upsert<T extends BaseModel<any>>(data: T) {
+    async upsert<T extends BaseModel<any> | BaseModel<any>[]>(data: T): Promise<UpsertReturnType<T>> {
+        if (Array.isArray(data)) {
+            const entities: BaseModel<any>[] = [];
+
+            for (const singleData of data) {
+                const entity = await this.singleUpsert(singleData);
+                entities.push(entity);
+            }
+
+            return entities as UpsertReturnType<T>;
+        } else {
+            return await this.singleUpsert(data) as UpsertReturnType<T>;
+        }
+    }
+
+    private async singleUpsert<T extends BaseModel<any>>(data: T) {
         let entity: T;
 
         // Get entity metadata
@@ -59,19 +83,21 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         });
 
         if (!data.id) {
-            shallowData.id = data.id = uuidv4();
             // Create new entity with shallow data
             entity = this.em.create(data.constructor.name, shallowData as any);
             await this.em.persist(entity).flush();
         } else {
             // Fetch and merge for existing entity
             entity = await this.em.findOneOrFail(data.constructor.name, data.id);
+
+            this.immutableFields.forEach(f => {
+                data[f] = entity[f];
+            });
+            // Use em.assign to properly handle m:n relationships for both new and existing entities
+            this.em.assign(entity, data);
+
+            await this.em.persist(entity).flush();
         }
-
-        // Use em.assign to properly handle m:n relationships for both new and existing entities
-        this.em.assign(entity, data);
-
-        await this.em.persist(entity).flush();
 
         return entity;
     }

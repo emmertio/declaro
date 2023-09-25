@@ -2,6 +2,7 @@ import type { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/cor
 import type { EntityManager, FilterQuery, Reference } from "@mikro-orm/core";
 import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
+import type { UpsertReturnType } from "./datastoreAbstract";
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -43,7 +44,22 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         })
     }
 
-    async upsert<T extends BaseModel<any>>(data: T) {
+    async upsert<T extends BaseModel<any> | BaseModel<any>[]>(data: T): Promise<UpsertReturnType<T>> {
+        if (Array.isArray(data)) {
+            const entities: BaseModel<any>[] = [];
+
+            for (const singleData of data) {
+                const entity = await this.singleUpsert(singleData);
+                entities.push(entity);
+            }
+
+            return entities as UpsertReturnType<T>;
+        } else {
+            return await this.singleUpsert(data) as UpsertReturnType<T>;
+        }
+    }
+
+    private async singleUpsert<T extends BaseModel<any>>(data: T) {
         let entity: T;
 
         // Get entity metadata

@@ -128,14 +128,25 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         }
     }
 
-    async remove(model: T | T[]): Promise<RemoveReturnType> {
+    async remove(model: T | T[], optimistic: boolean = false): Promise<RemoveReturnType> {
         if (Array.isArray(model)) {
             const objArray = model.map(m => Object.assign(new this.model(), m));
-            return await this.connection.remove(objArray);
+            if (optimistic) {
+                objArray.forEach(obj => this.removeFromStore(obj));
+            }
+
+            const result: RemoveReturnType = await this.connection.remove(objArray);
+            objArray.forEach(obj => this.removeFromStore(obj));
+            return result;
         } else {
             const obj = Object.assign(new this.model(), model);
+            if (optimistic) {
+                this.removeFromStore(obj);
+            }
 
-            return await this.connection.remove(obj);
+            const result: RemoveReturnType = await this.connection.remove(obj);
+            this.removeFromStore(obj);
+            return result;
         }
     }
 
@@ -166,6 +177,10 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         } else {
             this.set([...this.value, obj]);
         }
+    }
+
+    removeFromStore(obj: T) {
+        this.set(this.value.filter((i: T) => i.id !== obj.id));
     }
 }
 

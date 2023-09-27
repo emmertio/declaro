@@ -10,6 +10,7 @@ export type TrackedPayload<T> = {
 }
 
 export type UpsertReturnType<T> = T extends (infer U)[] ? U[] : T;
+export type RemoveReturnType = (number|string)[] | number | string | null;
 
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     protected value: T[] = [];
@@ -127,7 +128,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         }
     }
 
-    async remove(model: T | T[]): Promise<(number|string)[] | number | string | null> {
+    async remove(model: T | T[]): Promise<RemoveReturnType> {
         if (Array.isArray(model)) {
             const objArray = model.map(m => Object.assign(new this.model(), m));
             return await this.connection.remove(objArray);

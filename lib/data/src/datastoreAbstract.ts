@@ -149,6 +149,16 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         }
     }
 
+    async trackedRemove(payload: TrackedPayload<T | T[]>): Promise<RemoveReturnType> {
+        try {
+            const ret = await this.remove(payload.model);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Removed successfully' });
+            return ret;
+        } catch (e) {
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
+        }
+    }
+
     insertIntoStore(obj: T) {
         const exists = this.value.some((i: T) => i.id === obj.id);
         if (exists) {

@@ -127,6 +127,17 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         }
     }
 
+    async remove(model: T | T[]): Promise<(number|string)[] | number | string | null> {
+        if (Array.isArray(model)) {
+            const objArray = model.map(m => Object.assign(new this.model(), m));
+            return await this.connection.remove(objArray);
+        } else {
+            const obj = Object.assign(new this.model(), model);
+
+            return await this.connection.remove(obj);
+        }
+    }
+
     async trackedUpsert(payload: TrackedPayload<T | T[]>): Promise<UpsertReturnType<T>> {
         try {
             const ret = await this.upsert(payload.model);

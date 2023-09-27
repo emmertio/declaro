@@ -10,6 +10,7 @@ export type TrackedPayload<T> = {
 }
 
 export type UpsertReturnType<T> = T extends (infer U)[] ? U[] : T;
+export type RemoveReturnType = (number|string)[] | number | string | null;
 
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     protected value: T[] = [];
@@ -127,7 +128,7 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         }
     }
 
-    async remove(model: T | T[]): Promise<(number|string)[] | number | string | null> {
+    async remove(model: T | T[]): Promise<RemoveReturnType> {
         if (Array.isArray(model)) {
             const objArray = model.map(m => Object.assign(new this.model(), m));
             return await this.connection.remove(objArray);
@@ -141,11 +142,20 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     async trackedUpsert(payload: TrackedPayload<T | T[]>): Promise<UpsertReturnType<T>> {
         try {
             const ret = await this.upsert(payload.model);
-            console.log(payload.requestId);
-            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Completely successfully' })
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Upserted successfully' });
             return ret;
         } catch (e) {
-            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message })
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
+        }
+    }
+
+    async trackedRemove(payload: TrackedPayload<T | T[]>): Promise<RemoveReturnType> {
+        try {
+            const ret = await this.remove(payload.model);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Removed successfully' });
+            return ret;
+        } catch (e) {
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
         }
     }
 

@@ -91,7 +91,9 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
             entity = await this.em.findOneOrFail(data.constructor.name, data.id);
 
             this.immutableFields.forEach(f => {
-                data[f] = entity[f];
+                if (f in data) {
+                    data[f] = entity[f];
+                }
             });
             // Use em.assign to properly handle m:n relationships for both new and existing entities
             this.em.assign(entity, data);

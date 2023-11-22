@@ -9,6 +9,9 @@ export type TrackedPayload<T> = {
     optimistic?: boolean
 }
 
+export type UpsertReturnType<T> = T extends (infer U)[] ? U[] : T;
+export type RemoveReturnType = (number|string)[] | number | string | null;
+
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     protected value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
@@ -101,26 +104,69 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         this.hydrated = true;
     }
 
-    async upsert(model: T, optimistic: boolean = false): Promise<T> {
-        const obj = Object.assign(new this.model(), model);
-        if (optimistic) {
-            this.insertIntoStore(obj);
+    async upsert(model: T | T[], optimistic: boolean = false): Promise<UpsertReturnType<T>> {
+        if (Array.isArray(model)) {
+            const objArray = model.map(m => Object.assign(new this.model(), m));
+            if (optimistic) {
+                objArray.forEach(obj => this.insertIntoStore(obj));
+            }
+
+            const updatedArray: T[] = await this.connection.upsert(objArray);
+            updatedArray.forEach(obj => this.insertIntoStore(obj));
+
+            return updatedArray as UpsertReturnType<T>;
+        } else {
+            const obj = Object.assign(new this.model(), model);
+            if (optimistic) {
+                this.insertIntoStore(obj);
+            }
+
+            const updated: T = await this.connection.upsert(obj);
+            this.insertIntoStore(updated);
+
+            return updated as UpsertReturnType<T>;
         }
-
-        const updated: T = await this.connection.upsert(obj);
-        this.insertIntoStore(updated);
-
-        return updated;
     }
 
-    async trackedUpsert(payload: TrackedPayload<T>): Promise<T> {
+    async remove(model: T | T[], optimistic: boolean = false): Promise<RemoveReturnType> {
+        if (Array.isArray(model)) {
+            const objArray = model.map(m => Object.assign(new this.model(), m));
+            if (optimistic) {
+                objArray.forEach(obj => this.removeFromStore(obj));
+            }
+
+            const result: RemoveReturnType = await this.connection.remove(objArray);
+            objArray.forEach(obj => this.removeFromStore(obj));
+            return result;
+        } else {
+            const obj = Object.assign(new this.model(), model);
+            if (optimistic) {
+                this.removeFromStore(obj);
+            }
+
+            const result: RemoveReturnType = await this.connection.remove(obj);
+            this.removeFromStore(obj);
+            return result;
+        }
+    }
+
+    async trackedUpsert(payload: TrackedPayload<T | T[]>): Promise<UpsertReturnType<T>> {
         try {
             const ret = await this.upsert(payload.model);
-            console.log(payload.requestId);
-            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Completely successfully' })
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Upserted successfully' });
             return ret;
         } catch (e) {
-            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message })
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
+        }
+    }
+
+    async trackedRemove(payload: TrackedPayload<T | T[]>): Promise<RemoveReturnType> {
+        try {
+            const ret = await this.remove(payload.model);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Removed successfully' });
+            return ret;
+        } catch (e) {
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
         }
     }
 
@@ -132,9 +178,13 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
             this.set([...this.value, obj]);
         }
     }
+
+    removeFromStore(obj: T) {
+        this.set(this.value.filter((i: T) => i.id !== obj.id));
+    }
 }
 
 // this is useful for dynamic references to methods on concrete extensions of this class
-export type ActionableStore = AbstractStore<BaseModel<never>> & {
+export type ActionableStore = AbstractStore<BaseModel<any>> & {
     [key: string]: (...args: any[]) => any;
 };

@@ -39,8 +39,12 @@ export class ServerConnection<T extends BaseModel<any>> implements IDatastorePro
         })
     }
 
-    upsert(model: T): Promise<any> {
+    upsert(model: T | T[]): Promise<any> {
         return this._callStoreMethod('upsert', 'POST', model);
+    }
+
+    remove(model: T | T[]): Promise<any> {
+        return this._callStoreMethod('remove', 'POST', model);
     }
 
     _callStoreMethod(method: string, httpMethod: string, payload: any = null): Promise<any> {

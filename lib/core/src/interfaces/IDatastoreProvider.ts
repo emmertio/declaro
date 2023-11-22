@@ -11,7 +11,7 @@ export interface IDatastoreProvider<TModel> {
 
     setup: (modelClass: BaseModelClass<TModel>, options?: any) => void;
 
-    upsert: (model: TModel | TModel[]) => Promise<any>;
+    upsert: (model: TModel) => Promise<any>;
 }
 
 export interface IDatastoreProviderWithFetch<TModel> extends IDatastoreProvider<TModel> {

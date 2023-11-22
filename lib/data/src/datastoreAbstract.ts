@@ -9,8 +9,6 @@ export type TrackedPayload<T> = {
     optimistic?: boolean
 }
 
-export type UpsertReturnType<T> = T extends (infer U)[] ? U[] : T;
-
 export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     protected value: T[] = [];
     private subscribers: Array<(value: T[]) => void> = [];
@@ -103,31 +101,19 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
         this.hydrated = true;
     }
 
-    async upsert(model: T | T[], optimistic: boolean = false): Promise<UpsertReturnType<T>> {
-        if (Array.isArray(model)) {
-            const objArray = model.map(m => Object.assign(new this.model(), m));
-            if (optimistic) {
-                objArray.forEach(obj => this.insertIntoStore(obj));
-            }
-
-            const updatedArray: T[] = await this.connection.upsert(objArray);
-            updatedArray.forEach(obj => this.insertIntoStore(obj));
-
-            return updatedArray as UpsertReturnType<T>;
-        } else {
-            const obj = Object.assign(new this.model(), model);
-            if (optimistic) {
-                this.insertIntoStore(obj);
-            }
-
-            const updated: T = await this.connection.upsert(obj);
-            this.insertIntoStore(updated);
-
-            return updated as UpsertReturnType<T>;
+    async upsert(model: T, optimistic: boolean = false): Promise<T> {
+        const obj = Object.assign(new this.model(), model);
+        if (optimistic) {
+            this.insertIntoStore(obj);
         }
+
+        const updated: T = await this.connection.upsert(obj);
+        this.insertIntoStore(updated);
+
+        return updated;
     }
 
-    async trackedUpsert(payload: TrackedPayload<T | T[]>): Promise<UpsertReturnType<T>> {
+    async trackedUpsert(payload: TrackedPayload<T>): Promise<T> {
         try {
             const ret = await this.upsert(payload.model);
             console.log(payload.requestId);

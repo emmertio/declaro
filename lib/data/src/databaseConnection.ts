@@ -77,7 +77,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         const shallowData: Partial<T> = {};
         Object.keys(data).forEach((key) => {
             const property = meta.properties[key];
-            if (property && property.reference !== 'm:n') {
+            if (!property || property.reference !== 'm:n') {
                 shallowData[key] = data[key];
             }
         });

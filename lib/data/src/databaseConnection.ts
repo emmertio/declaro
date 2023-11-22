@@ -73,8 +73,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         // Get entity metadata
         const meta = this.em.getMetadata().get(data.constructor.name);
 
-        // Create a shallow copy of data, excluding m:n fields, these are ignored for the
-        // shallow clone because those aren't stored in the row itself but rather a linking table
+        // Create a shallow copy of data, excluding m:n fields
         const shallowData: Partial<T> = {};
         Object.keys(data).forEach((key) => {
             const property = meta.properties[key];
@@ -90,19 +89,17 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         } else {
             // Fetch and merge for existing entity
             entity = await this.em.findOneOrFail(data.constructor.name, data.id);
-        }
-        // NOTE: this is a current hacky workaround to prevent the em.assign call trying to reset the entity's id
-        // to undefined on an insert. This should probably actually reference the schema metadata to determine the PK
-        delete data.id;
 
-        this.immutableFields.forEach(f => {
-            if (f in data) {
-                data[f] = entity[f];
-            }
-        });
-        // Use em.assign to properly handle m:n relationships for both new and existing entities
-        this.em.assign(entity, data);
-        await this.em.persist(entity).flush();
+            this.immutableFields.forEach(f => {
+                if (f in data) {
+                    data[f] = entity[f];
+                }
+            });
+            // Use em.assign to properly handle m:n relationships for both new and existing entities
+            this.em.assign(entity, data);
+
+            await this.em.persist(entity).flush();
+        }
 
         return entity;
     }

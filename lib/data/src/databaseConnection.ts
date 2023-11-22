@@ -4,11 +4,6 @@ import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
 import type { UpsertReturnType } from "./datastoreAbstract";
 
-export type DatabaseConnectionOptions = {
-    populate?: string[];
-    immutableFields?: string[];
-};
-
 
 export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreProvider<T> {
 
@@ -19,19 +14,15 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
     public readonly em: EntityManager;
     private hydrator: Hydrator;
     private populate;
-    private immutableFields = [];
 
     constructor(em : EntityManager, reference: typeof Reference) {
         this.em = em;
         this.hydrator = new Hydrator(this.em, reference);
     }
 
-    setup(model: BaseModelClass<T>, options: DatabaseConnectionOptions) {
+    setup(model: BaseModelClass<T>, options) {
         this.repository = this.em.getRepository(model);
         this.populate = options?.populate;
-        if (options?.immutableFields) {
-            this.immutableFields = options.immutableFields;
-        }
     }
 
     getAll() {
@@ -89,15 +80,12 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         } else {
             // Fetch and merge for existing entity
             entity = await this.em.findOneOrFail(data.constructor.name, data.id);
-
-            this.immutableFields.forEach(f => {
-                data[f] = entity[f];
-            });
-            // Use em.assign to properly handle m:n relationships for both new and existing entities
-            this.em.assign(entity, data);
-
-            await this.em.persist(entity).flush();
         }
+
+        // Use em.assign to properly handle m:n relationships for both new and existing entities
+        this.em.assign(entity, data);
+
+        await this.em.persist(entity).flush();
 
         return entity;
     }

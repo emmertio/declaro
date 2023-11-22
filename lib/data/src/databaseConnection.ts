@@ -2,7 +2,7 @@ import type { IDatastoreProvider, BaseModel, BaseModelClass } from '@declaro/cor
 import type { EntityManager, FilterQuery, Reference } from "@mikro-orm/core";
 import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
-import type { RemoveReturnType, UpsertReturnType } from "./datastoreAbstract";
+import type { UpsertReturnType } from "./datastoreAbstract";
 
 export type DatabaseConnectionOptions = {
     populate?: string[];
@@ -102,7 +102,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         return entity;
     }
 
-    async remove(data: T[] | T): Promise<RemoveReturnType> {
+    async remove(data: T[] | T): Promise<(number|string)[] | number | string | null> {
         if (Array.isArray(data)) {
             const removedIds: (number|string)[] = [];
             for (const singleData of data) {

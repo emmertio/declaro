@@ -3,6 +3,7 @@ import type { EntityManager, FilterQuery, Reference } from "@mikro-orm/core";
 import type { EntityRepository } from '@mikro-orm/postgresql'
 import { Hydrator } from "./hydrateEntity";
 import type { UpsertReturnType } from "./datastoreAbstract";
+import { v4 as uuidv4 } from 'uuid';
 
 
 export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreProvider<T> {
@@ -74,6 +75,7 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         });
 
         if (!data.id) {
+            shallowData.id = data.id = uuidv4();
             // Create new entity with shallow data
             entity = this.em.create(data.constructor.name, shallowData as any);
             await this.em.persist(entity).flush();

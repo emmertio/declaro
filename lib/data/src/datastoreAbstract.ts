@@ -142,10 +142,11 @@ export abstract class AbstractStore<T extends BaseModel<any>> implements IStore{
     async trackedUpsert(payload: TrackedPayload<T | T[]>): Promise<UpsertReturnType<T>> {
         try {
             const ret = await this.upsert(payload.model);
-            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Upserted successfully' });
+            console.log(payload.requestId);
+            this.trackedStatus.push({ requestId: payload.requestId, error: false, message: 'Completely successfully' })
             return ret;
         } catch (e) {
-            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message });
+            this.trackedStatus.push({ requestId: payload.requestId, error: true, message: e.message })
         }
     }
 

@@ -25,5 +25,13 @@
   "dependencies": {
     "change-case": "^4.1.2",
     "pluralize": "^8.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emmertio/declaro.git#main"
+  },
+  "bugs": {
+    "url": "https://github.com/emmertio/declaro/issues"
+  },
+  "homepage": "https://github.com/emmertio/declaro/tree/main#readme"
 }

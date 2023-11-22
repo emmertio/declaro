@@ -102,31 +102,4 @@ export class DatabaseConnection<T extends BaseModel<any>> implements IDatastoreP
         return entity;
     }
 
-    async remove(data: T[] | T): Promise<(number|string)[] | number | string | null> {
-        if (Array.isArray(data)) {
-            const removedIds: (number|string)[] = [];
-            for (const singleData of data) {
-                if(await this.singleRemove(singleData)) {
-                    removedIds.push(singleData.id);
-                }
-            }
-            return removedIds;
-        } else {
-            return await this.singleRemove(data) ? data.id : null;
-        }
-    }
-
-    private async singleRemove<T extends BaseModel<any>>(data: T): Promise<boolean> {
-        try {
-            const entity = await this.em.findOneOrFail(data.constructor.name, data.id);
-            await this.em.remove(entity).flush();
-            return true;
-        } catch (e) {
-            if (e.constructor.name === 'NotFoundError') {
-                return false;
-            } else {
-                throw e;
-            }
-        }
-    }
 }

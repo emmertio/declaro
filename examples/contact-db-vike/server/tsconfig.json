@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  // Make IDEs complain about missing file extension .js in import paths.
+  // Alternatively, we could always set "module" to "Node16" and add the file extension .js to import paths everywhere.
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "strictPropertyInitialization": false
+  }
+}

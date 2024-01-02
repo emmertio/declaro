@@ -25,6 +25,6 @@
     "zod": "^3.22.4"
   },
   "peerDependencies": {
-    "@declaro/core": "^1.0.0-alpha.0"
+    "@declaro/core": "^1.0.0-beta.0"
   }
 }

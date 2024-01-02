@@ -42,6 +42,14 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
+"@declaro/core@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@declaro/core/-/core-1.0.0.tgz#2e26c6fbfeec42aa90c5bbd0bb1989c2bc314c31"
+  integrity sha512-aXEIL4PPouYdJZ8Vr41iE78mmdpcfMYUDXrVyN+BX7jART253CHD6pP6c/jL/Qa7f32hlnBYLLDPzzk/Z6N7Ew==
+  dependencies:
+    change-case "^4.1.2"
+    pluralize "^8.0.0"
+
 "@esbuild/android-arm64@0.18.20":
   version "0.18.20"
   resolved "https://registry.yarnpkg.com/@esbuild/android-arm64/-/android-arm64-0.18.20.tgz#984b4f9c8d0377443cc2dfcef266d02244593622"
@@ -5590,3 +5598,8 @@ z-schema@~5.0.2:
     validator "^13.7.0"
   optionalDependencies:
     commander "^10.0.0"
+
+zod@^3.22.4:
+  version "3.22.4"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-3.22.4.tgz#f31c3a9386f61b1f228af56faa9255e845cf3fff"
+  integrity sha512-iC+8Io04lddc+mVqQ9AZ7OQ2MrUKGN+oIQyq1vemgt46jwCwLfhq7/pwnBnNXXXZb8VTVLKwp9EDkx+ryxIWmg==

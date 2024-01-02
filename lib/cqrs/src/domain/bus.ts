@@ -1,10 +1,9 @@
-import type { EventRef, EventRefName, IEvent } from './event'
+import type { EventRef, IEvent } from './event'
 import type {
     EventKey,
     EventProcessorMap,
     IEventProcessor,
     SelectProcessorEvent,
-    UnwrapProcessorEvent,
 } from './event-processor'
 import type { PromiseOrValue } from '@declaro/core'
 

@@ -7,6 +7,9 @@
   "types": "dist/index.d.ts",
   "author": "Emmert Technology LLC",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",

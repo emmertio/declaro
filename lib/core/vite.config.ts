@@ -17,7 +17,7 @@ export default defineConfig({
         },
         write: true,
     },
-    plugins: [dts()],
+    plugins: [dts() as any],
     optimizeDeps: {
         include: ['src/**/*'],
     },

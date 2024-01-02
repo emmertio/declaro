@@ -6,7 +6,7 @@ import type {
     SelectProcessorEvent,
     UnwrapProcessorEvent,
 } from './event-processor'
-import type { PromiseOrValue } from '@declaro/core/src/typescript'
+import type { PromiseOrValue } from '@declaro/core'
 
 export type BeforeEventCallback<E extends IEvent> = (
     event: E,

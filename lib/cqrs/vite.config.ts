@@ -17,7 +17,11 @@ export default defineConfig({
         },
         write: true,
     },
-    plugins: [dts()],
+    plugins: [
+        dts({
+            entryRoot: resolve(__dirname, 'src'),
+        }) as any,
+    ],
     optimizeDeps: {
         include: ['src/**/*'],
     },

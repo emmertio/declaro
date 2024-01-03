@@ -7,7 +7,7 @@ export interface IEvent<Name extends string = string> {
 
 export interface ISerializable<T = any> {
     serialize(): T
-    deserialize(payload: T): any
+    parse(payload: T): any
 }
 
 export interface IValidatable {

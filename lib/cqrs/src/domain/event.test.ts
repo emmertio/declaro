@@ -13,7 +13,7 @@ describe('Class based event definition', () => {
             }
         }
 
-        deserialize(payload: any) {
+        parse(payload: any) {
             this.message = payload.message
         }
 

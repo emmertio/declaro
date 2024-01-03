@@ -25,7 +25,7 @@ export abstract class UnsecuredEvent
             }
         }, {})
     }
-    deserialize(payload: any): any {
+    parse(payload: any): any {
         Object.assign(this, payload)
     }
 

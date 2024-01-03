@@ -92,7 +92,7 @@ describe('Unsecured Events', () => {
 
         const event = new TestEvent()
 
-        event.deserialize({
+        event.parse({
             number: 42,
         })
 

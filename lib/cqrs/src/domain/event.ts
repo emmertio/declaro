@@ -1,4 +1,3 @@
-import { ZodType } from 'zod'
 import type { IError } from '@declaro/core/src/typescript/errors'
 import type { Class } from '@declaro/core/src/typescript'
 

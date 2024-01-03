@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { IEvent } from './event'
+import type { IEvent, ISerializable } from './event'
 
 describe('Class based event definition', () => {
-    class TestEvent implements IEvent {
+    class TestEvent implements IEvent, ISerializable {
         readonly $name = 'test/event'
 
         message: string
@@ -11,6 +11,10 @@ describe('Class based event definition', () => {
             return {
                 message: this.message,
             }
+        }
+
+        deserialize(payload: any) {
+            this.message = payload.message
         }
 
         validate(): boolean {

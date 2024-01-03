@@ -4,7 +4,14 @@ import type { Class } from '@declaro/core/src/typescript'
 
 export interface IEvent<Name extends string = string> {
     readonly $name: Name
-    serialize(): any
+}
+
+export interface ISerializable<T = any> {
+    serialize(): T
+    deserialize(payload: T): any
+}
+
+export interface IValidatable {
     validate(): boolean
 }
 

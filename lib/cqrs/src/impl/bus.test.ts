@@ -118,4 +118,24 @@ describe('Bus', () => {
 
         expect(afterHandler.mock.calls.length).toBe(1)
     })
+
+    it('should be able to merge buses', () => {
+        const bus = new Bus().addEventProcessor(new CustomQueryProcessor())
+
+        expect(bus.getProcessors().CustomQuery).toBeInstanceOf(
+            CustomQueryProcessor,
+        )
+        expect(bus.getProcessors()['CustomCommandProcessor']).toBeUndefined()
+
+        const merged = new Bus(bus.getProcessors())
+            .merge(bus)
+            .addEventProcessor(new CustomCommandProcessor())
+
+        expect(merged.getProcessors().CustomQuery).toBeInstanceOf(
+            CustomQueryProcessor,
+        )
+        expect(merged.getProcessors().CustomCommand).toBeInstanceOf(
+            CustomCommandProcessor,
+        )
+    })
 })

@@ -8,6 +8,7 @@ import type { EventRef, IEvent } from '../domain/event'
 import type {
     AfterEventCallback,
     BeforeEventCallback,
+    BusMap,
     DispatchResult,
     IBus,
 } from '../domain/bus'
@@ -42,6 +43,17 @@ export class Bus<T extends EventProcessorMap = {}> implements IBus<T> {
         })
     }
 
+    merge<B extends Bus<any>>(bus: B): Bus<T & BusMap<B>> {
+        return new Bus({
+            ...this.getProcessors(),
+            ...bus.getProcessors(),
+        })
+    }
+
+    getProcessors(): T {
+        return this.processorMap
+    }
+
     async dispatch<E extends IEvent>(event: E): Promise<DispatchResult<E, T>> {
         const processor = this.processorMap[event.$name]
         const key = event.$name
@@ -74,7 +86,7 @@ export class Bus<T extends EventProcessorMap = {}> implements IBus<T> {
     before<E extends EventKey<T>>(
         event: EventRef<E>,
         callback: BeforeEventCallback<SelectProcessorEvent<T, E>>,
-    ) {
+    ): Bus<T> {
         const key = getEventName(event)
         const handlers = this.beforeHandlerMap.get(key) ?? []
         handlers.push(callback)
@@ -86,7 +98,7 @@ export class Bus<T extends EventProcessorMap = {}> implements IBus<T> {
     after<E extends EventKey<T>>(
         event: EventRef<E>,
         callback: AfterEventCallback<SelectProcessorEvent<T, E>, T>,
-    ) {
+    ): Bus<T> {
         const key = getEventName(event)
         const handlers = this.afterHandlerMap.get(key) ?? []
         handlers.push(callback)

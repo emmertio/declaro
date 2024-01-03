@@ -10,7 +10,7 @@ import {
 describe('Secure Events', () => {
     class MySecureEvent extends SecureEvent {
         readonly $name = 'test/secure'
-        protected readonly permissions = PermissionValidator.create().allOf(
+        protected readonly $permissions = PermissionValidator.create().allOf(
             ['tweet-at-4am', 'break-the-internet'],
             'You made the SEC angry',
         )

@@ -14,14 +14,14 @@ export abstract class SecureEvent
 {
     secured: true
 
-    protected abstract readonly permissions: PermissionValidator
+    protected abstract readonly $permissions: PermissionValidator
 
     validatePermissions(permissions: string[]) {
-        return this.permissions.validate(permissions)
+        return this.$permissions.validate(permissions)
     }
 
     safeValidatePermissions(permissions: string[]) {
-        return this.permissions.safeValidate(permissions)
+        return this.$permissions.safeValidate(permissions)
     }
 }
 

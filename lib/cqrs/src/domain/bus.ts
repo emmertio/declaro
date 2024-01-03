@@ -19,6 +19,8 @@ export type DispatchResult<
     E extends IEvent,
     P extends EventProcessorMap,
 > = ReturnType<P[E['$name']]['process']>
+
+export type BusMap<B extends IBus<any>> = ReturnType<B['getProcessors']>
 export interface IBus<T extends EventProcessorMap> {
     dispatch<E extends IEvent>(event: E): Promise<DispatchResult<E, T>>
     addEventProcessor<Proc extends IEventProcessor>(
@@ -28,6 +30,7 @@ export interface IBus<T extends EventProcessorMap> {
             [key in Proc['event']]: Proc
         }
     >
+
     before<E extends EventKey<T>>(
         event: EventRef<E>,
         callback: BeforeEventCallback<SelectProcessorEvent<T, E>>,
@@ -36,4 +39,6 @@ export interface IBus<T extends EventProcessorMap> {
         event: EventRef<E>,
         callback: AfterEventCallback<SelectProcessorEvent<T, E>, T>,
     ): IBus<T>
+
+    getProcessors(): T
 }

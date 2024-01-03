@@ -1,4 +1,4 @@
-import { z, ZodType } from 'zod'
+import { ZodType } from 'zod'
 import { type IError } from '@declaro/core/src/typescript/errors'
 import type {
     EventRef,
@@ -8,7 +8,6 @@ import type {
     ISerializable,
     IValidatable,
 } from '../domain/event'
-import type { Class } from '@declaro/core/src/typescript'
 
 export abstract class UnsecuredEvent
     implements IEvent, ISerializable, IValidatable

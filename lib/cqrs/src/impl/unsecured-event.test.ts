@@ -58,4 +58,46 @@ describe('Unsecured Events', () => {
 
         expect(eventNameForString).toBe('test/event')
     })
+
+    it('should serialize values by default', () => {
+        class TestEvent extends UnsecuredEvent {
+            readonly $name = 'test/serialize'
+
+            protected readonly $validation = z.object({
+                number: z.number().min(10, 'Too Low').max(100, 'Too High'),
+            })
+
+            number: number
+        }
+
+        const event = new TestEvent()
+        event.number = 42
+
+        const payload = event.serialize()
+
+        expect(payload).to.deep.equal({
+            number: 42,
+        })
+    })
+
+    it('should deserialize values by default', () => {
+        class TestEvent extends UnsecuredEvent {
+            readonly $name = 'test/deserialize'
+
+            protected readonly $validation = z.object({
+                number: z.number().min(10, 'Too Low').max(100, 'Too High'),
+            })
+
+            number: number
+        }
+
+        const event = new TestEvent()
+
+        event.deserialize({
+            number: 42,
+        })
+
+        expect(event.number).toBe(42)
+        expect(event.$name).toBe('test/deserialize')
+    })
 })

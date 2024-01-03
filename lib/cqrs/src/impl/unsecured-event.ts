@@ -1,19 +1,34 @@
-import { ZodType } from 'zod'
+import { z, ZodType } from 'zod'
 import { type IError } from '@declaro/core/src/typescript/errors'
 import type {
     EventRef,
     EventRefName,
     IEvent,
     IEventValidationResult,
+    ISerializable,
+    IValidatable,
 } from '../domain/event'
 import type { Class } from '@declaro/core/src/typescript'
 
-export abstract class UnsecuredEvent implements IEvent {
+export abstract class UnsecuredEvent
+    implements IEvent, ISerializable, IValidatable
+{
     abstract readonly $name: string
 
     protected readonly $validation: ZodType
+    serialize(): any {
+        const keys = Object.keys(this).filter((key) => !key.startsWith('$'))
 
-    abstract serialize(): any
+        return keys.reduce((out, key) => {
+            return {
+                [key]: this[key],
+                ...out,
+            }
+        }, {})
+    }
+    deserialize(payload: any): any {
+        Object.assign(this, payload)
+    }
 
     validate(): boolean {
         if (this.$validation) {

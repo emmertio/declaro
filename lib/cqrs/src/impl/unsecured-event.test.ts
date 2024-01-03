@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getEventName, UnsecuredEvent } from './unsecured-event'
 import { z } from 'zod'
-import * as constants from 'constants'
 
 describe('Unsecured Events', () => {
     it('Should validate true by default, where no validation is provided', () => {

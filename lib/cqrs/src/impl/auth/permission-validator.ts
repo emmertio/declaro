@@ -4,18 +4,16 @@ export enum PermissionRuleType {
     SOME_OF = 'SOME_OF',
 }
 
+export type RulePermission = string | PermissionValidator
+
 export type PermissionRule = {
     type: PermissionRuleType
-    permissions: string[]
+    permissions: RulePermission[]
     errorMessage: string
 }
 
 export class PermissionError extends Error {
-    constructor(
-        message: string,
-        public rule: PermissionRule,
-        public permissions: string[],
-    ) {
+    constructor(message: string, public rule: PermissionRule, public permissions: RulePermission[]) {
         super(message ?? 'Permission Error')
     }
 }
@@ -44,7 +42,7 @@ export class PermissionValidator {
         return this
     }
 
-    allOf(permissions: string[], errorMessage?: string) {
+    allOf(permissions: RulePermission[], errorMessage?: string) {
         this.addRule({
             type: PermissionRuleType.ALL_OF,
             permissions,
@@ -53,7 +51,7 @@ export class PermissionValidator {
         return this
     }
 
-    noneOf(permissions: string[], errorMessage?: string) {
+    noneOf(permissions: RulePermission[], errorMessage?: string) {
         this.addRule({
             type: PermissionRuleType.NONE_OF,
             permissions,
@@ -62,7 +60,7 @@ export class PermissionValidator {
         return this
     }
 
-    someOf(permissions: string[], errorMessage?: string) {
+    someOf(permissions: RulePermission[], errorMessage?: string) {
         this.addRule({
             type: PermissionRuleType.SOME_OF,
             permissions,
@@ -73,19 +71,21 @@ export class PermissionValidator {
 
     private validateRule(rule: PermissionRule, permissions: string[]) {
         if (rule.type === PermissionRuleType.ALL_OF) {
-            return rule.permissions.every(
-                (permission) => permissions.indexOf(permission) > -1,
-            )
+            return rule.permissions.every((permission) => this.hasPermission(permission, permissions))
         } else if (rule.type === PermissionRuleType.NONE_OF) {
-            return !rule.permissions.some(
-                (permission) => permissions.indexOf(permission) > -1,
-            )
+            return !rule.permissions.some((permission) => this.hasPermission(permission, permissions))
         } else if (rule.type === PermissionRuleType.SOME_OF) {
-            return rule.permissions.some(
-                (permission) => permissions.indexOf(permission) > -1,
-            )
+            return rule.permissions.some((permission) => this.hasPermission(permission, permissions))
         } else {
             throw new Error(`Invalid permission rule type ${rule.type}`)
+        }
+    }
+
+    private hasPermission(permission: RulePermission, permissions: string[]) {
+        if (typeof permission === 'string') {
+            return permissions.indexOf(permission) > -1
+        } else {
+            return permission.safeValidate(permissions).valid
         }
     }
 
@@ -107,11 +107,7 @@ export class PermissionValidator {
                 const valid = this.validateRule(rule, permissions)
 
                 if (!valid) {
-                    return new PermissionError(
-                        rule.errorMessage,
-                        rule,
-                        permissions,
-                    )
+                    return new PermissionError(rule.errorMessage, rule, permissions)
                 } else {
                     return undefined
                 }

@@ -26,7 +26,13 @@ export abstract class UnsecuredEvent
         }, {})
     }
     parse(payload: any): any {
-        Object.assign(this, payload)
+        let values: any
+        if (this.$validation) {
+            values = this.$validation.parse(payload)
+        } else {
+            values = payload
+        }
+        Object.assign(this, values)
     }
 
     validate(): boolean {

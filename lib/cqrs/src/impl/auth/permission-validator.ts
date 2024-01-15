@@ -37,6 +37,13 @@ export class PermissionValidator {
         return this
     }
 
+    extend(...validators: PermissionValidator[]) {
+        validators.forEach((validator) => {
+            this.rules.push(...validator.rules)
+        })
+        return this
+    }
+
     allOf(permissions: string[], errorMessage?: string) {
         this.addRule({
             type: PermissionRuleType.ALL_OF,

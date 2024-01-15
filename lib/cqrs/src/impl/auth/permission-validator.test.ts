@@ -219,4 +219,71 @@ describe('Permission Builder', () => {
             ])
         }).toThrowError('Requires 1 master jedi')
     })
+
+    it('should validate multiple permission validators at once', () => {
+        const validator = PermissionValidator.create()
+            .allOf(['luke', 'leia', 'han', 'chewie'], 'Where are my heroes?')
+            .someOf(['obi-wan', 'yoda'], 'Requires 1 master jedi')
+
+        const validator2 = PermissionValidator.create().noneOf(
+            ['darth-vader', 'storm-trooper', 'emperor'],
+            'No sith allowed',
+        )
+
+        const combinedValidator = PermissionValidator.create().extend(
+            validator,
+            validator2,
+        )
+
+        const validResult = combinedValidator.validate([
+            'leia',
+            'han',
+            'yoda',
+            'chewie',
+            'c3po',
+            'r2d2',
+            'han',
+            'luke',
+        ])
+
+        expect(validResult).toBe(true)
+
+        expect(() =>
+            combinedValidator.validate([
+                'leia',
+                'han',
+                'yoda',
+                'chewie',
+                'c3po',
+                'r2d2',
+                'han',
+                'luke',
+                'storm-trooper',
+            ]),
+        ).toThrowError('No sith allowed')
+
+        expect(() => {
+            combinedValidator.validate([
+                'leia',
+                'han',
+                'yoda',
+                'chewie',
+                'c3po',
+                'r2d2',
+                'han',
+            ])
+        }).toThrowError('Where are my heroes?')
+
+        expect(() => {
+            combinedValidator.validate([
+                'leia',
+                'han',
+                'chewie',
+                'c3po',
+                'r2d2',
+                'han',
+                'luke',
+            ])
+        }).toThrowError('Requires 1 master jedi')
+    })
 })

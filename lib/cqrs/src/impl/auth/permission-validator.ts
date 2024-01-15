@@ -90,7 +90,7 @@ export class PermissionValidator {
     }
 
     validate(permissions: string[]) {
-        return this.rules.reduce((status, rule, i) => {
+        return this.rules.reduce((status, rule) => {
             const valid = this.validateRule(rule, permissions)
 
             if (!valid) {

@@ -180,4 +180,9 @@ describe('Permission Builder', () => {
             'Oh George, what have you done?',
         )
     })
+
+    it('should not error when passed undefined instead of a permission array to validate', () => {
+        const validator = PermissionValidator.create().someOf(['luke', 'leia', 'han', 'chewie'], 'Where are my heroes?')
+        expect(() => validator.safeValidate(undefined)).not.toThrowError()
+    })
 })

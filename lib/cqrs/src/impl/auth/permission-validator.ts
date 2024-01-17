@@ -89,7 +89,7 @@ export class PermissionValidator {
         }
     }
 
-    validate(permissions: string[]) {
+    validate(permissions: string[] = []) {
         return this.rules.reduce((status, rule) => {
             const valid = this.validateRule(rule, permissions)
 
@@ -101,7 +101,7 @@ export class PermissionValidator {
         }, true)
     }
 
-    safeValidate(permissions: string[]): PermissionValidationResults {
+    safeValidate(permissions: string[] = []): PermissionValidationResults {
         const errors = this.rules
             .map((rule) => {
                 const valid = this.validateRule(rule, permissions)

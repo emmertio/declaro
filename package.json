@@ -19,6 +19,5 @@
     "@tsconfig/node16": "^1.0.4",
     "lerna": "^7.0.2"
   },
-  "private": true,
   "packageManager": "yarn@3.6.1"
 }

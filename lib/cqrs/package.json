@@ -1,11 +1,12 @@
 {
-  "name": "@declaro/data",
+  "name": "@declaro/cqrs",
   "version": "2.0.0-alpha.3+a5a53a1",
-  "description": "Database utils",
-  "main": "dist/declaro-data.cjs",
-  "module": "dist/declaro-data.mjs",
+  "description": "Declarative Business Module Definition",
+  "main": "dist/pkg.cjs",
+  "module": "dist/pkg.mjs",
   "types": "dist/index.d.ts",
   "author": "Emmert Technology LLC",
+  "type": "module",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -17,20 +18,17 @@
     "test": "vitest"
   },
   "devDependencies": {
-    "@declaro/core": "^1.0.0",
-    "@types/uuid": "^9.0.3",
+    "@declaro/core": "^2.0.0-alpha.3+a5a53a1",
     "@vitest/coverage-v8": "^0.32.2",
     "vite": "^4.4.2",
     "vite-plugin-dts": "^2.3.0",
     "vitest": "^0.32.2"
   },
   "dependencies": {
-    "@mikro-orm/core": "~5.7.14",
-    "@mikro-orm/postgresql": "~5.7.14",
-    "pg-format": "^1.0.4"
+    "zod": "^3.22.4"
   },
   "peerDependencies": {
-    "@declaro/core": "^1.0.0-alpha.0"
+    "@declaro/core": "^1.0.0-beta.0"
   },
   "repository": {
     "type": "git",

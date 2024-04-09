@@ -11,13 +11,17 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/index.ts'),
-            name: 'Declaro',
+            name: 'DeclaroCqrs',
             formats: ['es', 'cjs'],
             fileName: (format) => `pkg.${extensions[format]}`,
         },
         write: true,
     },
-    plugins: [dts() as any],
+    plugins: [
+        dts({
+            entryRoot: resolve(__dirname, 'src'),
+        }) as any,
+    ],
     optimizeDeps: {
         include: ['src/**/*'],
     },

@@ -1,6 +1,6 @@
 {
   "name": "@declaro/core",
-  "version": "1.0.0",
+  "version": "2.0.0-alpha.3+a5a53a1",
   "description": "Declarative Business Module Definition",
   "main": "dist/pkg.cjs",
   "module": "dist/pkg.mjs",
@@ -8,6 +8,9 @@
   "author": "Emmert Technology LLC",
   "type": "module",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
@@ -25,5 +28,13 @@
   "dependencies": {
     "change-case": "^4.1.2",
     "pluralize": "^8.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emmertio/declaro.git#main"
+  },
+  "bugs": {
+    "url": "https://github.com/emmertio/declaro/issues"
+  },
+  "homepage": "https://github.com/emmertio/declaro/tree/main#readme"
 }

@@ -1,3 +1,5 @@
+import { minimatch } from 'minimatch'
+
 export enum PermissionRuleType {
     ALL_OF = 'ALL_OF',
     NONE_OF = 'NONE_OF',
@@ -83,7 +85,7 @@ export class PermissionValidator {
 
     private hasPermission(permission: RulePermission, permissions: string[]) {
         if (typeof permission === 'string') {
-            return permissions.indexOf(permission) > -1
+            return permissions.some((p) => minimatch(p, permission))
         } else {
             return permission.safeValidate(permissions).valid
         }

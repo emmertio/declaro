@@ -1,5 +1,7 @@
 <template>
-  <div>
-    <NuxtWelcome />
-  </div>
+    <div>
+        <NuxtWelcome />
+    </div>
 </template>
+
+<script lang="ts" setup></script>

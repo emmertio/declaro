@@ -19,4 +19,7 @@ export default defineNuxtConfig({
             }),
         ],
     },
+    alias: {
+        '@D': '../.declaro',
+    },
 })

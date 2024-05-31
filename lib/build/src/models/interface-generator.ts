@@ -6,11 +6,7 @@ import { pascalCase } from 'change-case'
 import fs from 'fs'
 
 export function formatInterfacePath(name: string, options: PluginConfig) {
-    return path.join(
-        options.declaroDirectory,
-        options.models?.outputDirectory,
-        `${formatInterfaceName(name)}.ts`,
-    )
+    return path.join(options.declaroDirectory, options.models?.outputDirectory, `${formatInterfaceName(name)}.ts`)
 }
 
 export function formatInterfaceName(name: string) {
@@ -35,26 +31,16 @@ export class InterfaceModelGenerator implements IModelGenerator {
                             const ref = (prop as any).$ref
                             const refModel = models.find((m) => m.name === ref)
                             if (!!ref && !refModel) {
-                                throw new Error(
-                                    `Could not find model ${ref} referenced by ${modelName}.${name}`,
-                                )
+                                throw new Error(`Could not find model ${ref} referenced by ${modelName}.${name}`)
                             }
                             if (typeof ref === 'string') {
-                                const relationName = formatInterfaceName(
-                                    refModel.name,
-                                )
-                                imports.push(
-                                    `import { ${relationName} } from './${relationName}'`,
-                                )
+                                const relationName = formatInterfaceName(refModel.name)
+                                imports.push(`import { type ${relationName} } from './${relationName}'`)
 
-                                const relationType = getReferenceType(
-                                    prop.format,
-                                )
+                                const relationType = getReferenceType(prop.format)
 
                                 if (!relationType) {
-                                    throw new Error(
-                                        `Could not find relation type for ${prop.format}`,
-                                    )
+                                    throw new Error(`Could not find relation type for ${prop.format}`)
                                 }
 
                                 if (relationType === 'array') {

@@ -483,7 +483,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/build@^2.0.0-beta.2, @declaro/build@workspace:lib/build":
+"@declaro/build@^2.0.0-beta.2, @declaro/build@workspace:^, @declaro/build@workspace:lib/build":
   version: 0.0.0-use.local
   resolution: "@declaro/build@workspace:lib/build"
   dependencies:
@@ -9780,6 +9780,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "nuxt-app@workspace:examples/movie-db-nuxt"
   dependencies:
+    "@declaro/build": "workspace:^"
     "@types/express": ^4.17.21
     express: ^4.19.2
     nuxt: ^3.11.2

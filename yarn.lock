@@ -503,7 +503,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/core@^2.0.0-beta.2, @declaro/core@workspace:lib/core":
+"@declaro/core@^2.0.0-beta.2, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
@@ -561,7 +561,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@workspace:lib/di":
+"@declaro/di@workspace:^, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
@@ -9781,6 +9781,8 @@ __metadata:
   resolution: "nuxt-app@workspace:examples/movie-db-nuxt"
   dependencies:
     "@declaro/build": "workspace:^"
+    "@declaro/core": "workspace:^"
+    "@declaro/di": "workspace:^"
     "@types/express": ^4.17.21
     express: ^4.19.2
     nuxt: ^3.11.2

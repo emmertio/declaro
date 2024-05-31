@@ -1,6 +1,6 @@
 {
 	"name": "movie-db-svelte",
-	"version": "2.0.0-beta.2",
+	"version": "2.0.0-beta.3",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -14,8 +14,8 @@
 		"format": "prettier --plugin-search-dir . --write ."
 	},
 	"devDependencies": {
-		"@declaro/build": "^2.0.0-beta.2",
-		"@declaro/core": "^2.0.0-beta.2",
+		"@declaro/build": "^2.0.0-beta.3",
+		"@declaro/core": "^2.0.0-beta.3",
 		"@playwright/test": "^1.28.1",
 		"@sveltejs/adapter-auto": "^2.0.0",
 		"@sveltejs/kit": "^1.5.0",

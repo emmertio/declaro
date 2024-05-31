@@ -185,4 +185,25 @@ describe('Permission Builder', () => {
         const validator = PermissionValidator.create().someOf(['luke', 'leia', 'han', 'chewie'], 'Where are my heroes?')
         expect(() => validator.safeValidate(undefined)).not.toThrowError()
     })
+
+    it('should support wildcards', () => {
+        const validator = PermissionValidator.create().allOf(['*'])
+
+        expect(validator.safeValidate(['anything']).valid).toBe(true)
+        expect(validator.safeValidate(['everything']).valid).toBe(true)
+        expect(validator.safeValidate(['nothing']).valid).toBe(true)
+        expect(validator.safeValidate(['something']).valid).toBe(true)
+
+        const validator2 = PermissionValidator.create().allOf(['namespace::resource.action:*'])
+
+        expect(validator2.safeValidate(['namespace::resource.action:read']).valid).toBe(true)
+        expect(validator2.safeValidate(['namespace::resource.action:write']).valid).toBe(true)
+        expect(validator2.safeValidate(['namespace::resource.action:delete']).valid).toBe(true)
+
+        const validator3 = PermissionValidator.create().allOf(['namespace::resource.*:*'])
+
+        expect(validator3.safeValidate(['namespace::resource.action:read']).valid).toBe(true)
+        expect(validator3.safeValidate(['namespace::resource.action1:write']).valid).toBe(true)
+        expect(validator3.safeValidate(['namespace::resource.action2:delete']).valid).toBe(true)
+    })
 })

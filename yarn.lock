@@ -483,7 +483,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/build@^2.0.0-beta.2, @declaro/build@workspace:^, @declaro/build@workspace:lib/build":
+"@declaro/build@^2.0.0-beta.3, @declaro/build@workspace:^, @declaro/build@workspace:lib/build":
   version: 0.0.0-use.local
   resolution: "@declaro/build@workspace:lib/build"
   dependencies:
@@ -503,7 +503,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/core@^2.0.0-beta.2, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
+"@declaro/core@^2.0.0-beta.3, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
@@ -532,8 +532,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": ^2.0.0-beta.2
+    "@declaro/core": ^2.0.0-beta.3
     "@vitest/coverage-v8": ^0.32.2
+    minimatch: ^9.0.4
     vite: ^4.4.2
     vite-plugin-dts: ^2.3.0
     vitest: ^0.32.2
@@ -1376,8 +1377,8 @@ __metadata:
   linkType: hard
 
 "@npmcli/package-json@npm:^5.0.0, @npmcli/package-json@npm:^5.1.0":
-  version: 5.1.1
-  resolution: "@npmcli/package-json@npm:5.1.1"
+  version: 5.1.0
+  resolution: "@npmcli/package-json@npm:5.1.0"
   dependencies:
     "@npmcli/git": ^5.0.0
     glob: ^10.2.2
@@ -1386,7 +1387,7 @@ __metadata:
     normalize-package-data: ^6.0.0
     proc-log: ^4.0.0
     semver: ^7.5.3
-  checksum: 073e7344ae96e8c187fe605db4cc41827916648ec1225f9ac640eae8841d3bfd7e92d56c5863591fc6ebba46f9554cb9b113b93d5ebe6e7d900ae43907fd4492
+  checksum: 1482c737aebf318133cff7ea671662eb4438ea82920205d00ff1f1c47ca311e1b48bb157d64e2e24eb76cfc9a0137e8b77b98b50f7a2a23c7db249c7b50dcf88
   languageName: node
   linkType: hard
 
@@ -3116,12 +3117,12 @@ __metadata:
   linkType: hard
 
 "@vitejs/plugin-vue@npm:^5.0.4":
-  version: 5.0.5
-  resolution: "@vitejs/plugin-vue@npm:5.0.5"
+  version: 5.0.4
+  resolution: "@vitejs/plugin-vue@npm:5.0.4"
   peerDependencies:
     vite: ^5.0.0
     vue: ^3.2.25
-  checksum: 96077539da0c6d0d19f68ca112466d804e374a9e18cdb97b5396793a7eecaff433c109bac82ff0d130d39c48963f658158f2f44696fd0a50df2eb5080fafbdcc
+  checksum: e2ec5446daf87e404d537498ca87c01462d0f749d2c8ee92ab67de568fd9937b267babbbb26e3036a84bfd4d37be584e4e07da5e3471d79c8797a468a2f255cc
   languageName: node
   linkType: hard
 
@@ -3315,9 +3316,9 @@ __metadata:
   linkType: hard
 
 "@vue/devtools-api@npm:^6.5.1":
-  version: 6.6.2
-  resolution: "@vue/devtools-api@npm:6.6.2"
-  checksum: 987a3e75b69278c03be4774cf58f4169e4cf305110d597ebb841e6a5f2150a614e5ceb9c6f8e3fba8cbd1be664d8d756d3bd06bd9b28106f05d8f8c53afc76b9
+  version: 6.6.1
+  resolution: "@vue/devtools-api@npm:6.6.1"
+  checksum: cf12b5ebcc7729725087072289410107b55bb82e0b86b8442e4e85516977110a8a3f4e1dec763be8b567a59173703b4e9c0ac1b0489bb2bb81363af7ea258a27
   languageName: node
   linkType: hard
 
@@ -3901,12 +3902,12 @@ __metadata:
   linkType: hard
 
 "ast-kit@npm:^0.12.1":
-  version: 0.12.2
-  resolution: "ast-kit@npm:0.12.2"
+  version: 0.12.1
+  resolution: "ast-kit@npm:0.12.1"
   dependencies:
-    "@babel/parser": ^7.24.6
+    "@babel/parser": ^7.23.9
     pathe: ^1.1.2
-  checksum: efa4d82031a2d3c9ef32681a49bcf2e16976b9ffb4fb32afe755f05c439bd625d93f0daa8bbbebdf81613321bb78972e1e6ae3d4f60a136277d769ffdd6e8e90
+  checksum: 7dbf9fdef7be685a81c396e46dbbf309612fa5b1f8fe7ebb7a7c1835011d97eca9e68355e6358858c128d7f8b5a3ed0f47614905fc5efe020187605d00ff1f6a
   languageName: node
   linkType: hard
 
@@ -4003,9 +4004,9 @@ __metadata:
   linkType: hard
 
 "bare-events@npm:^2.2.0":
-  version: 2.3.1
-  resolution: "bare-events@npm:2.3.1"
-  checksum: 5d7554dbbdd0a64f66ef8015b9a9b63fdcd8998fe7a87c5bb657febc2e8f58d1b1a8dcb3634ccd325bbcbd3d555df369679e9a0bd9699eb81ac1a58583b9a387
+  version: 2.2.2
+  resolution: "bare-events@npm:2.2.2"
+  checksum: 154d3fc044cc171d3b85a89b768e626417b60c050123ac2ac10fc002152b4bdeb359ed1453ad54c0f1d05a7786f780d3b976af68e55c09fe4579d8466d3ff256
   languageName: node
   linkType: hard
 
@@ -4373,9 +4374,9 @@ __metadata:
   linkType: hard
 
 "caniuse-lite@npm:^1.0.0, caniuse-lite@npm:^1.0.30001587, caniuse-lite@npm:^1.0.30001599":
-  version: 1.0.30001625
-  resolution: "caniuse-lite@npm:1.0.30001625"
-  checksum: e7f8b9e10c35a5d9a1d1db76be398cb1c592ee1bc905fabe6bd90313537099d29a65c49c85e6350132fa30ca20e8c0317ecfaa66d997f7fac21ff37ddaece2a9
+  version: 1.0.30001624
+  resolution: "caniuse-lite@npm:1.0.30001624"
+  checksum: 0b9d0c17e28c0c14c0a845fd595ab25e2c79a69f9d85b56c9459ec712ba3a912b71d2ad2e6eb2763ed1574ec80a1c2a37a3cd404dc6b6989b03658c825abeed0
   languageName: node
   linkType: hard
 
@@ -5647,9 +5648,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.4.668":
-  version: 1.4.787
-  resolution: "electron-to-chromium@npm:1.4.787"
-  checksum: 0cfac6acabd8d779a4f1a3a47b91bfddf0275f2448a800830953caa46d3ccdbf548054f86c97196de147dd7abdbc2491e2628364f353d1852d9045502aa87f0f
+  version: 1.4.783
+  resolution: "electron-to-chromium@npm:1.4.783"
+  checksum: 49dfd8614c8e28076ca82e241a4a246685440dacde5e2cdb85d57a0d5bcc1cbd5de3201b3158b94ad5f1016e91ab9bb0d4da8cfe46d2897400fb62e6a5be198e
   languageName: node
   linkType: hard
 
@@ -6184,7 +6185,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fast-fifo@npm:^1.2.0, fast-fifo@npm:^1.3.2":
+"fast-fifo@npm:^1.1.0, fast-fifo@npm:^1.2.0":
   version: 1.3.2
   resolution: "fast-fifo@npm:1.3.2"
   checksum: 6bfcba3e4df5af7be3332703b69a7898a8ed7020837ec4395bb341bd96cc3a6d86c3f6071dd98da289618cf2234c70d84b2a6f09a33dd6f988b1ff60d8e54275
@@ -9056,8 +9057,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "movie-db-svelte@workspace:examples/movie-db-svelte"
   dependencies:
-    "@declaro/build": ^2.0.0-beta.2
-    "@declaro/core": ^2.0.0-beta.2
+    "@declaro/build": ^2.0.0-beta.3
+    "@declaro/core": ^2.0.0-beta.3
     "@playwright/test": ^1.28.1
     "@sveltejs/adapter-auto": ^2.0.0
     "@sveltejs/kit": ^1.5.0
@@ -12457,17 +12458,16 @@ __metadata:
   linkType: hard
 
 "streamx@npm:^2.15.0":
-  version: 2.18.0
-  resolution: "streamx@npm:2.18.0"
+  version: 2.16.1
+  resolution: "streamx@npm:2.16.1"
   dependencies:
     bare-events: ^2.2.0
-    fast-fifo: ^1.3.2
+    fast-fifo: ^1.1.0
     queue-tick: ^1.0.1
-    text-decoder: ^1.1.0
   dependenciesMeta:
     bare-events:
       optional: true
-  checksum: 88193eb37ad194e18cf62a7d6392180a0565017d494e2c96ee09f1e7ff64c16cdf97059e39cab4b16972e812d08d744d1e3c5117f4213e8057c44ad3963f2461
+  checksum: 6bbb4c38c0ab6ddbe0857d55e72f71288f308f2a9f4413b7b07391cdf9f94232ffc2bbe40a1212d2e09634ecdbd5052b444c73cc8d67ae1c97e2b7e553dad559
   languageName: node
   linkType: hard
 
@@ -12884,15 +12884,6 @@ __metadata:
     glob: ^7.1.4
     minimatch: ^3.0.4
   checksum: 3b34a3d77165a2cb82b34014b3aba93b1c4637a5011807557dc2f3da826c59975a5ccad765721c4648b39817e3472789f9b0fa98fc854c5c1c7a1e632aacdc28
-  languageName: node
-  linkType: hard
-
-"text-decoder@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "text-decoder@npm:1.1.0"
-  dependencies:
-    b4a: ^1.6.4
-  checksum: 450056ddac3cd56a47d1d3093af651f446981721f893e28fafeb2563b3270bcd5c879ecac263297569f894f63f03f4ec3b32ac9aa884febffe05604e119d50c6
   languageName: node
   linkType: hard
 
@@ -13903,8 +13894,8 @@ __metadata:
   linkType: hard
 
 "vite@npm:^5.0.0, vite@npm:^5.2.8":
-  version: 5.2.12
-  resolution: "vite@npm:5.2.12"
+  version: 5.2.11
+  resolution: "vite@npm:5.2.11"
   dependencies:
     esbuild: ^0.20.1
     fsevents: ~2.3.3
@@ -13938,7 +13929,7 @@ __metadata:
       optional: true
   bin:
     vite: bin/vite.js
-  checksum: 908b8a09460c031fe94c2038a46743a73a70fe76fd1991ae8b51a56eb88dec75128bc7da7ab37d8f84c0e1e3063ce268bdd81cc27d79229f8ea756e752bc83d9
+  checksum: 3f9f976cc6ada93aca56abcc683a140e807725b351abc241a1ec0763ec561a4bf5760e1ad94de4e59505904ddaa88727de66af02f61ecf540c7720045de55d0a
   languageName: node
   linkType: hard
 
@@ -14125,8 +14116,8 @@ __metadata:
   linkType: hard
 
 "vue-demi@npm:>=0.14.7":
-  version: 0.14.8
-  resolution: "vue-demi@npm:0.14.8"
+  version: 0.14.7
+  resolution: "vue-demi@npm:0.14.7"
   peerDependencies:
     "@vue/composition-api": ^1.0.0-rc.1
     vue: ^3.0.0-0 || ^2.6.0
@@ -14136,7 +14127,7 @@ __metadata:
   bin:
     vue-demi-fix: bin/vue-demi-fix.js
     vue-demi-switch: bin/vue-demi-switch.js
-  checksum: e9ac4fd09dc1846cf840de34dc335dba810e5d47a488e66abc14102013ff2b2c13a4aa34c5f398a7c5e1ee1a40d0d52ef3901242487579f8caa0b410e8c7f4fb
+  checksum: 6819b1cd52355047ae899d7cdfa32f1b00e806e6c67455601d33ab0226f3172c48a5f6c3d547cb7fa32925b3b7100448bf18f98ea4d5f8bc4b9d28ae005a805d
   languageName: node
   linkType: hard
 

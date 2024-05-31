@@ -1,6 +1,6 @@
 {
   "name": "@declaro/cqrs",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "description": "Declarative Business Module Definition",
   "main": "dist/pkg.cjs",
   "module": "dist/pkg.mjs",
@@ -18,8 +18,9 @@
     "test": "vitest"
   },
   "devDependencies": {
-    "@declaro/core": "^2.0.0-beta.2",
+    "@declaro/core": "^2.0.0-beta.3",
     "@vitest/coverage-v8": "^0.32.2",
+    "minimatch": "^9.0.4",
     "vite": "^4.4.2",
     "vite-plugin-dts": "^2.3.0",
     "vitest": "^0.32.2"

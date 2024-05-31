@@ -83,6 +83,14 @@ const getDefaultResolveOptions = (): ResolveOptions => {
 export class Container<T extends DependencyMap = DependencyMap<never>> {
     constructor(readonly dependencies: T = {} as T) {}
 
+    /**
+     * Add a static dependency
+     *
+     * @param key a key to identify the value
+     * @param value a static value to provide into the container
+     * @param defaultResolveOptions the intendend options for resolving the value in the default scenario
+     * @returns a chainable new container instance with the provided value
+     */
     provideValue<K extends string, V extends KeyRestrictedValue<T, K>>(
         key: K,
         value: V,
@@ -100,6 +108,15 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         })
     }
 
+    /**
+     * Add a factory dependency
+     *
+     * @param key a key to identify the value
+     * @param factory a factory function to create the value
+     * @param inject a list of dependencies to inject into the factory
+     * @param defaultResolveOptions the intendend options for resolving the value in the default scenario
+     * @returns a chainable new container instance with the provided factory
+     */
     provideFactory<K extends string, A extends any[], V extends KeyRestrictedValue<T, K>>(
         key: K,
         factory: DependencyFactory<V, A>,
@@ -120,6 +137,15 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         })
     }
 
+    /**
+     * Add an async factory dependency
+     *
+     * @param key a key to identify the value
+     * @param factory an async factory function to create the value
+     * @param inject a list of dependencies to inject into the factory
+     * @param defaultResolveOptions the intendend options for resolving the value in the default scenario
+     * @returns a chainable new container instance with the provided async factory
+     */
     provideAsyncFactory<K extends string, A extends any[], V extends UnwrapPromise<KeyRestrictedValue<T, K>>>(
         key: K,
         factory: DependencyFactory<Promise<V>, A>,
@@ -133,6 +159,15 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         return this.provideFactory(key, injector, inject as any, defaultResolveOptions)
     }
 
+    /**
+     * Add a class dependency
+     *
+     * @param key a key to identify the value
+     * @param classDefinition a class definition
+     * @param inject a list of dependencies to inject into the class constructor
+     * @param defaultResolveOptions the intendend options for resolving the class in the default scenario
+     * @returns a chainable new container instance with the provided class
+     */
     provideClass<K extends string, A extends any[], V extends KeyRestrictedValue<T, K>>(
         key: K,
         classDefinition: DependencyClass<V, A>,
@@ -153,6 +188,15 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         })
     }
 
+    /**
+     * Add an async class dependency
+     *
+     * @param key a key to identify the value
+     * @param classDefinition a class definition
+     * @param inject a list of dependencies to inject into the class constructor
+     * @param defaultResolveOptions the intendend options for resolving the class in the default scenario
+     * @returns a chainable new container instance with the provided async class
+     */
     provideAsyncClass<K extends string, A extends any[], V extends KeyRestrictedValue<T, K>>(
         key: K,
         classDefinition: DependencyClass<V, A>,
@@ -173,10 +217,25 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         })
     }
 
+    /**
+     * Resolve a dependency by key
+     *
+     * @param key a key to identify the value
+     * @param options the resolve options
+     * @returns the resolved value
+     */
     resolve<K extends MapKeys<T>>(key: K, options: ResolveOptions = {}): DependencyValue<T, K> {
         return this._resolveValue(key, options)
     }
 
+    /**
+     * Determine whether or not a dependency exists
+     *
+     * @param key a key to check for matching dependencies
+     * @param value a value to compare potential existing dependencies against
+     * @param options the resolve options
+     * @returns the resolved value
+     */
     validateValueForKey<K extends MapKeys<T>, V extends any>(key: K, value: V, options: ResolveOptions = {}): boolean {
         const existingValue = this.resolve(key, { strict: false })
 
@@ -191,6 +250,13 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         return isValid
     }
 
+    /**
+     * Introspect a dependency by key
+     *
+     * @param key a key to identify the value
+     * @param options the resolve options
+     * @returns dependency metadata for the key you provided
+     */
     introspect<K extends keyof T>(key: K, options: ResolveOptions = {}): T[K] {
         const dep = this.dependencies[key]
 
@@ -201,10 +267,21 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         return dep
     }
 
+    /**
+     * Fork the container
+     *
+     * @returns a new container instance with the same dependencies
+     */
     fork(): Container<T> {
         return new Container({ ...this.dependencies })
     }
 
+    /**
+     * Merge the container with another container
+     *
+     * @param container the container to merge with
+     * @returns a new container instance with the merged dependencies
+     */
     merge<C extends Container<any>>(container: C): Container<T & ExtractDependencyMap<C>> {
         return new Container({ ...this.dependencies, ...container.dependencies })
     }

@@ -9053,6 +9053,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"movie-db-nuxt@workspace:examples/movie-db-nuxt":
+  version: 0.0.0-use.local
+  resolution: "movie-db-nuxt@workspace:examples/movie-db-nuxt"
+  dependencies:
+    "@declaro/build": "workspace:^"
+    "@declaro/core": "workspace:^"
+    "@declaro/di": "workspace:^"
+    "@types/express": ^4.17.21
+    express: ^4.19.2
+    nuxt: ^3.11.2
+    vue: ^3.4.27
+    vue-router: ^4.3.2
+  languageName: unknown
+  linkType: soft
+
 "movie-db-svelte@workspace:examples/movie-db-svelte":
   version: 0.0.0-use.local
   resolution: "movie-db-svelte@workspace:examples/movie-db-svelte"
@@ -9777,15 +9792,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nuxt-app@workspace:examples/movie-db-nuxt":
+"nuxt-app@workspace:apps/core":
   version: 0.0.0-use.local
-  resolution: "nuxt-app@workspace:examples/movie-db-nuxt"
+  resolution: "nuxt-app@workspace:apps/core"
   dependencies:
-    "@declaro/build": "workspace:^"
-    "@declaro/core": "workspace:^"
-    "@declaro/di": "workspace:^"
-    "@types/express": ^4.17.21
-    express: ^4.19.2
     nuxt: ^3.11.2
     vue: ^3.4.27
     vue-router: ^4.3.2

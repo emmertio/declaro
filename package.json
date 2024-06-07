@@ -15,7 +15,8 @@
   "workspaces": {
     "packages": [
       "examples/*",
-      "lib/*"
+      "lib/*",
+      "apps/*"
     ]
   },
   "devDependencies": {

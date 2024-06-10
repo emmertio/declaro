@@ -20,8 +20,12 @@
     ]
   },
   "devDependencies": {
+    "@declaro/build": "workspace:^",
     "@tsconfig/node16": "^1.0.4",
     "lerna": "^7.0.2"
   },
-  "packageManager": "yarn@3.6.1"
+  "packageManager": "yarn@3.6.1",
+  "dependencies": {
+    "@declaro/di": "workspace:^"
+  }
 }

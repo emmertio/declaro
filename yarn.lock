@@ -5317,6 +5317,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "declaro@workspace:."
   dependencies:
+    "@declaro/build": "workspace:^"
+    "@declaro/di": "workspace:^"
     "@tsconfig/node16": ^1.0.4
     lerna: ^7.0.2
   languageName: unknown

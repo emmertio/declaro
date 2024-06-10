@@ -15,4 +15,11 @@ export default defineNuxtConfig({
     alias: {
         '@D': '../.declaro',
     },
+    serverHandlers: [
+        {
+            route: '/api',
+            handler: '~/server/index.ts',
+            middleware: true,
+        },
+    ],
 })

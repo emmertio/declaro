@@ -5317,8 +5317,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "declaro@workspace:."
   dependencies:
-    "@declaro/build": "workspace:^"
-    "@declaro/di": "workspace:^"
     "@tsconfig/node16": ^1.0.4
     lerna: ^7.0.2
   languageName: unknown
@@ -9798,6 +9796,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "nuxt-app@workspace:apps/core"
   dependencies:
+    "@declaro/build": "workspace:^"
+    "@declaro/core": "workspace:^"
+    "@declaro/di": "workspace:^"
     nuxt: ^3.11.2
     vue: ^3.4.27
     vue-router: ^4.3.2

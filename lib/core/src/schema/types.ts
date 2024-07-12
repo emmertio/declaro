@@ -1,30 +1,37 @@
 import type { OpenAPIV3_1 } from 'openapi-types'
 /// @ts-ignore This import is optional - it should be defined by your project's build settings (@declaro/build).
 import type { ModelNames } from '$models/reference'
+import type { EntityLabels } from './labels'
 
 export declare namespace DeclaroSchema {
     export type NonArraySchemaObjectType = OpenAPIV3_1.NonArraySchemaObjectType
     export type ArraySchemaObjectType = OpenAPIV3_1.ArraySchemaObjectType
+    export type AnySchemaObjectType = NonArraySchemaObjectType | ArraySchemaObjectType
 
-    export interface BaseSchemaObject extends OpenAPIV3_1.BaseSchemaObject {
+    export type AnyObjectProperties = {
+        [name: string]: SchemaObject<any>
+    }
+
+    export interface BaseSchemaObject<T extends AnyObjectProperties> extends OpenAPIV3_1.BaseSchemaObject {
         $schema?: ModelNames
-        additionalProperties?: boolean | ReferenceObject | SchemaObject
-        properties?: {
-            [name: string]: ReferenceObject | SchemaObject
-        }
-        not?: ReferenceObject | SchemaObject
-        allOf?: (ReferenceObject | SchemaObject)[]
-        anyOf?: (ReferenceObject | SchemaObject)[]
-        oneOf?: (ReferenceObject | SchemaObject)[]
+        propertyName?: string
+        additionalProperties?: boolean | ReferenceObject | SchemaObject<T>
+        properties?: T
+        labels?: EntityLabels
+        not?: ReferenceObject | SchemaObject<T>
+        allOf?: (ReferenceObject | SchemaObject<T>)[]
+        anyOf?: (ReferenceObject | SchemaObject<T>)[]
+        oneOf?: (ReferenceObject | SchemaObject<T>)[]
     }
 
-    export interface NonArraySchemaObject extends BaseSchemaObject {
+    export interface NonArraySchemaObject<T extends AnyObjectProperties> extends BaseSchemaObject<T> {
         type?: NonArraySchemaObjectType
+        labels?: EntityLabels
     }
 
-    export interface ArraySchemaObject extends BaseSchemaObject {
+    export interface ArraySchemaObject<T extends AnyObjectProperties> extends BaseSchemaObject<T> {
         type: ArraySchemaObjectType
-        items: ReferenceObject | SchemaObject
+        items: ReferenceObject | SchemaObject<T>
     }
 
     // Open API supports mixed schema objects, but we strategically don't yet.
@@ -34,7 +41,9 @@ export declare namespace DeclaroSchema {
     //     items?: ReferenceObject | SchemaObject
     // }
 
-    export type SchemaObject = ArraySchemaObject | NonArraySchemaObject
+    export type SchemaObject<T extends AnyObjectProperties, N extends string = string> =
+        | ArraySchemaObject<T>
+        | NonArraySchemaObject<T>
 
     export interface ReferenceObject {
         $ref: ModelNames

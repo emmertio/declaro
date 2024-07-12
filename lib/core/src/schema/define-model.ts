@@ -1,7 +1,7 @@
 import type { DeclaroSchema } from './types'
 
-export type Model<T extends DeclaroSchema.AnyObjectProperties> = {
-    name: string
+export type Model<T extends DeclaroSchema.AnyObjectProperties, N extends Readonly<string> = string> = {
+    name: N
     schema: DeclaroSchema.SchemaObject<{
         [K in keyof T]: DeclaroSchema.SchemaObject<T[K]['properties']> & T[K]
     }>
@@ -13,6 +13,9 @@ type TraverseSchemaFn<T extends DeclaroSchema.AnyObjectProperties> = (
     property: DeclaroSchema.SchemaObject<any>,
     schema: DeclaroSchema.SchemaObject<T>,
 ) => DeclaroSchema.SchemaObject<any>
+
+export type ModelName<T extends Model<any, string>> = T['name']
+export type ModelProperties<T extends Model<any, string>> = T['schema']['properties']
 
 function traverseSchema<T extends DeclaroSchema.AnyObjectProperties>(
     schema: DeclaroSchema.SchemaObject<T>,
@@ -28,10 +31,10 @@ export function initializeModel(schema: DeclaroSchema.SchemaObject<any>) {
     return schema
 }
 
-export function defineModel<T extends DeclaroSchema.AnyObjectProperties>(
-    name: string,
+export function defineModel<T extends DeclaroSchema.AnyObjectProperties, N extends Readonly<string>>(
+    name: N,
     doc: DeclaroSchema.SchemaObject<T>,
-): Model<T> {
+): Model<T, N> {
     traverseSchema(doc, (name, property, schema) => {
         return initializeModel({
             propertyName: name,
@@ -39,7 +42,7 @@ export function defineModel<T extends DeclaroSchema.AnyObjectProperties>(
         })
     })
     return {
-        name,
+        name: name as Readonly<N>,
         schema: { ...doc },
         isModel: true,
     }

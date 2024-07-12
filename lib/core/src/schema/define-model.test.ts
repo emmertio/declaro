@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineModel } from '.'
+import { defineModel, type ModelName, type ModelProperties } from '.'
 
 describe('Model definition', async () => {
     it('should define a model', async () => {
@@ -24,6 +24,12 @@ describe('Model definition', async () => {
                 pluralEntityName: 'Movies',
             },
         })
+
+        const name: ModelName<typeof movie> = movie.name
+        const properties: ModelProperties<typeof movie> = movie.schema.properties
+
+        expect(name).toBe('Movie')
+        expect(properties.title.type).toBe('string')
 
         expect(movie.name).toBe('Movie')
         expect(movie.isModel).toBe(true)

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Container, DependencyType } from './container'
+import { Container, defer, DependencyType } from './container'
 
 describe('Container', () => {
     it('should be able to add and resolve values', () => {
@@ -302,6 +302,42 @@ describe('Container', () => {
 
         expect(myClass).toBeInstanceOf(MyOtherClass)
         expect(myClass.message).toBe('Goodbye')
+    })
+
+    it('should be able to require dependencies to be provided at a later time', () => {
+        const container = new Container()
+            .requireDependency('Foo', defer<string>())
+            .requireDependency('Bar', defer<number>())
+
+        const fooSchema = container.introspect('Foo')
+        const barSchema = container.introspect('Bar')
+
+        expect(fooSchema.deferred).toBe(true)
+        expect(barSchema.deferred).toBe(true)
+
+        const container2 = container.fork().provideValue('Foo', 'Hello').provideValue('Bar', 42)
+
+        const foo = container2.resolve('Foo')
+        const bar = container2.resolve('Bar')
+
+        expect(foo).toBe('Hello')
+        expect(bar).toBe(42)
+    })
+
+    it('Should error when resolving a deferred dependency without providing it', () => {
+        const container = new Container().requireDependency('Foo', defer<string>())
+
+        expect(() => {
+            container.resolve('Foo')
+        }).toThrow(`Dependency "Foo" was required but not provided`)
+    })
+
+    it('Should return undefined when resolving a deferred dependency in non-strict mode', () => {
+        const container = new Container().requireDependency('Foo', defer<string>())
+
+        const foo = container.resolve('Foo', { strict: false })
+
+        expect(foo).toBeUndefined()
     })
 
     it('should be able to fork a container', () => {

@@ -52,6 +52,7 @@ export type DependencyRecord<
     value: V
     cachedValue?: UnwrapFactoryValue<V>
     defaultResolveOptions?: ResolveOptions
+    deferred?: boolean
 }
 export type DependencyMap<K extends string = string> = Record<K, DependencyRecord>
 export type DependencyKey<T extends DependencyMap, K extends MapKeys<T>> = K
@@ -80,6 +81,15 @@ const getDefaultResolveOptions = (): ResolveOptions => {
     }
 }
 
+export type Deferred<T> = {
+    __deferred: true
+    value: T
+}
+
+export function defer<T>(typeTemplate?: T): Deferred<T> {
+    return { __deferred: true, value: typeTemplate as T }
+}
+
 export class Container<T extends DependencyMap = DependencyMap<never>> {
     constructor(readonly dependencies: T = {} as T) {}
 
@@ -104,6 +114,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 type: DependencyType.VALUE as const,
                 value: () => value,
                 defaultResolveOptions,
+                deferred: false,
             },
         })
     }
@@ -133,6 +144,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                     return factory(...(values as any))
                 },
                 defaultResolveOptions,
+                deferred: false,
             },
         })
     }
@@ -184,6 +196,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                     return new classDefinition(...(values as any))
                 },
                 defaultResolveOptions,
+                deferred: false,
             },
         })
     }
@@ -213,6 +226,34 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                     return new classDefinition(...(values as A))
                 },
                 defaultResolveOptions,
+                deferred: false,
+            },
+        })
+    }
+
+    /**
+     * Mark a dependency as required. This allows modules to be loaded without providing all dependencies. Dependencies can be deferred to implementation. For example, an ORM module can require a database connection to be provided by the application, and add an entity manager instance that will work with whichever connection is provided.
+     *
+     * @param key A key to identify the value
+     * @param value A value that is deferred to be provided later
+     * @param defaultResolveOptions the resolve options
+     * @returns
+     */
+    requireDependency<K extends string, V extends KeyRestrictedValue<T, K>>(
+        key: K,
+        value: Deferred<V>,
+        defaultResolveOptions?: ResolveOptions | undefined,
+    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+        return new Container({
+            ...this.dependencies,
+            [key]: <DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE>>{
+                key,
+                type: DependencyType.VALUE as const,
+                value: () => {
+                    return undefined
+                },
+                defaultResolveOptions,
+                deferred: true,
             },
         })
     }
@@ -327,6 +368,10 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
 
         if (typeof fn !== 'function') {
             throw new Error(`Dependency ${key?.toString()} is not injectable`)
+        }
+
+        if (dep.deferred && settings.strict !== false) {
+            throw new Error(`Dependency "${key?.toString()}" was required but not provided`)
         }
 
         const value = fn()

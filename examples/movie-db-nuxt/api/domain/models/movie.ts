@@ -1,5 +1,5 @@
 import { date, integer, pgEnum, pgTable, serial, text, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
-import { people } from './person'
+import { people } from '../../modules/person/models/person'
 import { generateSchema } from '@declaro/db-drizzle'
 
 // Movies table

@@ -1,6 +1,6 @@
 import { integer, pgEnum, pgTable, uniqueIndex } from 'drizzle-orm/pg-core'
 import { movies } from './movie'
-import { people } from './person'
+import { people } from '../../modules/person/models/person'
 import { generateSchema } from '@declaro/db-drizzle'
 
 export const movieRoleType = pgEnum('movie_role_type', ['ACTOR', 'DIRECTOR', 'PRODUCER', 'OTHER'])

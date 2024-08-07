@@ -62,7 +62,7 @@ describe('Container', () => {
 
         expect(dep.key).toEqual('foo')
         expect(dep.type).toEqual(DependencyType.VALUE)
-        expect(dep.value()).toEqual('bar')
+        expect(dep.value(container1)).toEqual('bar')
     })
 
     it('should validate a value for a key', () => {
@@ -350,6 +350,25 @@ describe('Container', () => {
         const greeting = container.resolve('Greeting')
 
         expect(greeting).toBe('Hello World')
+    })
+
+    it('Should acknowledge existing values when deferring dependencies', () => {
+        const module1 = new Container().requireDependency('Name', defer<string>()).provideFactory(
+            'Greeting',
+            (name: string) => {
+                return `Hello ${name}`
+            },
+            ['Name'],
+        )
+        const module2 = new Container().provideValue('Name', 'World').requireDependency('Name', defer<string>())
+
+        const container = new Container().provideValue('Name', 'World').merge(module1)
+
+        const greeting = container.resolve('Greeting')
+        const testName = module2.resolve('Name')
+
+        expect(greeting).toBe('Hello World')
+        expect(testName).toBe('World')
     })
 
     it('should be able to fork a container', () => {

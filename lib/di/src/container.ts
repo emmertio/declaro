@@ -1,4 +1,5 @@
 import { type Class } from '@declaro/core'
+import _ from 'lodash'
 
 export type FilterKeys<T, U> = {
     [K in keyof T]: T[K] extends U ? K : never
@@ -111,12 +112,12 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         key: K,
         value: V,
         defaultResolveOptions?: ResolveOptions | undefined,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
         const existingDep = this.introspect(key, { strict: false })
         this.validateValueForKey(key as any, value, { strict: true })
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE>>{
                 key,
                 type: DependencyType.VALUE as const,
                 value: () => value,
@@ -257,11 +258,16 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         key: K,
         value: Deferred<V>,
         defaultResolveOptions?: ResolveOptions | undefined,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
         const existingDep = this.introspect(key, { strict: false })
+
+        if (existingDep) {
+            return this as any
+        }
+
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE>>{
                 key,
                 type: DependencyType.VALUE as const,
                 value: () => {
@@ -351,8 +357,43 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
      * @param container the container to merge with
      * @returns a new container instance with the merged dependencies
      */
-    merge<C extends Container<any>>(container: C): Container<T & ExtractDependencyMap<C>> {
-        return new Container({ ...this.dependencies, ...container.dependencies })
+    merge<C extends Container<any>>(
+        container: C,
+    ): Container<{
+        [K in keyof T | keyof ExtractDependencyMap<C>]: ExtractDependencyMap<C>[K] extends DependencyRecord
+            ? ExtractDependencyMap<C>[K]
+            : K extends keyof T
+            ? T[K]
+            : never
+    }> {
+        const existingDeferredKeys = Object.keys(this.dependencies).filter(
+            (key) => container?.dependencies?.[key]?.deferred && !this.dependencies?.[key]?.deferred,
+        )
+        const mergedDeps: any = {
+            ...this.dependencies,
+            ...container.dependencies,
+        }
+
+        Object.keys(mergedDeps).forEach((key) => {
+            const existingDep = this.introspect(key, { strict: false })
+            const selectedDep = container.introspect(key, { strict: false })
+
+            // If the new dependency is not deferred, use that. Otherwise, if the existing dependency is not deferred, use that. If both are deferred, use the new dependency.
+            let mergeDep = selectedDep
+            if (!selectedDep && existingDep) {
+                mergeDep = existingDep
+            } else if (selectedDep?.deferred && existingDep && !existingDep?.deferred) {
+                mergeDep = existingDep
+            }
+
+            const newDep = {
+                ...mergeDep,
+                middleware: [...(existingDep?.middleware ?? []), ...(selectedDep?.middleware ?? [])],
+            }
+
+            mergedDeps[key] = newDep
+        })
+        return new Container({ ...mergedDeps })
     }
 
     protected resolveDependencies(inject: MapKeys<T>[], args: any[] = []) {

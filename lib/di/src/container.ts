@@ -37,12 +37,15 @@ export type UnwrapFactoryArgs<F extends DependencyFactory<any, any>> = F extends
     : never
 
 export type ValueLoader<T, A extends any[]> = (container: Container<any>, ...args: A) => T
+export type UnwrapValueLoader<V extends ValueLoader<any, any>> = V extends ValueLoader<infer T, any> ? T : never
 
 export enum DependencyType {
     VALUE = 'VALUE',
     FACTORY = 'FACTORY',
     CLASS = 'CLASS',
 }
+
+export type DependencyMiddleware<V> = (value: UnwrapPromise<V>) => V
 
 export type DependencyRecord<
     K extends string | Symbol = string,
@@ -52,9 +55,10 @@ export type DependencyRecord<
     key: K
     type: T
     value: V
-    cachedValue?: UnwrapFactoryValue<V>
+    cachedValue?: UnwrapValueLoader<V>
     defaultResolveOptions?: ResolveOptions
     deferred?: boolean
+    middleware: DependencyMiddleware<UnwrapValueLoader<V>>[]
 }
 export type DependencyMap<K extends string = string> = Record<K, DependencyRecord>
 export type DependencyKey<T extends DependencyMap, K extends MapKeys<T>> = K
@@ -108,6 +112,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         value: V,
         defaultResolveOptions?: ResolveOptions | undefined,
     ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+        const existingDep = this.introspect(key, { strict: false })
         this.validateValueForKey(key as any, value, { strict: true })
         return new Container({
             ...this.dependencies,
@@ -117,6 +122,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 value: () => value,
                 defaultResolveOptions,
                 deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -136,6 +142,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
     ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
             [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY>>{
@@ -147,6 +154,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 },
                 defaultResolveOptions,
                 deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -188,6 +196,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
     ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
             [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS>>{
@@ -199,6 +208,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 },
                 defaultResolveOptions,
                 deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -218,6 +228,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
     ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
             [key]: <DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS>>{
@@ -229,6 +240,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 },
                 defaultResolveOptions,
                 deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -246,6 +258,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         value: Deferred<V>,
         defaultResolveOptions?: ResolveOptions | undefined,
     ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
             [key]: <DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE>>{
@@ -256,6 +269,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 },
                 defaultResolveOptions,
                 deferred: true,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -269,6 +283,18 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
      */
     resolve<K extends MapKeys<T>>(key: K, options: ResolveOptions = {}): DependencyValue<T, K> {
         return this._resolveValue(key, options)
+    }
+
+    middleware<K extends MapKeys<T>>(
+        key: K,
+        middleware: DependencyMiddleware<DependencyValue<T, K>>,
+        options: ResolveOptions = {},
+    ): Container<T> {
+        const dep = this.introspect(key, options)
+
+        dep?.middleware?.push(middleware)
+
+        return this
     }
 
     /**
@@ -376,7 +402,17 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
             throw new Error(`Dependency "${key?.toString()}" was required but not provided`)
         }
 
-        const value = fn(this)
+        let value = fn(this)
+
+        if (dep.middleware) {
+            value = dep.middleware.reduce((acc, middleware) => {
+                if (typeof (acc as any)?.then === 'function') {
+                    return (acc as any).then((val: any) => middleware(val))
+                } else {
+                    return middleware(acc)
+                }
+            }, value)
+        }
 
         if (settings.cache) {
             dep.cachedValue = value

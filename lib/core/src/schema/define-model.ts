@@ -1,6 +1,6 @@
 import type { DeclaroSchema } from './types'
 
-export type Model<T extends DeclaroSchema.AnyObjectProperties, N extends Readonly<string> = string> = {
+export type Model<T extends DeclaroSchema.AnyObjectProperties = DeclaroSchema.AnyObjectProperties, N extends Readonly<string> = string> = {
     name: N
     schema: DeclaroSchema.SchemaObject<{
         [K in keyof T]: DeclaroSchema.SchemaObject<T[K]['properties']> & T[K]

@@ -374,4 +374,20 @@ describe('Container', () => {
         expect(merged.resolve('foo')).toBe('bar')
         expect(merged.resolve('baz')).toBe('qux')
     })
+
+    it('should be able to configure middleware to run on resolve', async () => {
+        const container = new Container()
+            .provideValue('foo', 'bar')
+            .provideAsyncFactory('bex', async () => 42)
+            .middleware('foo', (value) => {
+                value = 'baz'
+                return value
+            })
+            .middleware('bex', async (value) => {
+                return value * 2
+            })
+
+        expect(container.resolve('foo')).toBe('baz')
+        expect(await container.resolve('bex')).toBe(84)
+    })
 })

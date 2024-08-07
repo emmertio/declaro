@@ -340,6 +340,18 @@ describe('Container', () => {
         expect(foo).toBeUndefined()
     })
 
+    it('Should be able to merge containers with deferred dependencies', () => {
+        const module1 = new Container()
+            .requireDependency('Name', defer<string>())
+            .provideFactory('Greeting', (name: string) => `Hello ${name}`, ['Name'])
+
+        const container = new Container().merge(module1).provideValue('Name', 'World')
+
+        const greeting = container.resolve('Greeting')
+
+        expect(greeting).toBe('Hello World')
+    })
+
     it('should be able to fork a container', () => {
         const container = new Container().provideValue('foo', 'bar')
 

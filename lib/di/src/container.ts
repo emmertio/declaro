@@ -36,6 +36,8 @@ export type UnwrapFactoryArgs<F extends DependencyFactory<any, any>> = F extends
     ? A
     : never
 
+export type ValueLoader<T, A extends any[]> = (container: Container<any>, ...args: A) => T
+
 export enum DependencyType {
     VALUE = 'VALUE',
     FACTORY = 'FACTORY',
@@ -44,7 +46,7 @@ export enum DependencyType {
 
 export type DependencyRecord<
     K extends string | Symbol = string,
-    V extends DependencyFactory<any, any> = DependencyFactory<any, any>,
+    V extends ValueLoader<any, any> = ValueLoader<any, any>,
     T extends DependencyType = DependencyType,
 > = {
     key: K
@@ -133,14 +135,14 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, A>, DependencyType.FACTORY> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }> {
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, A>, DependencyType.FACTORY>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY>>{
                 key,
                 type: DependencyType.FACTORY as const,
-                value: (...args: A) => {
-                    const values = this.resolveDependencies(inject as any[], args)
+                value: (container, ...args: A) => {
+                    const values = container.resolveDependencies(inject as string[], args)
                     return factory(...(values as any))
                 },
                 defaultResolveOptions,
@@ -163,7 +165,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<Promise<V>, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.FACTORY> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.FACTORY> }> {
         const injector = (async (...args: A) => {
             const values = await Promise.all([...args])
             return factory(...values)
@@ -185,14 +187,14 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, A>, DependencyType.CLASS> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }> {
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, A>, DependencyType.CLASS>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS>>{
                 key,
                 type: DependencyType.CLASS as const,
-                value: (...args: A) => {
-                    const values = this.resolveDependencies(inject as any[], args)
+                value: (container, ...args: A) => {
+                    const values = container.resolveDependencies(inject as any[], args)
                     return new classDefinition(...(values as any))
                 },
                 defaultResolveOptions,
@@ -215,14 +217,14 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.CLASS> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }> {
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.CLASS>>{
+            [key]: <DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS>>{
                 key,
                 type: DependencyType.CLASS as const,
-                value: async (...args: A) => {
-                    const values = await Promise.all(this.resolveDependencies(inject as any[], args))
+                value: async (container, ...args: A) => {
+                    const values = await Promise.all(container.resolveDependencies(inject as any[], args))
                     return new classDefinition(...(values as A))
                 },
                 defaultResolveOptions,
@@ -374,7 +376,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
             throw new Error(`Dependency "${key?.toString()}" was required but not provided`)
         }
 
-        const value = fn()
+        const value = fn(this)
 
         if (settings.cache) {
             dep.cachedValue = value

@@ -569,14 +569,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@npm:^2.0.0-beta.5":
-  version: 2.0.0-beta.5
-  resolution: "@declaro/di@npm:2.0.0-beta.5"
-  checksum: 10c0/f009a686c7edd9924eec3d361e981fe22b18af3fbdcdb2560eed775c6a681c0c1c7fc4d37d534cc7f648f33da8fa840b1e2ff0813826812bae58ef0de57cc852
-  languageName: node
-  linkType: hard
-
-"@declaro/di@workspace:^, @declaro/di@workspace:lib/di":
+"@declaro/di@npm:^2.0.0-beta.3, @declaro/di@workspace:^, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
@@ -9693,7 +9686,7 @@ __metadata:
     "@declaro/build": "npm:^2.0.0-beta.5"
     "@declaro/core": "npm:^2.0.0-beta.5"
     "@declaro/db-drizzle": "npm:^2.0.0-beta.3"
-    "@declaro/di": "npm:^2.0.0-beta.5"
+    "@declaro/di": "npm:^2.0.0-beta.3"
     "@types/express": "npm:^4.17.21"
     "@types/swagger-ui-express": "npm:^4.1.6"
     drizzle-kit: "npm:^0.23.0"

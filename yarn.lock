@@ -483,7 +483,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/build@^2.0.0-beta.3, @declaro/build@workspace:^, @declaro/build@workspace:lib/build":
+"@declaro/build@^2.0.0-beta.5, @declaro/build@workspace:^, @declaro/build@workspace:lib/build":
   version: 0.0.0-use.local
   resolution: "@declaro/build@workspace:lib/build"
   dependencies:
@@ -503,7 +503,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/core@^2.0.0-beta.3, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
+"@declaro/core@^2.0.0-beta.5, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
@@ -532,7 +532,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": ^2.0.0-beta.3
+    "@declaro/core": ^2.0.0-beta.5
     "@vitest/coverage-v8": ^0.32.2
     minimatch: ^9.0.4
     vite: ^4.4.2
@@ -9072,8 +9072,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "movie-db-svelte@workspace:examples/movie-db-svelte"
   dependencies:
-    "@declaro/build": ^2.0.0-beta.3
-    "@declaro/core": ^2.0.0-beta.3
+    "@declaro/build": ^2.0.0-beta.5
+    "@declaro/core": ^2.0.0-beta.5
     "@playwright/test": ^1.28.1
     "@sveltejs/adapter-auto": ^2.0.0
     "@sveltejs/kit": ^1.5.0

@@ -1,5 +1,9 @@
 import type { UnwrapPromise } from '../typescript'
-import type { PipelineAction } from './pipeline-action'
+import { pipelineAction, type PipelineAction } from './pipeline-action'
+
+export function initialInput<T>(input?: T) {
+    return pipelineAction((input: T) => input)
+}
 
 /**
  * A pipeline is a series of actions that are executed in sequence, with the output of each action being passed as input to the next action.
@@ -35,5 +39,14 @@ export class Pipeline<TFrom, TTo> {
      */
     execute(input: TFrom): TTo {
         return this.action(input)
+    }
+
+    /**
+     * Forks the current pipeline. The forked pipeline will have the same actions as the current pipeline, but will not share state.
+     *
+     * @returns A new pipeline that is a fork of the current pipeline. The forked pipeline will have the same actions as the current pipeline, but will not share state.
+     */
+    fork(): Pipeline<TFrom, TTo> {
+        return new Pipeline(this.action)
     }
 }

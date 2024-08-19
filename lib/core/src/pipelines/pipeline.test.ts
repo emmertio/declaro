@@ -57,4 +57,22 @@ describe('Pipelines', () => {
 
         expect(result).toBe('4')
     })
+
+    it('should support forking pipelines', async () => {
+        const fromString = async (input: string) => parseInt(input)
+        const add = (increment: number) => (input: number) => input + increment
+        const multiply = (factor: number) => (input: number) => input * factor
+        const divide = (divisor: number) => (input: number) => input / divisor
+        const toString = async (input: number) => input.toString()
+
+        const basePipeline = new Pipeline(fromString).pipe(add(1)).pipe(toString)
+
+        const pipeline = basePipeline.fork().pipe(fromString).pipe(multiply(8)).pipe(divide(4)).pipe(toString)
+
+        const result = await pipeline.execute('1')
+        const baseResult = await basePipeline.execute('1')
+
+        expect(result).toBe('4')
+        expect(baseResult).toBe('2')
+    })
 })

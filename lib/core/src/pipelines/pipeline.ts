@@ -1,9 +1,15 @@
 import type { UnwrapPromise } from '../typescript'
-import { pipelineAction, type PipelineAction } from './pipeline-action'
+import { pipelineAction, type ActionOutput, type PipelineAction } from './pipeline-action'
 
 export function initialInput<T>(input?: T) {
     return pipelineAction((input: T) => input)
 }
+
+export type PipelineOutput<T extends Pipeline<any, any>> = T extends Pipeline<any, infer U> ? U : never
+export type PipelineInput<T extends Pipeline<any, any>> = T extends Pipeline<infer U, any> ? U : never
+
+export type SplitOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
+export type SplitDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
 
 /**
  * A pipeline is a series of actions that are executed in sequence, with the output of each action being passed as input to the next action.
@@ -48,5 +54,23 @@ export class Pipeline<TFrom, TTo> {
      */
     fork(): Pipeline<TFrom, TTo> {
         return new Pipeline(this.action)
+    }
+
+    export(): PipelineAction<TFrom, TTo> {
+        return this.action
+    }
+
+    split<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
+        decision: SplitDecision<UnwrapPromise<TTo>, TAction>,
+    ): Pipeline<TFrom, SplitOutput<UnwrapPromise<TTo>, TAction>> {
+        return this.pipe((input) => {
+            const action = decision(input)
+
+            if (action instanceof Promise) {
+                return action.then((action) => action(input)) as SplitOutput<UnwrapPromise<TTo>, TAction>
+            }
+
+            return action(input)
+        })
     }
 }

@@ -1,10 +1,11 @@
 import type { DeclaroSchema } from './types'
 
-export type Model<T extends DeclaroSchema.AnyObjectProperties = DeclaroSchema.AnyObjectProperties, N extends Readonly<string> = string> = {
+export type Model<
+    T extends DeclaroSchema.AnyObjectProperties = DeclaroSchema.AnyObjectProperties,
+    N extends Readonly<string> = string,
+> = {
     name: N
-    schema: DeclaroSchema.SchemaObject<{
-        [K in keyof T]: DeclaroSchema.SchemaObject<T[K]['properties']> & T[K]
-    }>
+    schema: DeclaroSchema.SchemaObject<T>
     isModel: true
 }
 
@@ -22,7 +23,7 @@ function traverseSchema<T extends DeclaroSchema.AnyObjectProperties>(
     fn: TraverseSchemaFn<T>,
 ) {
     for (const [key, value] of Object.entries(schema.properties ?? {})) {
-        let properties: DeclaroSchema.AnyObjectProperties = schema.properties
+        let properties: DeclaroSchema.AnyObjectProperties = schema.properties!
         properties[key] = fn(key, value, schema)
     }
 }

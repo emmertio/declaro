@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defineModel, type ModelName, type ModelProperties } from '.'
+import { t } from './properties'
 
 describe('Model definition', async () => {
     it('should define a model', async () => {
@@ -45,6 +46,36 @@ describe('Model definition', async () => {
         expect(movie.schema.properties.title.labels).toBeTypeOf('object')
         expect(movie.schema.properties.title.labels.pluralEntityName).toBe('Titles')
         expect(movie.schema.properties.title.labels.singularEntityName).toBe('Title')
-        expect(movie.schema.properties.title.labels.pluralSlug).toBe(undefined) // Only include explicitly defined labels—leave the rest up to the framework
+        expect((movie.schema.properties.title.labels as any).pluralSlug).toBe(undefined) // Only include explicitly defined labels—leave the rest up to the framework
+    })
+
+    it('should define a model with nested properties', async () => {
+        const movie = defineModel('Movie', {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                    labels: {
+                        singularEntityName: 'Title',
+                        pluralEntityName: 'Titles',
+                    },
+                },
+                year: {
+                    type: 'integer',
+                    format: 'int32',
+                },
+                meta: {
+                    type: 'object',
+                    properties: {
+                        rating: t.integer(),
+                    },
+                },
+            },
+            required: ['title'],
+            labels: {
+                singularEntityName: 'Movie',
+                pluralEntityName: 'Movies',
+            },
+        })
     })
 })

@@ -80,6 +80,13 @@ export type ResolveOptions = {
 }
 export type ExtractDependencyMap<C extends Container<any>> = C extends Container<infer T> ? T : never
 
+export type ContainerExtensionFn<T extends DependencyMap> = (container: Container) => Container<T>
+export type ContainerExtension<T extends DependencyMap> = (container: Container<any>) => Container<T>
+
+export function defineExtension<T extends DependencyMap>(extension: ContainerExtensionFn<T>): ContainerExtension<T> {
+    return extension
+}
+
 const getDefaultResolveOptions = (): ResolveOptions => {
     return {
         strict: true,
@@ -394,6 +401,16 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
             mergedDeps[key] = newDep
         })
         return new Container({ ...mergedDeps })
+    }
+
+    /**
+     * Extend the container
+     *
+     * @param extension an extension function that returns a new container
+     * @returns a new container instance with the extended dependencies
+     */
+    extend<TExt extends DependencyMap>(extension: ContainerExtension<TExt>): Container<T & TExt> {
+        return extension(this.fork() as any) as any
     }
 
     protected resolveDependencies(inject: MapKeys<T>[], args: any[] = []) {

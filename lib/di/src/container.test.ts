@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Container, defer, DependencyType } from './container'
+import { Container, defer, defineExtension, DependencyType } from './container'
 
 describe('Container', () => {
     it('should be able to add and resolve values', () => {
@@ -408,5 +408,18 @@ describe('Container', () => {
 
         expect(container.resolve('foo')).toBe('baz')
         expect(await container.resolve('bex')).toBe(84)
+    })
+
+    it('should extend a container with a pre-built extension', () => {
+        const container = new Container().provideValue('foo', 1)
+
+        const extension = defineExtension((c) => {
+            return c.provideValue('bar', 2)
+        })
+
+        const extended = container.extend(extension)
+
+        expect(extended.resolve('foo')).toBe(1)
+        expect(extended.resolve('bar')).toBe(2)
     })
 })

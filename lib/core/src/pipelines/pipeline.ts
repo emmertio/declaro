@@ -8,8 +8,8 @@ export function initialInput<T>(input?: T) {
 export type PipelineOutput<T extends Pipeline<any, any>> = T extends Pipeline<any, infer U> ? U : never
 export type PipelineInput<T extends Pipeline<any, any>> = T extends Pipeline<infer U, any> ? U : never
 
-export type MergeActionOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
-export type ActionDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
+export type DivergedOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
+export type DivergeDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
 
 /**
  * A pipeline is a series of actions that are executed in sequence, with the output of each action being passed as input to the next action.
@@ -51,14 +51,14 @@ export class Pipeline<TFrom, TTo> {
         return this._action
     }
 
-    chooseAction<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
-        decision: ActionDecision<UnwrapPromise<TTo>, TAction>,
-    ): Pipeline<TFrom, MergeActionOutput<UnwrapPromise<TTo>, TAction>> {
+    diverge<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
+        decision: DivergeDecision<UnwrapPromise<TTo>, TAction>,
+    ): Pipeline<TFrom, DivergedOutput<UnwrapPromise<TTo>, TAction>> {
         return this.pipe((input) => {
             const action = decision(input)
 
             if (action instanceof Promise) {
-                return action.then((action) => action(input)) as MergeActionOutput<UnwrapPromise<TTo>, TAction>
+                return action.then((action) => action(input)) as DivergedOutput<UnwrapPromise<TTo>, TAction>
             }
 
             return action(input)

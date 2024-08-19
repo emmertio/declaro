@@ -106,7 +106,7 @@ describe('Pipelines', () => {
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)
 
-        const divergedPipeline = originalPipeline.chooseAction((input) => {
+        const divergedPipeline = originalPipeline.diverge((input) => {
             if (input.positive) {
                 return new Pipeline(initialInput<Meta>())
                     .pipe((m) => m.number)
@@ -174,7 +174,7 @@ describe('Pipelines', () => {
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)
 
-        const calculatePipeline = new Pipeline(initialInput<Meta>()).chooseAction((input) => {
+        const calculatePipeline = new Pipeline(initialInput<Meta>()).diverge((input) => {
             if (input.positive) {
                 return new Pipeline(initialInput<Meta>())
                     .pipe((m) => m.number)
@@ -194,7 +194,7 @@ describe('Pipelines', () => {
             }
         })
 
-        const recursivePipeline = calculatePipeline.chooseAction((input) => {
+        const recursivePipeline = calculatePipeline.diverge((input) => {
             if (typeof input === 'string') {
                 return (text) => text
             } else {

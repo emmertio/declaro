@@ -8,14 +8,14 @@ export function initialInput<T>(input?: T) {
 export type PipelineOutput<T extends Pipeline<any, any>> = T extends Pipeline<any, infer U> ? U : never
 export type PipelineInput<T extends Pipeline<any, any>> = T extends Pipeline<infer U, any> ? U : never
 
-export type SplitOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
-export type SplitDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
+export type MergeActionOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
+export type ActionDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
 
 /**
  * A pipeline is a series of actions that are executed in sequence, with the output of each action being passed as input to the next action.
  */
 export class Pipeline<TFrom, TTo> {
-    constructor(protected readonly action: PipelineAction<TFrom, TTo>) {}
+    constructor(protected readonly _action: PipelineAction<TFrom, TTo>) {}
 
     /**
      * Adds a new action to the pipeline.
@@ -27,7 +27,7 @@ export class Pipeline<TFrom, TTo> {
      */
     pipe<TModTo>(action: PipelineAction<UnwrapPromise<TTo>, TModTo>): Pipeline<TFrom, TModTo> {
         return new Pipeline<TFrom, TModTo>((input: TFrom) => {
-            const output = this.action(input)
+            const output = this._action(input)
 
             if (output instanceof Promise) {
                 return output.then(action) as TModTo
@@ -44,30 +44,21 @@ export class Pipeline<TFrom, TTo> {
      * @returns The output of the last action in the pipeline.
      */
     execute(input: TFrom): TTo {
-        return this.action(input)
-    }
-
-    /**
-     * Forks the current pipeline. The forked pipeline will have the same actions as the current pipeline, but will not share state.
-     *
-     * @returns A new pipeline that is a fork of the current pipeline. The forked pipeline will have the same actions as the current pipeline, but will not share state.
-     */
-    fork(): Pipeline<TFrom, TTo> {
-        return new Pipeline(this.action)
+        return this._action(input)
     }
 
     export(): PipelineAction<TFrom, TTo> {
-        return this.action
+        return this._action
     }
 
-    split<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
-        decision: SplitDecision<UnwrapPromise<TTo>, TAction>,
-    ): Pipeline<TFrom, SplitOutput<UnwrapPromise<TTo>, TAction>> {
+    chooseAction<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
+        decision: ActionDecision<UnwrapPromise<TTo>, TAction>,
+    ): Pipeline<TFrom, MergeActionOutput<UnwrapPromise<TTo>, TAction>> {
         return this.pipe((input) => {
             const action = decision(input)
 
             if (action instanceof Promise) {
-                return action.then((action) => action(input)) as SplitOutput<UnwrapPromise<TTo>, TAction>
+                return action.then((action) => action(input)) as MergeActionOutput<UnwrapPromise<TTo>, TAction>
             }
 
             return action(input)

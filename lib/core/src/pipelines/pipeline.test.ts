@@ -75,7 +75,7 @@ describe('Pipelines', () => {
 
         const basePipeline = new Pipeline(fromString).pipe(add(1)).pipe(toString)
 
-        const pipeline = basePipeline.fork().pipe(fromString).pipe(multiply(8)).pipe(divide(4)).pipe(toString)
+        const pipeline = basePipeline.pipe(fromString).pipe(multiply(8)).pipe(divide(4)).pipe(toString)
 
         const result = await pipeline.execute('1')
         const baseResult = await basePipeline.execute('1')
@@ -106,7 +106,7 @@ describe('Pipelines', () => {
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)
 
-        const divergedPipeline = originalPipeline.split((input) => {
+        const divergedPipeline = originalPipeline.chooseAction((input) => {
             if (input.positive) {
                 return new Pipeline(initialInput<Meta>())
                     .pipe((m) => m.number)
@@ -174,7 +174,7 @@ describe('Pipelines', () => {
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)
 
-        const calculatePipeline = new Pipeline(initialInput<Meta>()).split((input) => {
+        const calculatePipeline = new Pipeline(initialInput<Meta>()).chooseAction((input) => {
             if (input.positive) {
                 return new Pipeline(initialInput<Meta>())
                     .pipe((m) => m.number)
@@ -194,7 +194,7 @@ describe('Pipelines', () => {
             }
         })
 
-        const recursivePipeline = calculatePipeline.split((input) => {
+        const recursivePipeline = calculatePipeline.chooseAction((input) => {
             if (typeof input === 'string') {
                 return (text) => text
             } else {

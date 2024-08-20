@@ -7,6 +7,9 @@ export function initialInput<T>(input?: T) {
 
 export type PipelineOutput<T extends Pipeline<any, any>> = T extends Pipeline<any, infer U> ? U : never
 export type PipelineInput<T extends Pipeline<any, any>> = T extends Pipeline<infer U, any> ? U : never
+export type SyncOrAsync<TOriginalOut, TNewOut> = TOriginalOut extends Promise<any>
+    ? Promise<UnwrapPromise<TNewOut>>
+    : TNewOut
 
 export type DivergedOutput<TFrom, P extends PipelineAction<TFrom, any>> = ActionOutput<P>
 export type DivergeDecision<TFrom, TAction extends PipelineAction<TFrom, any>> = (input: TFrom) => TAction
@@ -25,15 +28,15 @@ export class Pipeline<TFrom, TTo> {
      *
      * NOTE: Downstream outputs must be a Promise if the current output is a Promise.
      */
-    pipe<TModTo>(action: PipelineAction<UnwrapPromise<TTo>, TModTo>): Pipeline<TFrom, TModTo> {
-        return new Pipeline<TFrom, TModTo>((input: TFrom) => {
+    pipe<TModTo>(action: PipelineAction<UnwrapPromise<TTo>, TModTo>): Pipeline<TFrom, SyncOrAsync<TTo, TModTo>> {
+        return new Pipeline<TFrom, SyncOrAsync<TTo, TModTo>>((input: TFrom) => {
             const output = this._action(input)
 
             if (output instanceof Promise) {
                 return output.then(action) as TModTo
             }
 
-            return action(output as UnwrapPromise<TTo>)
+            return action(output as UnwrapPromise<TTo>) as any
         })
     }
 
@@ -64,7 +67,7 @@ export class Pipeline<TFrom, TTo> {
      */
     diverge<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
         decision: DivergeDecision<UnwrapPromise<TTo>, TAction>,
-    ): Pipeline<TFrom, DivergedOutput<UnwrapPromise<TTo>, TAction>> {
+    ): Pipeline<TFrom, SyncOrAsync<TTo, DivergedOutput<UnwrapPromise<TTo>, TAction>>> {
         return this.pipe((input) => {
             const action = decision(input)
 
@@ -73,6 +76,6 @@ export class Pipeline<TFrom, TTo> {
             }
 
             return action(input)
-        })
+        }) as any
     }
 }

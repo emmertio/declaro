@@ -50,8 +50,8 @@ describe('Pipelines', () => {
         const fromString = async (input: string) => parseInt(input)
         const add = (increment: number) => (input: number) => input + increment
         const multiply = (factor: number) => (input: number) => input * factor
-        const divide = (divisor: number) => (input: number) => input / divisor
-        const toString = async (input: number) => input.toString()
+        const divide = (divisor: number) => async (input: number) => input / divisor
+        const toString = (input: number) => input.toString()
 
         const pipeline = new Pipeline(fromString)
             .pipe(add(1))

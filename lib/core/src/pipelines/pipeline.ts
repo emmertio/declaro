@@ -47,10 +47,21 @@ export class Pipeline<TFrom, TTo> {
         return this._action(input)
     }
 
+    /**
+     * Exports the pipeline as a pipeline action. This is useful for combining pipelines into larger pipelines.
+     *
+     * @returns A pipeline action that represents the current pipeline.
+     */
     export(): PipelineAction<TFrom, TTo> {
         return this._action
     }
 
+    /**
+     * Adds a new action to the pipeline based on the output of the current pipeline. This is useful for creating conditional pipelines.
+     *
+     * @param decision A function that takes the output of the current pipeline and returns a new action. Async decisions are automatically awaited, and will be passed the resolved output of the current pipeline.
+     * @returns A new pipeline that includes the current pipeline and the new action.
+     */
     diverge<TAction extends PipelineAction<UnwrapPromise<TTo>, any>>(
         decision: DivergeDecision<UnwrapPromise<TTo>, TAction>,
     ): Pipeline<TFrom, DivergedOutput<UnwrapPromise<TTo>, TAction>> {

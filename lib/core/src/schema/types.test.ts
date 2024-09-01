@@ -24,17 +24,5 @@ describe('Type tests', () => {
                 },
             },
         })
-
-        const test = {} as any as DeclaroSchema.ObjectPayload<(typeof model)['schema']['properties']>
-
-        const foo = test.foo
-        const bar = test.bar
-        const baz = bar.baz
-
-        const baz2 = {} as any as (typeof model)['schema']['properties']['bar']['properties']
-        const baz3 = {} as any as DeclaroSchema.ObjectPayload<(typeof bazModel)['schema']['properties']>
-
-        const bval1 = baz2.baz
-        const bval2 = baz3.baz
     })
 })

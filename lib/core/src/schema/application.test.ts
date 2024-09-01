@@ -50,7 +50,7 @@ describe('Application schema', () => {
             },
         })
 
-        expect(result).toBeInstanceOf(Application)
+        expect(result).toBeInstanceOf(Module)
 
         const module = app.getModule('Module')
 

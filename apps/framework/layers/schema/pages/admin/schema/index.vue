@@ -1,7 +1,7 @@
 <template>
-    <div>
+    <Panel>
         <h1>Schema</h1>
-    </div>
+    </Panel>
 </template>
 
 <script lang="ts" setup>

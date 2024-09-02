@@ -1,8 +1,5 @@
 <template>
-    <Panel>
-        <h1>Admin</h1>
-        <NuxtPage />
-    </Panel>
+    <Panel> Testing {{ $route.params.test }} </Panel>
 </template>
 
 <script lang="ts" setup>

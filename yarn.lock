@@ -29,6 +29,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@antfu/install-pkg@npm:^0.4.0":
+  version: 0.4.1
+  resolution: "@antfu/install-pkg@npm:0.4.1"
+  dependencies:
+    package-manager-detector: "npm:^0.2.0"
+    tinyexec: "npm:^0.3.0"
+  checksum: 10c0/af47a84e77f3f69077ec464e0a9e82791666693380fc8ed9867f388f5c0cd8421e2642b9deefc7d4adb7b8cfb9dd1a715b25f9a974d023b10779cad0885439ef
+  languageName: node
+  linkType: hard
+
 "@antfu/utils@npm:^0.7.10":
   version: 0.7.10
   resolution: "@antfu/utils@npm:0.7.10"
@@ -1668,8 +1678,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/framework@workspace:apps/framework"
   dependencies:
+    "@iconify-json/material-symbols": "npm:^1.2.0"
+    "@iconify-json/mdi": "npm:^1.2.0"
+    "@nuxt/icon": "npm:^1.5.0"
     "@nuxtjs/storybook": "npm:^8.2.0"
     "@nuxtjs/tailwindcss": "npm:^6.10.0"
+    "@pinia/nuxt": "npm:^0.5.4"
     "@storybook-vue/nuxt": "npm:^8.2.0"
     "@storybook/addon-essentials": "npm:^8.2.9"
     "@storybook/addon-interactions": "npm:^8.2.9"
@@ -2543,6 +2557,66 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@iconify-json/material-symbols@npm:^1.2.0":
+  version: 1.2.0
+  resolution: "@iconify-json/material-symbols@npm:1.2.0"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/feb94100f4aa7480a625f459655f55a640a2e41ff5bece35c9e778f97b24b4dae01f60b06dcf8a6fe52d26e7a264ab3420f7cb9be757f70a63e91ad14d8efa17
+  languageName: node
+  linkType: hard
+
+"@iconify-json/mdi@npm:^1.2.0":
+  version: 1.2.0
+  resolution: "@iconify-json/mdi@npm:1.2.0"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/e2f9d5b3e68a1bb9d1096feddac52b6cf0386a832209d69dfaf24671c38021bf1199d8154d416840c8eda99cc966ae3c378c02696d5928837d90560328d806dc
+  languageName: node
+  linkType: hard
+
+"@iconify/collections@npm:^1.0.453":
+  version: 1.0.455
+  resolution: "@iconify/collections@npm:1.0.455"
+  dependencies:
+    "@iconify/types": "npm:*"
+  checksum: 10c0/211b084452833a4ef13fd69c97342a318b149d96f1fb09243d67ccd6dc16ab4e147071055f1183a8d30641b0f68aa291c701d017c3e38378984684e8c643526c
+  languageName: node
+  linkType: hard
+
+"@iconify/types@npm:*, @iconify/types@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@iconify/types@npm:2.0.0"
+  checksum: 10c0/65a3be43500c7ccacf360e136d00e1717f050b7b91da644e94370256ac66f582d59212bdb30d00788aab4fc078262e91c95b805d1808d654b72f6d2072a7e4b2
+  languageName: node
+  linkType: hard
+
+"@iconify/utils@npm:^2.1.32":
+  version: 2.1.32
+  resolution: "@iconify/utils@npm:2.1.32"
+  dependencies:
+    "@antfu/install-pkg": "npm:^0.4.0"
+    "@antfu/utils": "npm:^0.7.10"
+    "@iconify/types": "npm:^2.0.0"
+    debug: "npm:^4.3.6"
+    kolorist: "npm:^1.8.0"
+    local-pkg: "npm:^0.5.0"
+    mlly: "npm:^1.7.1"
+  checksum: 10c0/a84f14e2faa6ad4d7ec09ca445cf7a08491c2bc29fd61b926dbf2aa2f0d4f55d68e03344aa558574234b793a6e0a6c597a639bd18589c728500c2e67ef0e2d44
+  languageName: node
+  linkType: hard
+
+"@iconify/vue@npm:4.1.3-beta.1":
+  version: 4.1.3-beta.1
+  resolution: "@iconify/vue@npm:4.1.3-beta.1"
+  dependencies:
+    "@iconify/types": "npm:^2.0.0"
+  peerDependencies:
+    vue: ">=3"
+  checksum: 10c0/6b5e712f7fdf37824612fd9459dc423d8dfcf015d69cc8d10a3716875b5c66735ac9f86eb1acbc988848e7c0bccff6b7b1e68573ea1ae6630f90a7fe6be14bb6
+  languageName: node
+  linkType: hard
+
 "@ioredis/commands@npm:^1.1.1":
   version: 1.2.0
   resolution: "@ioredis/commands@npm:1.2.0"
@@ -3116,7 +3190,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nuxt/devtools-kit@npm:1.4.1, @nuxt/devtools-kit@npm:^1.0.8":
+"@nuxt/devtools-kit@npm:1.4.1, @nuxt/devtools-kit@npm:^1.0.8, @nuxt/devtools-kit@npm:^1.4.1":
   version: 1.4.1
   resolution: "@nuxt/devtools-kit@npm:1.4.1"
   dependencies:
@@ -3198,7 +3272,27 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nuxt/kit@npm:3.13.0, @nuxt/kit@npm:^3.11.2, @nuxt/kit@npm:^3.12.0, @nuxt/kit@npm:^3.12.2, @nuxt/kit@npm:^3.12.3, @nuxt/kit@npm:^3.13.0":
+"@nuxt/icon@npm:^1.5.0":
+  version: 1.5.0
+  resolution: "@nuxt/icon@npm:1.5.0"
+  dependencies:
+    "@iconify/collections": "npm:^1.0.453"
+    "@iconify/types": "npm:^2.0.0"
+    "@iconify/utils": "npm:^2.1.32"
+    "@iconify/vue": "npm:4.1.3-beta.1"
+    "@nuxt/devtools-kit": "npm:^1.4.1"
+    "@nuxt/kit": "npm:^3.13.0"
+    consola: "npm:^3.2.3"
+    fast-glob: "npm:^3.3.2"
+    local-pkg: "npm:^0.5.0"
+    mlly: "npm:^1.7.1"
+    pathe: "npm:^1.1.2"
+    std-env: "npm:^3.7.0"
+  checksum: 10c0/b240e2475384be169a3179c6d81bf8e69f7f7b808a338ea17d088077f873b1dd29640efef2d361e055229bbf0af7eec69274648db7c690439ca785606a055cc9
+  languageName: node
+  linkType: hard
+
+"@nuxt/kit@npm:3.13.0, @nuxt/kit@npm:^3.11.2, @nuxt/kit@npm:^3.12.0, @nuxt/kit@npm:^3.12.2, @nuxt/kit@npm:^3.12.3, @nuxt/kit@npm:^3.13.0, @nuxt/kit@npm:^3.9.0":
   version: 3.13.0
   resolution: "@nuxt/kit@npm:3.13.0"
   dependencies:
@@ -3747,6 +3841,16 @@ __metadata:
     "@parcel/watcher-win32-x64":
       optional: true
   checksum: 10c0/33b7112094b9eb46c234d824953967435b628d3d93a0553255e9910829b84cab3da870153c3a870c31db186dc58f3b2db81382fcaee3451438aeec4d786a6211
+  languageName: node
+  linkType: hard
+
+"@pinia/nuxt@npm:^0.5.4":
+  version: 0.5.4
+  resolution: "@pinia/nuxt@npm:0.5.4"
+  dependencies:
+    "@nuxt/kit": "npm:^3.9.0"
+    pinia: "npm:^2.2.2"
+  checksum: 10c0/c6aee28d7383f023eda38553e5f6e31ee0352a2bc71944c6e2956e0d983458ff4c374f6bcaa99c87a144fb4296e9d952662dd7f7ebbdd9df90f3a28efad98697
   languageName: node
   linkType: hard
 
@@ -13565,6 +13669,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"package-manager-detector@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "package-manager-detector@npm:0.2.0"
+  checksum: 10c0/1ad699098018f9425b0f0a197537e085420ebcb7b6c49ef5a8dcff198f50d8de206f52ed10867624b7cb01bebac76396f5ac020dcff96f44154d59e6a5dcf36a
+  languageName: node
+  linkType: hard
+
 "packet-reader@npm:1.0.0":
   version: 1.0.0
   resolution: "packet-reader@npm:1.0.0"
@@ -13988,6 +14099,25 @@ __metadata:
   version: 4.0.1
   resolution: "pify@npm:4.0.1"
   checksum: 10c0/6f9d404b0d47a965437403c9b90eca8bb2536407f03de165940e62e72c8c8b75adda5516c6b9b23675a5877cc0bcac6bdfb0ef0e39414cd2476d5495da40e7cf
+  languageName: node
+  linkType: hard
+
+"pinia@npm:^2.2.2":
+  version: 2.2.2
+  resolution: "pinia@npm:2.2.2"
+  dependencies:
+    "@vue/devtools-api": "npm:^6.6.3"
+    vue-demi: "npm:^0.14.10"
+  peerDependencies:
+    "@vue/composition-api": ^1.4.0
+    typescript: ">=4.4.4"
+    vue: ^2.6.14 || ^3.3.0
+  peerDependenciesMeta:
+    "@vue/composition-api":
+      optional: true
+    typescript:
+      optional: true
+  checksum: 10c0/6c30a6e355be294f87a0256d4b2c266d3315d4fc1451c0a17847d03c0e7879faab4d58df2496e0c2b34a54743807bf65b27f8e80e400883d8bb46682f7af3b5f
   languageName: node
   linkType: hard
 
@@ -16667,6 +16797,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tinyexec@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "tinyexec@npm:0.3.0"
+  checksum: 10c0/138a4f4241aea6b6312559508468ab275a31955e66e2f57ed206e0aaabecee622624f208c5740345f0a66e33478fd065e359ed1eb1269eb6fd4fa25d44d0ba3b
+  languageName: node
+  linkType: hard
+
 "tinyglobby@npm:^0.2.5":
   version: 0.2.5
   resolution: "tinyglobby@npm:0.2.5"
@@ -17947,6 +18084,22 @@ __metadata:
   version: 2.1.4
   resolution: "vue-component-type-helpers@npm:2.1.4"
   checksum: 10c0/b8c3eb24a5dfc90317dbc10a148bf46c687e1e0e74dd36b37d28199c9535b79c2847213a4e287b9b42da09c08231c404b7856a22990da254f6763934bacd7448
+  languageName: node
+  linkType: hard
+
+"vue-demi@npm:^0.14.10":
+  version: 0.14.10
+  resolution: "vue-demi@npm:0.14.10"
+  peerDependencies:
+    "@vue/composition-api": ^1.0.0-rc.1
+    vue: ^3.0.0-0 || ^2.6.0
+  peerDependenciesMeta:
+    "@vue/composition-api":
+      optional: true
+  bin:
+    vue-demi-fix: bin/vue-demi-fix.js
+    vue-demi-switch: bin/vue-demi-switch.js
+  checksum: 10c0/a9ed8712fa36d01bc13c39757f95f30cebf42d557b99e94bff86d8660c81f2911b41220f7affc023d1ffcc19e13999e4a83019991e264787cca2c616e83aea48
   languageName: node
   linkType: hard
 

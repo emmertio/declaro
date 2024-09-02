@@ -8,18 +8,33 @@
         "dev": "nuxt dev",
         "generate": "nuxt generate",
         "preview": "nuxt preview",
-        "postinstall": "nuxt prepare"
+        "postinstall": "nuxt prepare",
+        "storybook": "storybook dev --port 6006",
+        "build-storybook": "storybook build",
+        "typecheck": "nuxt typecheck"
     },
     "dependencies": {
+        "@nuxtjs/storybook": "^8.2.0",
         "nuxt": "^3.13.0",
         "vue": "latest"
     },
     "devDependencies": {
+        "@nuxtjs/storybook": "^8.2.0",
         "@nuxtjs/tailwindcss": "^6.10.0",
+        "@storybook-vue/nuxt": "^8.2.0",
+        "@storybook/addon-essentials": "^8.2.9",
+        "@storybook/addon-interactions": "^8.2.9",
+        "@storybook/addon-links": "^8.2.9",
+        "@storybook/blocks": "^8.2.9",
+        "@storybook/builder-vite": "^8.2.9",
+        "@storybook/test": "^8.2.9",
+        "@storybook/vue3": "^8.2.9",
+        "@types/node": "^18.17.5",
         "autoprefixer": "^10.4.20",
         "daisyui": "^4.12.10",
         "postcss": "^8.4.43",
         "sass": "^1.77.8",
+        "storybook": "^8.2.9",
         "tailwindcss": "^3.4.10"
     }
 }

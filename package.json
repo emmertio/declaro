@@ -8,13 +8,13 @@
     "license": "MIT",
     "scripts": {
         "dev": "yarn lerna run dev --parallel",
+        "typecheck": "yarn lerna run typecheck --parallel",
         "test": "yarn lerna run test -- run",
         "build": "yarn lerna run build",
-        "release": "yarn test && yarn build && yarn lerna publish --force-publish"
+        "release": "yarn typecheck && yarn test && yarn build && yarn lerna publish --force-publish"
     },
     "workspaces": {
         "packages": [
-            "examples/*",
             "lib/*",
             "apps/*"
         ]

@@ -15,7 +15,7 @@
         </div>
         <div class="drawer-side">
             <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-            <ListNav class="w-80 p-4">
+            <ListNav class="w-80 p-2">
                 <ListNavItem v-for="item in adminMenuStore.menu" :key="`admin-menu-item-${item.id}`" :item="item" />
             </ListNav>
         </div>

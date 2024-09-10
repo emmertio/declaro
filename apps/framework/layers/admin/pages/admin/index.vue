@@ -1,7 +1,6 @@
 <template>
     <Panel>
         <h1>Admin</h1>
-        <NuxtPage />
     </Panel>
 </template>
 

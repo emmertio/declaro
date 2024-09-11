@@ -1,0 +1,72 @@
+version: '3.1'
+
+services:
+    meilisearch:
+        image: getmeili/meilisearch
+        restart: always
+        ports:
+            - ${MEILISEARCH_PORT:-7700}:7700
+        volumes:
+            - ./.data/data.ms:/data.ms
+        networks:
+            - backend
+    db:
+        image: postgres
+        restart: always
+        ports:
+            - ${DB_PORT:-5432}:5432
+        environment:
+            POSTGRES_DB: ${DB_NAME:-app}
+            POSTGRES_USER: ${DB_USER:-app}
+            POSTGRES_PASSWORD: ${DB_PASS:-sa}
+        networks:
+            - backend
+        volumes:
+            - ./.data/postgres:/var/lib/postgresql/data
+
+    pgadmin:
+        container_name: pgadmin_container
+        image: dpage/pgadmin4
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+        volumes:
+            - pgadmin:/root/.pgadmin
+        ports:
+            - '${PGADMIN_PORT:-5050}:80'
+        networks:
+            - backend
+        restart: unless-stopped
+    redis:
+        image: 'redis:alpine'
+        container_name: redis
+
+        ports:
+            - '6379:6379'
+
+        networks:
+            - backend
+
+    redisinsights:
+        image: redislabs/redisinsight:latest
+        restart: always
+        ports:
+            - '8001:8001'
+        volumes:
+            - ./.data/redisinsight:/db
+        networks:
+            - backend
+
+    mailhog:
+        container_name: mailhog
+        image: mailhog/mailhog
+        ports:
+            - '1025:1025' # smtp server
+            - '8025:8025' # web ui
+        networks:
+            backend:
+
+networks:
+    backend:
+volumes:
+    pgadmin:

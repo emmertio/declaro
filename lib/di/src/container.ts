@@ -1,4 +1,5 @@
 import { type Class } from '@declaro/core'
+import _ from 'lodash'
 
 export type FilterKeys<T, U> = {
     [K in keyof T]: T[K] extends U ? K : never
@@ -36,22 +37,29 @@ export type UnwrapFactoryArgs<F extends DependencyFactory<any, any>> = F extends
     ? A
     : never
 
+export type ValueLoader<T, A extends any[]> = (container: Container<any>, ...args: A) => T
+export type UnwrapValueLoader<V extends ValueLoader<any, any>> = V extends ValueLoader<infer T, any> ? T : never
+
 export enum DependencyType {
     VALUE = 'VALUE',
     FACTORY = 'FACTORY',
     CLASS = 'CLASS',
 }
 
+export type DependencyMiddleware<V> = (value: UnwrapPromise<V>) => V
+
 export type DependencyRecord<
     K extends string | Symbol = string,
-    V extends DependencyFactory<any, any> = DependencyFactory<any, any>,
+    V extends ValueLoader<any, any> = ValueLoader<any, any>,
     T extends DependencyType = DependencyType,
 > = {
     key: K
     type: T
     value: V
-    cachedValue?: UnwrapFactoryValue<V>
+    cachedValue?: UnwrapValueLoader<V>
     defaultResolveOptions?: ResolveOptions
+    deferred?: boolean
+    middleware: DependencyMiddleware<UnwrapValueLoader<V>>[]
 }
 export type DependencyMap<K extends string = string> = Record<K, DependencyRecord>
 export type DependencyKey<T extends DependencyMap, K extends MapKeys<T>> = K
@@ -72,12 +80,28 @@ export type ResolveOptions = {
 }
 export type ExtractDependencyMap<C extends Container<any>> = C extends Container<infer T> ? T : never
 
+export type ContainerExtensionFn<T extends DependencyMap> = (container: Container) => Container<T>
+export type ContainerExtension<T extends DependencyMap> = (container: Container<any>) => Container<T>
+
+export function defineExtension<T extends DependencyMap>(extension: ContainerExtensionFn<T>): ContainerExtension<T> {
+    return extension
+}
+
 const getDefaultResolveOptions = (): ResolveOptions => {
     return {
         strict: true,
         cache: true,
         singleton: false,
     }
+}
+
+export type Deferred<T> = {
+    __deferred: true
+    value: T
+}
+
+export function defer<T>(typeTemplate?: T): Deferred<T> {
+    return { __deferred: true, value: typeTemplate as T }
 }
 
 export class Container<T extends DependencyMap = DependencyMap<never>> {
@@ -95,15 +119,18 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         key: K,
         value: V,
         defaultResolveOptions?: ResolveOptions | undefined,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
+        const existingDep = this.introspect(key, { strict: false })
         this.validateValueForKey(key as any, value, { strict: true })
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, []>, DependencyType.VALUE>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE>>{
                 key,
                 type: DependencyType.VALUE as const,
                 value: () => value,
                 defaultResolveOptions,
+                deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -122,17 +149,20 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, A>, DependencyType.FACTORY> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, A>, DependencyType.FACTORY>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY>>{
                 key,
                 type: DependencyType.FACTORY as const,
-                value: (...args: A) => {
-                    const values = this.resolveDependencies(inject as any[], args)
+                value: (container, ...args: A) => {
+                    const values = container.resolveDependencies(inject as string[], args)
                     return factory(...(values as any))
                 },
                 defaultResolveOptions,
+                deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -151,7 +181,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<Promise<V>, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.FACTORY> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.FACTORY> }> {
         const injector = (async (...args: A) => {
             const values = await Promise.all([...args])
             return factory(...values)
@@ -173,17 +203,20 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<V, A>, DependencyType.CLASS> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<V, A>, DependencyType.CLASS>>{
+            [key]: <DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS>>{
                 key,
                 type: DependencyType.CLASS as const,
-                value: (...args: A) => {
-                    const values = this.resolveDependencies(inject as any[], args)
+                value: (container, ...args: A) => {
+                    const values = container.resolveDependencies(inject as any[], args)
                     return new classDefinition(...(values as any))
                 },
                 defaultResolveOptions,
+                deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -202,17 +235,54 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.CLASS> }> {
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }> {
+        const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
-            [key]: <DependencyRecord<K, DependencyFactory<Promise<V>, A>, DependencyType.CLASS>>{
+            [key]: <DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS>>{
                 key,
                 type: DependencyType.CLASS as const,
-                value: async (...args: A) => {
-                    const values = await Promise.all(this.resolveDependencies(inject as any[], args))
+                value: async (container, ...args: A) => {
+                    const values = await Promise.all(container.resolveDependencies(inject as any[], args))
                     return new classDefinition(...(values as A))
                 },
                 defaultResolveOptions,
+                deferred: false,
+                middleware: [...(existingDep?.middleware ?? [])],
+            },
+        })
+    }
+
+    /**
+     * Mark a dependency as required. This allows modules to be loaded without providing all dependencies. Dependencies can be deferred to implementation. For example, an ORM module can require a database connection to be provided by the application, and add an entity manager instance that will work with whichever connection is provided.
+     *
+     * @param key A key to identify the value
+     * @param value A value that is deferred to be provided later
+     * @param defaultResolveOptions the resolve options
+     * @returns
+     */
+    requireDependency<K extends string, V extends KeyRestrictedValue<T, K>>(
+        key: K,
+        value: Deferred<V>,
+        defaultResolveOptions?: ResolveOptions | undefined,
+    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
+        const existingDep = this.introspect(key, { strict: false })
+
+        if (existingDep) {
+            return this as any
+        }
+
+        return new Container({
+            ...this.dependencies,
+            [key]: <DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE>>{
+                key,
+                type: DependencyType.VALUE as const,
+                value: () => {
+                    return undefined
+                },
+                defaultResolveOptions,
+                deferred: true,
+                middleware: [...(existingDep?.middleware ?? [])],
             },
         })
     }
@@ -226,6 +296,18 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
      */
     resolve<K extends MapKeys<T>>(key: K, options: ResolveOptions = {}): DependencyValue<T, K> {
         return this._resolveValue(key, options)
+    }
+
+    middleware<K extends MapKeys<T>>(
+        key: K,
+        middleware: DependencyMiddleware<DependencyValue<T, K>>,
+        options: ResolveOptions = {},
+    ): Container<T> {
+        const dep = this.introspect(key, options)
+
+        dep?.middleware?.push(middleware)
+
+        return this
     }
 
     /**
@@ -282,8 +364,53 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
      * @param container the container to merge with
      * @returns a new container instance with the merged dependencies
      */
-    merge<C extends Container<any>>(container: C): Container<T & ExtractDependencyMap<C>> {
-        return new Container({ ...this.dependencies, ...container.dependencies })
+    merge<C extends Container<any>>(
+        container: C,
+    ): Container<{
+        [K in keyof T | keyof ExtractDependencyMap<C>]: ExtractDependencyMap<C>[K] extends DependencyRecord
+            ? ExtractDependencyMap<C>[K]
+            : K extends keyof T
+            ? T[K]
+            : never
+    }> {
+        const existingDeferredKeys = Object.keys(this.dependencies).filter(
+            (key) => container?.dependencies?.[key]?.deferred && !this.dependencies?.[key]?.deferred,
+        )
+        const mergedDeps: any = {
+            ...this.dependencies,
+            ...container.dependencies,
+        }
+
+        Object.keys(mergedDeps).forEach((key) => {
+            const existingDep = this.introspect(key, { strict: false })
+            const selectedDep = container.introspect(key, { strict: false })
+
+            // If the new dependency is not deferred, use that. Otherwise, if the existing dependency is not deferred, use that. If both are deferred, use the new dependency.
+            let mergeDep = selectedDep
+            if (!selectedDep && existingDep) {
+                mergeDep = existingDep
+            } else if (selectedDep?.deferred && existingDep && !existingDep?.deferred) {
+                mergeDep = existingDep
+            }
+
+            const newDep = {
+                ...mergeDep,
+                middleware: [...(existingDep?.middleware ?? []), ...(selectedDep?.middleware ?? [])],
+            }
+
+            mergedDeps[key] = newDep
+        })
+        return new Container({ ...mergedDeps })
+    }
+
+    /**
+     * Extend the container
+     *
+     * @param extension an extension function that returns a new container
+     * @returns a new container instance with the extended dependencies
+     */
+    extend<TExt extends DependencyMap>(extension: ContainerExtension<TExt>): Container<T & TExt> {
+        return extension(this.fork() as any) as any
     }
 
     protected resolveDependencies(inject: MapKeys<T>[], args: any[] = []) {
@@ -329,7 +456,21 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
             throw new Error(`Dependency ${key?.toString()} is not injectable`)
         }
 
-        const value = fn()
+        if (dep.deferred && settings.strict !== false) {
+            throw new Error(`Dependency "${key?.toString()}" was required but not provided`)
+        }
+
+        let value = fn(this)
+
+        if (dep.middleware) {
+            value = dep.middleware.reduce((acc, middleware) => {
+                if (typeof (acc as any)?.then === 'function') {
+                    return (acc as any).then((val: any) => middleware(val))
+                } else {
+                    return middleware(acc)
+                }
+            }, value)
+        }
 
         if (settings.cache) {
             dep.cachedValue = value

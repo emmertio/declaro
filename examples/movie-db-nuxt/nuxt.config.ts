@@ -2,24 +2,29 @@ import { InterfaceModelGenerator, ReferenceGenerator, declaro } from '@declaro/b
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-    devtools: { enabled: true },
-    serverHandlers: [
-        {
-            route: '/api',
-            handler: '~/server/index.ts',
-            middleware: true,
-        },
-    ],
-    vite: {
-        plugins: [
-            declaro({
-                models: {
-                    generators: [new ReferenceGenerator(), new InterfaceModelGenerator()],
-                },
-            }),
-        ],
-    },
-    alias: {
-        '@D': '../.declaro',
-    },
+  devtools: { enabled: true },
+
+  serverHandlers: [
+      {
+          route: '/api',
+          handler: '~/api/index.ts',
+          middleware: true,
+      },
+  ],
+
+  vite: {
+      plugins: [
+          // declaro({
+          //     models: {
+          //         generators: [new ReferenceGenerator(), new InterfaceModelGenerator()],
+          //     },
+          // }),
+      ],
+  },
+
+  alias: {
+      '@D': '../.declaro',
+  },
+
+  compatibilityDate: '2024-08-06',
 })

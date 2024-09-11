@@ -20,7 +20,7 @@ export function formatClassPath(name: string, options: PluginConfig) {
 }
 
 export class ClassModelGenerator implements IModelGenerator {
-    async generateModels(models: Model[], options: PluginConfig) {
+    async generateModels(models: Model<any>[], options: PluginConfig) {
         await Promise.all(
             models.map(async (model) => {
                 const outputFile = formatClassPath(model.name, options)

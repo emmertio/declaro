@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Container, DependencyType } from './container'
+import { Container, defer, defineExtension, DependencyType } from './container'
 
 describe('Container', () => {
     it('should be able to add and resolve values', () => {
@@ -62,7 +62,7 @@ describe('Container', () => {
 
         expect(dep.key).toEqual('foo')
         expect(dep.type).toEqual(DependencyType.VALUE)
-        expect(dep.value()).toEqual('bar')
+        expect(dep.value(container1)).toEqual('bar')
     })
 
     it('should validate a value for a key', () => {
@@ -304,6 +304,73 @@ describe('Container', () => {
         expect(myClass.message).toBe('Goodbye')
     })
 
+    it('should be able to require dependencies to be provided at a later time', () => {
+        const container = new Container()
+            .requireDependency('Foo', defer<string>())
+            .requireDependency('Bar', defer<number>())
+
+        const fooSchema = container.introspect('Foo')
+        const barSchema = container.introspect('Bar')
+
+        expect(fooSchema.deferred).toBe(true)
+        expect(barSchema.deferred).toBe(true)
+
+        const container2 = container.fork().provideValue('Foo', 'Hello').provideValue('Bar', 42)
+
+        const foo = container2.resolve('Foo')
+        const bar = container2.resolve('Bar')
+
+        expect(foo).toBe('Hello')
+        expect(bar).toBe(42)
+    })
+
+    it('Should error when resolving a deferred dependency without providing it', () => {
+        const container = new Container().requireDependency('Foo', defer<string>())
+
+        expect(() => {
+            container.resolve('Foo')
+        }).toThrow(`Dependency "Foo" was required but not provided`)
+    })
+
+    it('Should return undefined when resolving a deferred dependency in non-strict mode', () => {
+        const container = new Container().requireDependency('Foo', defer<string>())
+
+        const foo = container.resolve('Foo', { strict: false })
+
+        expect(foo).toBeUndefined()
+    })
+
+    it('Should be able to merge containers with deferred dependencies', () => {
+        const module1 = new Container()
+            .requireDependency('Name', defer<string>())
+            .provideFactory('Greeting', (name: string) => `Hello ${name}`, ['Name'])
+
+        const container = new Container().merge(module1).provideValue('Name', 'World')
+
+        const greeting = container.resolve('Greeting')
+
+        expect(greeting).toBe('Hello World')
+    })
+
+    it('Should acknowledge existing values when deferring dependencies', () => {
+        const module1 = new Container().requireDependency('Name', defer<string>()).provideFactory(
+            'Greeting',
+            (name: string) => {
+                return `Hello ${name}`
+            },
+            ['Name'],
+        )
+        const module2 = new Container().provideValue('Name', 'World').requireDependency('Name', defer<string>())
+
+        const container = new Container().provideValue('Name', 'World').merge(module1)
+
+        const greeting = container.resolve('Greeting')
+        const testName = module2.resolve('Name')
+
+        expect(greeting).toBe('Hello World')
+        expect(testName).toBe('World')
+    })
+
     it('should be able to fork a container', () => {
         const container = new Container().provideValue('foo', 'bar')
 
@@ -325,5 +392,34 @@ describe('Container', () => {
 
         expect(merged.resolve('foo')).toBe('bar')
         expect(merged.resolve('baz')).toBe('qux')
+    })
+
+    it('should be able to configure middleware to run on resolve', async () => {
+        const container = new Container()
+            .provideValue('foo', 'bar')
+            .provideAsyncFactory('bex', async () => 42)
+            .middleware('foo', (value) => {
+                value = 'baz'
+                return value
+            })
+            .middleware('bex', async (value) => {
+                return value * 2
+            })
+
+        expect(container.resolve('foo')).toBe('baz')
+        expect(await container.resolve('bex')).toBe(84)
+    })
+
+    it('should extend a container with a pre-built extension', () => {
+        const container = new Container().provideValue('foo', 1)
+
+        const extension = defineExtension((c) => {
+            return c.provideValue('bar', 2)
+        })
+
+        const extended = container.extend(extension)
+
+        expect(extended.resolve('foo')).toBe(1)
+        expect(extended.resolve('bar')).toBe(2)
     })
 })

@@ -9,6 +9,9 @@ dist
 # Node dependencies
 node_modules
 
+# Declaro
+.declaro
+
 # Logs
 logs
 *.log

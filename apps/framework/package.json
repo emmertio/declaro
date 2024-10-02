@@ -1,6 +1,6 @@
 {
     "name": "@declaro/framework",
-    "version": "2.0.0-beta.3",
+    "version": "2.0.0-beta.10",
     "main": "./nuxt.config.ts",
     "type": "module",
     "scripts": {

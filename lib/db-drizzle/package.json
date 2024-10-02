@@ -38,7 +38,9 @@
         "zod": "^3.23.8"
     },
     "dependencies": {
+        "@asteasolutions/zod-to-openapi": "^7.1.2",
         "change-case": "^5.4.4",
+        "drizzle-zod": "^0.5.1",
         "lodash-es": "^4.17.21"
     }
 }

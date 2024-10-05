@@ -1,4 +1,4 @@
-import _ from 'lodash-es'
+import { cloneDeep } from 'lodash-es'
 import type { Model } from './define-model'
 import { Module } from './module'
 import type { DeclaroSchema } from './types'
@@ -25,7 +25,7 @@ export class Application {
      * Note: This should be set by the application implementation. It would be dangerous for any one module to be able to change the application info for all of the others.
      */
     get info() {
-        return _.cloneDeep(this._info)
+        return cloneDeep(this._info)
     }
 
     /**

@@ -504,11 +504,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/core@npm:^2.0.0-beta.3, @declaro/core@npm:^2.0.0-beta.9, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
+"@declaro/core@npm:^2.0.0-beta.10, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
-    "@declaro/di": "npm:^2.0.0-beta.6"
+    "@declaro/di": "npm:^2.0.0-beta.10"
     "@vitest/coverage-v8": "npm:^2.0.5"
     change-case: "npm:^4.1.2"
     json-schema-library: "npm:^7.4.8"
@@ -527,7 +527,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.9"
+    "@declaro/core": "npm:^2.0.0-beta.10"
     "@vitest/coverage-v8": "npm:^0.32.2"
     minimatch: "npm:^9.0.4"
     vite: "npm:^4.4.2"
@@ -577,7 +577,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@npm:^2.0.0-beta.3, @declaro/di@npm:^2.0.0-beta.6, @declaro/di@workspace:^, @declaro/di@workspace:lib/di":
+"@declaro/di@npm:^2.0.0-beta.10, @declaro/di@workspace:^, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
@@ -592,8 +592,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/express@workspace:lib/express"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.3"
-    "@declaro/di": "npm:^2.0.0-beta.3"
+    "@declaro/core": "npm:^2.0.0-beta.10"
+    "@declaro/di": "npm:^2.0.0-beta.10"
     "@vitest/coverage-v8": "npm:^0.32.2"
     express-openapi: "npm:^12.1.3"
     vite: "npm:^4.4.2"

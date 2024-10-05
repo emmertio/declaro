@@ -1,5 +1,5 @@
-import _ from 'lodash-es'
 import type { DeclaroSchema } from './types'
+import { merge, cloneDeep } from 'lodash-es'
 
 export type MediaRecord<T extends DeclaroSchema.AnyObjectProperties> = {
     contentType: string
@@ -36,7 +36,7 @@ export class Response {
     }
 
     merge(response: Response) {
-        _.merge(this._response, response._response)
+        merge(this._response, response._response)
         this._mediaTypes.push(...response._mediaTypes)
 
         return this
@@ -57,7 +57,7 @@ export class Response {
     get schema(): DeclaroSchema.ResponseObject {
         const contentTypes = this.getContentTypes()
 
-        const response = _.cloneDeep(this._response)
+        const response = cloneDeep(this._response)
 
         contentTypes.forEach((contentType) => {
             const media = this.getMediaForContentType(contentType)

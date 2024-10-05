@@ -41,5 +41,6 @@
     "bugs": {
         "url": "https://github.com/emmertio/declaro/issues"
     },
-    "homepage": "https://github.com/emmertio/declaro/tree/main#readme"
+    "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
+    "gitHead": "80358f9cddc9c859055b7d26de91abd4e5704830"
 }

@@ -33,5 +33,6 @@
   },
   "dependencies": {
     "vite": "^4.4.2"
-  }
+  },
+  "gitHead": "80358f9cddc9c859055b7d26de91abd4e5704830"
 }

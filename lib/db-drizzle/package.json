@@ -42,5 +42,6 @@
         "change-case": "^5.4.4",
         "drizzle-zod": "^0.5.1",
         "lodash-es": "^4.17.21"
-    }
+    },
+    "gitHead": "80358f9cddc9c859055b7d26de91abd4e5704830"
 }

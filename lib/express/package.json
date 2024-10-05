@@ -38,5 +38,6 @@
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
     "dependencies": {
         "express-openapi": "^12.1.3"
-    }
+    },
+    "gitHead": "80358f9cddc9c859055b7d26de91abd4e5704830"
 }

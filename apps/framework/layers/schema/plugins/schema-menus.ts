@@ -8,14 +8,14 @@ export default defineNuxtPlugin(() => {
         to: '/admin/schema',
         children: [
             {
-                id: 'schema.models',
-                label: 'Data Models',
-                to: '/admin/schema',
-            },
-            {
                 id: 'schema.data-sources',
                 label: 'Data Sources',
                 to: '/admin/schema/data-sources',
+            },
+            {
+                id: 'schema.models',
+                label: 'Data Models',
+                to: '/admin/schema',
             },
         ],
     })

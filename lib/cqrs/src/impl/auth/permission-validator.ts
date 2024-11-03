@@ -85,7 +85,9 @@ export class PermissionValidator {
 
     private hasPermission(permission: RulePermission, permissions: string[]) {
         if (typeof permission === 'string') {
-            return permissions.some((p) => minimatch(p, permission))
+            const matches = minimatch.match(permissions, permission)
+            return matches.length > 0
+            // return permissions.some((p) => minimatch(p, permission))
         } else {
             return permission.safeValidate(permissions).valid
         }

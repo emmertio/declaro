@@ -371,6 +371,41 @@ describe('Container', () => {
         expect(testName).toBe('World')
     })
 
+    it('should be able to inject deferred values', () => {
+        const module1 = new Container()
+            .requireDependency('Name', defer<string>())
+            .provideFactory(
+                'Greeting',
+                (name: string) => {
+                    return `Hello ${name}`
+                },
+                ['Name'],
+            )
+            .provideFactory('Intro', (name: string) => `My name is ${name}`, ['Name'])
+
+        const module2 = module1.fork().provideValue('Name', 'World').requireDependency('Name', defer<string>())
+
+        const intro = module2.resolve('Intro')
+
+        expect(intro).toBe('My name is World')
+    })
+
+    it('should be able to defer async values', async () => {
+        const module1 = new Container().requireDependency('Name', defer<Promise<string>>()).provideAsyncFactory(
+            'Greeting',
+            async (name: string) => {
+                return `Hello ${name}`
+            },
+            ['Name'],
+        )
+
+        const module2 = module1.provideAsyncFactory('Name', async () => 'World')
+
+        const name = await module2.resolve('Name')
+
+        expect(name).toBe('World')
+    })
+
     it('should be able to fork a container', () => {
         const container = new Container().provideValue('foo', 'bar')
 

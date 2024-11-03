@@ -1,4 +1,4 @@
-import { type Class } from '@declaro/core'
+import type { Class, Merge } from '@declaro/core'
 import _ from 'lodash'
 
 export type FilterKeys<T, U> = {
@@ -119,7 +119,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         key: K,
         value: V,
         defaultResolveOptions?: ResolveOptions | undefined,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }>> {
         const existingDep = this.introspect(key, { strict: false })
         this.validateValueForKey(key as any, value, { strict: true })
         return new Container({
@@ -132,7 +132,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 deferred: false,
                 middleware: [...(existingDep?.middleware ?? [])],
             },
-        })
+        } as Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }>)
     }
 
     /**
@@ -149,7 +149,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }>> {
         const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
@@ -164,7 +164,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 deferred: false,
                 middleware: [...(existingDep?.middleware ?? [])],
             },
-        })
+        } as Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.FACTORY> }>)
     }
 
     /**
@@ -181,12 +181,12 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         factory: DependencyFactory<Promise<V>, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.FACTORY> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.FACTORY> }>> {
         const injector = (async (...args: A) => {
             const values = await Promise.all([...args])
             return factory(...values)
         }) as any
-        return this.provideFactory(key, injector, inject as any, defaultResolveOptions)
+        return this.provideFactory(key, injector, inject as any, defaultResolveOptions) as any
     }
 
     /**
@@ -203,7 +203,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTuple<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }>> {
         const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
@@ -218,7 +218,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 deferred: false,
                 middleware: [...(existingDep?.middleware ?? [])],
             },
-        })
+        } as Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, A>, DependencyType.CLASS> }>)
     }
 
     /**
@@ -235,7 +235,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         classDefinition: DependencyClass<V, A>,
         inject?: ResultTupleAsync<T, A>,
         defaultResolveOptions?: ResolveOptions,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }>> {
         const existingDep = this.introspect(key, { strict: false })
         return new Container({
             ...this.dependencies,
@@ -250,7 +250,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 deferred: false,
                 middleware: [...(existingDep?.middleware ?? [])],
             },
-        })
+        } as Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<Promise<V>, A>, DependencyType.CLASS> }>)
     }
 
     /**
@@ -265,7 +265,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
         key: K,
         value: Deferred<V>,
         defaultResolveOptions?: ResolveOptions | undefined,
-    ): Container<T & { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }> {
+    ): Container<Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }>> {
         const existingDep = this.introspect(key, { strict: false })
 
         if (existingDep) {
@@ -284,7 +284,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
                 deferred: true,
                 middleware: [...(existingDep?.middleware ?? [])],
             },
-        })
+        } as Merge<T, { [key in K]: DependencyRecord<K, ValueLoader<V, []>, DependencyType.VALUE> }>)
     }
 
     /**
@@ -409,7 +409,7 @@ export class Container<T extends DependencyMap = DependencyMap<never>> {
      * @param extension an extension function that returns a new container
      * @returns a new container instance with the extended dependencies
      */
-    extend<TExt extends DependencyMap>(extension: ContainerExtension<TExt>): Container<T & TExt> {
+    extend<TExt extends DependencyMap>(extension: ContainerExtension<TExt>): Container<Merge<T, TExt>> {
         return extension(this.fork() as any) as any
     }
 

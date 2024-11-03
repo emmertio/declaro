@@ -1,4 +1,4 @@
-import { type Class, type Merge } from '@declaro/core'
+import type { Class, Merge } from '@declaro/core'
 import _ from 'lodash'
 
 export type FilterKeys<T, U> = {

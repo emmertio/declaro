@@ -1,14 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import {
-    Container,
-    defer,
-    defineExtension,
-    DependencyType,
-    type DependencyRecord,
-    type KeyRestrictedValue,
-    type UnwrapPromise,
-    type ValueLoader,
-} from './container'
+import { Container, defer, defineExtension, DependencyType } from './container'
 
 describe('Container', () => {
     it('should be able to add and resolve values', () => {

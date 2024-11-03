@@ -10,7 +10,7 @@
         "dev": "yarn lerna run dev --parallel",
         "typecheck": "yarn lerna run typecheck --parallel",
         "test": "yarn lerna run test -- run",
-        "build": "yarn lerna run build -- scope lib/*",
+        "build": "yarn lerna run --scope \"@declaro/*\" build",
         "release": "yarn typecheck && yarn test && yarn build && yarn lerna publish --force-publish",
         "prepare": "husky"
     },

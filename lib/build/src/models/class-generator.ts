@@ -12,11 +12,7 @@ export function formatClassName(name: string) {
 }
 
 export function formatClassPath(name: string, options: PluginConfig) {
-    return resolve(
-        options.declaroDirectory,
-        options.models?.outputDirectory,
-        `${formatClassName(name)}.ts`,
-    )
+    return resolve(options.declaroDirectory, options.models?.outputDirectory, `${formatClassName(name)}.ts`)
 }
 
 export class ClassModelGenerator implements IModelGenerator {
@@ -34,27 +30,22 @@ export class ClassModelGenerator implements IModelGenerator {
                         .map(([name, prop]) => {
                             const type = prop['type']
                             const tsType = TypescriptMap[type]
-                            const ref = (prop as DeclaroSchema.ReferenceObject)
-                                .$ref
+                            const ref = (prop as DeclaroSchema.ReferenceObject).$ref
                             const refModel = models.find((m) => m.name === ref)
                             if (!!ref && !refModel) {
-                                throw new Error(
-                                    `Could not find model ${ref} referenced by ${modelName}.${name}`,
-                                )
+                                throw new Error(`Could not find model ${ref} referenced by ${modelName}.${name}`)
                             }
                             if (typeof ref === 'string') {
-                                const relationName = formatClassName(
-                                    refModel.name,
-                                )
-                                imports.push(
-                                    `import { ${relationName} } from './${relationName}'`,
-                                )
+                                const relationName = formatClassName(refModel.name)
+                                imports.push(`import { ${relationName} } from './${relationName}'`)
                                 const relationType = getReferenceType(
-                                    prop.format ?? RelationFormat.ManyToMany,
+                                    (prop as DeclaroSchema.ReferenceObject).format ?? RelationFormat.ManyToMany,
                                 )
                                 if (!relationType) {
                                     throw new Error(
-                                        `Could not find relation type for ${prop.format}`,
+                                        `Could not find relation type for ${
+                                            (prop as DeclaroSchema.ReferenceObject).format
+                                        }`,
                                     )
                                 }
 

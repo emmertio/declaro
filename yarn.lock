@@ -3969,6 +3969,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@trpc/client@npm:^10.45.2":
+  version: 10.45.2
+  resolution: "@trpc/client@npm:10.45.2"
+  peerDependencies:
+    "@trpc/server": 10.45.2
+  checksum: 10/a772f7ed529d1753412f04abbd84432e49eadec626fc568354349832995aa06f41d42f434ec4152f2531d125a719a332b935ae2adbbc262e2a6e569ec761f260
+  languageName: node
+  linkType: hard
+
+"@trpc/server@npm:^10.45.2":
+  version: 10.45.2
+  resolution: "@trpc/server@npm:10.45.2"
+  checksum: 10/0f3fdb5cd505c9f6947e00d67d61663cf87c51c9a591e5f3443f62b37b7d78e1f729cc6784090ec46e4a3c38e73277170590be8eeb8c4ee3dffcc80a3557c1a4
+  languageName: node
+  linkType: hard
+
 "@trysound/sax@npm:0.2.0":
   version: 0.2.0
   resolution: "@trysound/sax@npm:0.2.0"
@@ -12348,6 +12364,8 @@ __metadata:
     "@nuxt/module-builder": "npm:^0.8.4"
     "@nuxt/schema": "npm:^3.13.2"
     "@nuxt/test-utils": "npm:^3.14.4"
+    "@trpc/client": "npm:^10.45.2"
+    "@trpc/server": "npm:^10.45.2"
     "@types/node": "npm:latest"
     changelogen: "npm:^0.5.7"
     eslint: "npm:^9.14.0"
@@ -12355,6 +12373,9 @@ __metadata:
     typescript: "npm:latest"
     vitest: "npm:^2.1.4"
     vue-tsc: "npm:^2.1.10"
+  peerDependencies:
+    "@trpc/client": ^10.45.2
+    "@trpc/server": ^10.45.2
   languageName: unknown
   linkType: soft
 

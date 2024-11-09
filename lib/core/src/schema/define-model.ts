@@ -1,3 +1,4 @@
+import type { DeepPartial } from '../typescript'
 import type { DeclaroSchema } from './types'
 import { mergician } from 'mergician'
 
@@ -56,4 +57,13 @@ export function mergeModels<
     T2 extends DeclaroSchema.AnyObjectProperties,
 >(model1: Model<T1, N>, model2: Model<T2, N>): Model<T1 & T2, N> {
     return mergician(model1, model2) as any
+}
+
+export function extendModel<
+    T extends DeclaroSchema.AnyObjectProperties,
+    N extends Readonly<string>,
+    E extends DeclaroSchema.AnyObjectProperties,
+>(model: Model<T, N>, extension: DeclaroSchema.SchemaObject<E>): Model<T & E, N> {
+    const annotation = defineModel(model.name, extension)
+    return mergeModels(model, annotation)
 }

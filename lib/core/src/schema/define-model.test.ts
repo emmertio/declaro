@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineModel, mergeModels, type ModelName, type ModelProperties } from '.'
+import { defineModel, extendModel, mergeModels, type ModelName, type ModelProperties } from '.'
 import { t } from './properties'
 
 describe('Model definition', async () => {
@@ -127,5 +127,54 @@ describe('Model definition', async () => {
         expect(merged.schema.properties.year.type).toBe('integer')
         expect(merged.schema.properties.meta.properties.rating.type).toBe('integer')
         expect(merged.schema.properties.rating.type).toBe('integer')
+    })
+
+    it('should extend existing models', async () => {
+        const base = defineModel('Movie', {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                    minimum: 3,
+                    labels: {
+                        singularEntityName: 'Title',
+                        pluralEntityName: 'Titles',
+                    },
+                },
+                year: {
+                    type: 'integer',
+                    format: 'int32',
+                },
+                meta: {
+                    type: 'object',
+                    properties: {
+                        rating: t.integer(),
+                    },
+                },
+            },
+            required: ['title'],
+            labels: {
+                singularEntityName: 'Movie',
+                pluralEntityName: 'Movies',
+            },
+        })
+
+        const extended = extendModel(base, {
+            type: 'object',
+            properties: {
+                foo: {
+                    type: 'string',
+                },
+                title: {
+                    type: 'string',
+                    maximum: 100,
+                },
+            },
+        })
+
+        expect(extended.schema.properties.title.minimum).toBe(3)
+        expect(extended.schema.properties.title.maximum).toBe(100)
+        expect(extended.schema.properties.foo.type).toBe('string')
+        expect(extended.schema.properties.year.type).toBe('integer')
     })
 })

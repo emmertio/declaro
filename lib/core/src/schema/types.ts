@@ -79,7 +79,7 @@ export declare namespace DeclaroSchema {
     export type Payload<T extends AnyObjectProperties, TSchema extends SchemaObject<T>> = any
 
     export interface ReferenceObject {
-        $ref: ModelNames
+        $ref: Readonly<ModelNames>
         format?: string
     }
 

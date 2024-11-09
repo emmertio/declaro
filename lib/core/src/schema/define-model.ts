@@ -9,6 +9,9 @@ export type Model<
     name: N
     schema: DeclaroSchema.SchemaObject<T>
     isModel: true
+    reference: {
+        $ref: N
+    }
 }
 
 type TraverseSchemaFn<T extends DeclaroSchema.AnyObjectProperties> = (
@@ -36,18 +39,25 @@ export function initializeModel(schema: DeclaroSchema.SchemaObject<any>) {
 
 export function defineModel<T extends DeclaroSchema.AnyObjectProperties, N extends Readonly<string>>(
     name: N,
-    doc: DeclaroSchema.SchemaObject<T>,
+    definition: DeclaroSchema.SchemaObject<T> | (() => DeclaroSchema.SchemaObject<T>),
 ): Model<T, N> {
-    traverseSchema(doc, (name, property, schema) => {
-        return initializeModel({
-            propertyName: name,
-            ...property,
-        })
-    })
     return {
         name: name as Readonly<N>,
-        schema: { ...doc },
+        get schema() {
+            const doc = typeof definition === 'function' ? definition() : definition
+            traverseSchema(doc, (name, property, schema) => {
+                return initializeModel({
+                    propertyName: name,
+                    ...property,
+                })
+            })
+
+            return doc
+        },
         isModel: true,
+        reference: {
+            $ref: name,
+        },
     }
 }
 
@@ -56,7 +66,14 @@ export function mergeModels<
     N extends Readonly<string>,
     T2 extends DeclaroSchema.AnyObjectProperties,
 >(model1: Model<T1, N>, model2: Model<T2, N>): Model<T1 & T2, N> {
-    return mergician(model1, model2) as any
+    return {
+        name: model1.name,
+        schema: mergician(model1.schema, model2.schema),
+        isModel: true,
+        reference: {
+            $ref: model1.name,
+        },
+    }
 }
 
 export function extendModel<

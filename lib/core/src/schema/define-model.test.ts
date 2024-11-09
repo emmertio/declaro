@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineModel, type ModelName, type ModelProperties } from '.'
+import { defineModel, mergeModels, type ModelName, type ModelProperties } from '.'
 import { t } from './properties'
 
 describe('Model definition', async () => {
@@ -80,5 +80,52 @@ describe('Model definition', async () => {
 
         expect(movie.schema.properties.meta.type).toBe('object')
         expect(movie.schema.properties.meta.properties.rating.type).toBe('integer')
+    })
+
+    it('should merge models', async () => {
+        const base = defineModel('Movie', {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                    labels: {
+                        singularEntityName: 'Title',
+                        pluralEntityName: 'Titles',
+                    },
+                },
+                year: {
+                    type: 'integer',
+                    format: 'int32',
+                },
+                meta: {
+                    type: 'object',
+                    properties: {
+                        rating: t.integer(),
+                    },
+                },
+            },
+            required: ['title'],
+            labels: {
+                singularEntityName: 'Movie',
+                pluralEntityName: 'Movies',
+            },
+        })
+
+        const annotation = defineModel('Movie', {
+            type: 'object',
+            properties: {
+                rating: {
+                    type: 'integer',
+                    format: 'int32',
+                },
+            },
+        })
+
+        const merged = mergeModels(base, annotation)
+
+        expect(merged.schema.properties.title.type).toBe('string')
+        expect(merged.schema.properties.year.type).toBe('integer')
+        expect(merged.schema.properties.meta.properties.rating.type).toBe('integer')
+        expect(merged.schema.properties.rating.type).toBe('integer')
     })
 })

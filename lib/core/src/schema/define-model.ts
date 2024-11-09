@@ -1,4 +1,5 @@
 import type { DeclaroSchema } from './types'
+import { mergician } from 'mergician'
 
 export type Model<
     T extends DeclaroSchema.AnyObjectProperties = DeclaroSchema.AnyObjectProperties,
@@ -47,4 +48,12 @@ export function defineModel<T extends DeclaroSchema.AnyObjectProperties, N exten
         schema: { ...doc },
         isModel: true,
     }
+}
+
+export function mergeModels<
+    T1 extends DeclaroSchema.AnyObjectProperties,
+    N extends Readonly<string>,
+    T2 extends DeclaroSchema.AnyObjectProperties,
+>(model1: Model<T1, N>, model2: Model<T2, N>): Model<T1 & T2, N> {
+    return mergician(model1, model2) as any
 }

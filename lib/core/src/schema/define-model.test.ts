@@ -77,5 +77,8 @@ describe('Model definition', async () => {
                 pluralEntityName: 'Movies',
             },
         })
+
+        expect(movie.schema.properties.meta.type).toBe('object')
+        expect(movie.schema.properties.meta.properties.rating.type).toBe('integer')
     })
 })

@@ -17,7 +17,11 @@
         "@nuxt/icon": "^1.5.0",
         "@nuxtjs/storybook": "^8.2.0",
         "@pinia/nuxt": "^0.5.4",
+        "@prisma/client": "^5.22.0",
+        "@scalar/nuxt": "^0.2.140",
         "@sinclair/typebox": "^0.33.15",
+        "@zenstackhq/runtime": "2.8.1",
+        "@zenstackhq/server": "^2.8.1",
         "nuxt": "^3.13.0",
         "vue": "latest"
     },
@@ -34,12 +38,15 @@
         "@storybook/test": "^8.2.9",
         "@storybook/vue3": "^8.2.9",
         "@types/node": "^18.17.5",
+        "@zenstackhq/openapi": "^2.8.1",
         "autoprefixer": "^10.4.20",
         "daisyui": "^4.12.10",
         "postcss": "^8.4.47",
+        "prisma": "^5.22.0",
         "sass": "^1.77.8",
         "storybook": "^8.2.9",
-        "tailwindcss": "^3.4.10"
+        "tailwindcss": "^3.4.10",
+        "zenstack": "2.8.1"
     },
     "gitHead": "6677bf0382c0434caadf03515bacb9f1fd238cad"
 }

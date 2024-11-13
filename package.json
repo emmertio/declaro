@@ -23,7 +23,8 @@
     "devDependencies": {
         "@tsconfig/node20": "^20.1.4",
         "husky": "^9.1.5",
-        "lerna": "^7.0.2"
+        "lerna": "^7.0.2",
+        "rimraf": "^6.0.1"
     },
     "packageManager": "yarn@4.3.1"
 }

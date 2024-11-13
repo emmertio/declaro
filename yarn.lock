@@ -663,10 +663,13 @@ __metadata:
     nuxt: "npm:^3.13.0"
     postcss: "npm:^8.4.47"
     prisma: "npm:^5.22.0"
+    rimraf: "npm:^6.0.1"
     sass: "npm:^1.77.8"
     storybook: "npm:^8.2.9"
     tailwindcss: "npm:^3.4.10"
+    typescript: "npm:^5.6.3"
     vue: "npm:latest"
+    vue-tsc: "npm:^2.1.10"
     zenstack: "npm:2.8.1"
   languageName: unknown
   linkType: soft
@@ -8002,6 +8005,7 @@ __metadata:
     "@tsconfig/node20": "npm:^20.1.4"
     husky: "npm:^9.1.5"
     lerna: "npm:^7.0.2"
+    rimraf: "npm:^6.0.1"
   languageName: unknown
   linkType: soft
 
@@ -10040,7 +10044,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"glob@npm:*":
+"glob@npm:*, glob@npm:^11.0.0":
   version: 11.0.0
   resolution: "glob@npm:11.0.0"
   dependencies:
@@ -16864,6 +16868,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"rimraf@npm:^6.0.1":
+  version: 6.0.1
+  resolution: "rimraf@npm:6.0.1"
+  dependencies:
+    glob: "npm:^11.0.0"
+    package-json-from-dist: "npm:^1.0.0"
+  bin:
+    rimraf: dist/esm/bin.mjs
+  checksum: 10/0eb7edf08aa39017496c99ba675552dda11a20811ba78f8232da2ba945308c91e9cd673f95998b1a8202bc7436d33390831d23ea38ae52751038d56373ad99e2
+  languageName: node
+  linkType: hard
+
 "rollup-plugin-node-externals@npm:^6.1.1":
   version: 6.1.2
   resolution: "rollup-plugin-node-externals@npm:6.1.2"
@@ -17120,7 +17136,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:^7.0.0, semver@npm:^7.1.1, semver@npm:^7.3.4, semver@npm:^7.3.5, semver@npm:^7.3.7, semver@npm:^7.3.8, semver@npm:^7.5.2, semver@npm:^7.5.3, semver@npm:^7.6.2, semver@npm:^7.6.3":
+"semver@npm:^7.0.0, semver@npm:^7.1.1, semver@npm:^7.3.4, semver@npm:^7.3.5, semver@npm:^7.3.7, semver@npm:^7.3.8, semver@npm:^7.5.2, semver@npm:^7.5.3, semver@npm:^7.5.4, semver@npm:^7.6.2, semver@npm:^7.6.3":
   version: 7.6.3
   resolution: "semver@npm:7.6.3"
   bin:
@@ -18686,7 +18702,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:>=3 < 6, typescript@npm:^5.0.0, typescript@npm:^5.5.4":
+"typescript@npm:>=3 < 6, typescript@npm:^5.0.0, typescript@npm:^5.5.4, typescript@npm:^5.6.3":
   version: 5.6.3
   resolution: "typescript@npm:5.6.3"
   bin:
@@ -18706,7 +18722,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@npm%3A>=3 < 6#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.0.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.5.4#optional!builtin<compat/typescript>":
+"typescript@patch:typescript@npm%3A>=3 < 6#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.0.0#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.5.4#optional!builtin<compat/typescript>, typescript@patch:typescript@npm%3A^5.6.3#optional!builtin<compat/typescript>":
   version: 5.6.3
   resolution: "typescript@patch:typescript@npm%3A5.6.3#optional!builtin<compat/typescript>::version=5.6.3&hash=379a07"
   bin:
@@ -19986,6 +20002,21 @@ __metadata:
   version: 1.2.5
   resolution: "vue-sonner@npm:1.2.5"
   checksum: 10/1e5dd85c520ec49391f3baaef4e1badb9ae5451c97edaf4d49ade7ffbb35a31542f3723c0e305860c8d8dc7ca69a0c4d316de8072287d7add633ee4fb770e63c
+  languageName: node
+  linkType: hard
+
+"vue-tsc@npm:^2.1.10":
+  version: 2.1.10
+  resolution: "vue-tsc@npm:2.1.10"
+  dependencies:
+    "@volar/typescript": "npm:~2.4.8"
+    "@vue/language-core": "npm:2.1.10"
+    semver: "npm:^7.5.4"
+  peerDependencies:
+    typescript: ">=5.0.0"
+  bin:
+    vue-tsc: ./bin/vue-tsc.js
+  checksum: 10/a64ad7b4388a1e2679cc0a53b6ecd7e26e5fda131ada06d7f02040c650616bdf93532482224f0e719a912b4d3222ec64997171f4721a29cf734b964141629691
   languageName: node
   linkType: hard
 

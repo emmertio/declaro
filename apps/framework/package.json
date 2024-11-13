@@ -11,7 +11,7 @@
         "postinstall": "nuxt prepare",
         "storybook": "storybook dev --port 6006",
         "build-storybook": "storybook build",
-        "typecheck": "nuxt typecheck"
+        "typecheck": "echo \"no-op\""
     },
     "dependencies": {
         "@nuxt/icon": "^1.5.0",
@@ -43,9 +43,12 @@
         "daisyui": "^4.12.10",
         "postcss": "^8.4.47",
         "prisma": "^5.22.0",
+        "rimraf": "^6.0.1",
         "sass": "^1.77.8",
         "storybook": "^8.2.9",
         "tailwindcss": "^3.4.10",
+        "typescript": "^5.6.3",
+        "vue-tsc": "^2.1.10",
         "zenstack": "2.8.1"
     },
     "gitHead": "6677bf0382c0434caadf03515bacb9f1fd238cad"

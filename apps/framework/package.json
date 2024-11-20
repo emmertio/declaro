@@ -14,7 +14,7 @@
         "typecheck": "nuxt typecheck"
     },
     "dependencies": {
-        "@declaro/di": "workspace:^",
+        "@declaro/di": "^2.0.0-beta.12",
         "@nuxt/icon": "^1.5.0",
         "@nuxtjs/storybook": "^8.2.0",
         "@pinia/nuxt": "^0.5.4",
@@ -42,5 +42,5 @@
         "storybook": "^8.2.9",
         "tailwindcss": "^3.4.10"
     },
-    "gitHead": "6677bf0382c0434caadf03515bacb9f1fd238cad"
+    "gitHead": "06be92e98c8af0f81c1fbbf672f197f38346d449"
 }

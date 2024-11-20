@@ -24,6 +24,9 @@
         "vite-plugin-dts": "^2.3.0",
         "vitest": "^0.32.2"
     },
+    "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.11"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/emmertio/declaro.git#main"

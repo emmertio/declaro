@@ -1,5 +1,15 @@
-import type { Class, Merge } from '@declaro/core'
 import _ from 'lodash'
+
+export type Class<T extends {} = {}, A extends any[] = any[]> = {
+    new (...args: A): T
+}
+
+/**
+ * Merge two object types without using an intersection type. Intersection types preserve the original types of the objects causing confusion, while this type will merge the types of the objects.
+ */
+export type Merge<A, B> = {
+    [key in keyof A | keyof B]: key extends keyof B ? B[key] : key extends keyof A ? A[key] : never
+}
 
 export type FilterKeys<T, U> = {
     [K in keyof T]: T[K] extends U ? K : never

@@ -4,12 +4,15 @@ export type Class<T extends {} = {}, A extends any[] = any[]> = {
     new (...args: A): T
 }
 
+// Tells typescript to calculate this type and cache it as a static type.
+export type MakeStatic<T> = {} & { [K in keyof T]: T[K] }
+
 /**
- * Merge two object types without using an intersection type. Intersection types preserve the original types of the objects causing confusion, while this type will merge the types of the objects.
+ * Merge types in a performant way while preserving types.
  */
-export type Merge<A, B> = {
+export type Merge<A, B> = MakeStatic<{
     [key in keyof A | keyof B]: key extends keyof B ? B[key] : key extends keyof A ? A[key] : never
-}
+}>
 
 export type FilterKeys<T, U> = {
     [K in keyof T]: T[K] extends U ? K : never

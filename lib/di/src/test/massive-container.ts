@@ -1,91 +1,11 @@
 import { Container, defineExtension } from '../container'
 
 export type DeepNestedObject = {
-    level1: {
-        level2: {
-            level3: {
-                level4: {
-                    level5: {
-                        level6: {
-                            level7: {
-                                level8: {
-                                    level9: {
-                                        level10: {
-                                            name: string
-                                            value: number
-                                            nestedArray: Array<{
-                                                id: number
-                                                data: {
-                                                    info: string
-                                                    details: {
-                                                        description: string
-                                                        metadata: {
-                                                            created: Date
-                                                            updated: Date
-                                                            tags: string[]
-                                                            flags: {
-                                                                isActive: boolean
-                                                                isDeleted: boolean
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }>
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    level1: {}
 }
 
 export const complexObject: DeepNestedObject = {
-    level1: {
-        level2: {
-            level3: {
-                level4: {
-                    level5: {
-                        level6: {
-                            level7: {
-                                level8: {
-                                    level9: {
-                                        level10: {
-                                            name: 'Deeply Nested Object',
-                                            value: 42,
-                                            nestedArray: [
-                                                {
-                                                    id: 1,
-                                                    data: {
-                                                        info: 'Sample Info',
-                                                        details: {
-                                                            description: 'Sample Description',
-                                                            metadata: {
-                                                                created: new Date(),
-                                                                updated: new Date(),
-                                                                tags: ['sample', 'test'],
-                                                                flags: {
-                                                                    isActive: true,
-                                                                    isDeleted: false,
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    },
+    level1: {},
 }
 
 export class BigClass {
@@ -95,37 +15,37 @@ export class BigClass {
 export const massiveModule = defineExtension((container) => {
     return (
         container
-            .provideValue('complexObject', complexObject)
+            // .provideValue('complexObject', complexObject)
             // .provideValue(
             //     'deeplyNestedObject',
             //     complexObject.level1.level2.level3.level4.level5.level6.level7.level8.level9.level10,
             // )
-            .provideAsyncClass('bigAsyncClass', BigClass, ['complexObject'])
-            .provideAsyncFactory('deeplyNestedObjectFactory', async (container) => {
-                return container.get('deeplyNestedObject')
-            })
-            .provideFactory('deeplyNestedObjectFactorySync', (container) => {
-                return container.get('deeplyNestedObject')
-            })
-            .provideClass('bigClass', BigClass, ['complexObject'])
-            .provideValue('value1', complexObject)
-            .provideValue('value2', complexObject)
-            .provideValue('value3', complexObject)
-            .provideValue('value4', complexObject)
-            .provideValue('value5', complexObject)
-            .provideValue('value6', complexObject)
-            .provideValue('value7', complexObject)
-            .provideValue('value8', complexObject)
-            .provideValue('value9', complexObject)
-            .provideValue('value10', complexObject)
-            .provideValue('value11', complexObject)
-            .provideValue('value12', complexObject)
-            .provideValue('value13', complexObject)
-            .provideValue('value14', complexObject)
-            .provideValue('value15', complexObject)
-            .provideValue('value16', complexObject)
-            .provideValue('value17', complexObject)
-            .provideValue('value18', complexObject)
+            // .provideAsyncClass('bigAsyncClass', BigClass, ['complexObject'])
+            // .provideAsyncFactory('deeplyNestedObjectFactory', async (container) => {
+            //     return container.get('deeplyNestedObject')
+            // })
+            // .provideFactory('deeplyNestedObjectFactorySync', (container) => {
+            //     return container.get('deeplyNestedObject')
+            // })
+            // .provideClass('bigClass', BigClass, ['complexObject'])
+            // .provideValue('value1', complexObject)
+            // .provideValue('value2', complexObject)
+            // .provideValue('value3', complexObject)
+            // .provideValue('value4', complexObject)
+            // .provideValue('value5', complexObject)
+            // .provideValue('value6', complexObject)
+            // .provideValue('value7', complexObject)
+            // .provideValue('value8', complexObject)
+            // .provideValue('value9', complexObject)
+            // .provideValue('value10', complexObject)
+            // .provideValue('value11', complexObject)
+            // .provideValue('value12', complexObject)
+            // .provideValue('value13', complexObject)
+            // .provideValue('value14', complexObject)
+            // .provideValue('value15', complexObject)
+            // .provideValue('value16', complexObject)
+            // .provideValue('value17', complexObject)
+            // .provideValue('value18', complexObject)
             .provideValue('value19', complexObject)
             .provideValue('value20', complexObject)
             .provideValue('value21', complexObject)

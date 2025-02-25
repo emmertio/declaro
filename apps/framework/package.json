@@ -40,7 +40,8 @@
         "postcss": "^8.4.47",
         "sass": "^1.77.8",
         "storybook": "^8.2.9",
-        "tailwindcss": "^3.4.10"
+        "tailwindcss": "^3.4.10",
+        "vue-tsc": "^2.2.4"
     },
     "gitHead": "40c5dbd874d6591e61deeea51a40dd4bfa39cf5f"
 }

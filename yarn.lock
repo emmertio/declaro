@@ -437,7 +437,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro-apps/framework@workspace:apps/framework"
   dependencies:
-    "@declaro/di": "workspace:^"
+    "@declaro/di": "npm:^2.0.0-beta.13"
     "@iconify-json/mdi": "npm:^1.2.0"
     "@nuxt/icon": "npm:^1.5.0"
     "@nuxtjs/storybook": "npm:^8.2.0"
@@ -494,20 +494,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/core@npm:^2.0.0-beta.11, @declaro/core@workspace:^, @declaro/core@workspace:lib/core":
+"@declaro/core@npm:^2.0.0-beta.13, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
-    "@declaro/di": "npm:^2.0.0-beta.11"
+    "@declaro/di": "npm:^2.0.0-beta.13"
+    "@types/whatwg-url": "npm:^13.0.0"
     "@vitest/coverage-v8": "npm:^2.0.5"
     change-case: "npm:^4.1.2"
     json-schema-library: "npm:^7.4.8"
+    minimatch: "npm:^10.0.1"
+    node-mocks-http: "npm:^1.16.2"
     openapi-types: "npm:^12.1.3"
     pluralize: "npm:^8.0.0"
     typescript: "npm:^5.5.4"
     vite: "npm:^5.4.1"
     vite-plugin-dts: "npm:^4.0.3"
     vitest: "npm:^2.0.5"
+    whatwg-url: "npm:^14.1.1"
   peerDependencies:
     "@declaro/di": ^2.0.0-beta.6
   languageName: unknown
@@ -517,7 +521,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.11"
+    "@declaro/core": "npm:^2.0.0-beta.13"
     "@vitest/coverage-v8": "npm:^0.32.2"
     minimatch: "npm:^9.0.4"
     vite: "npm:^4.4.2"
@@ -568,17 +572,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@npm:^2.0.0-beta.11, @declaro/di@workspace:^, @declaro/di@workspace:lib/di":
+"@declaro/di@npm:^2.0.0-beta.13, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
-    "@declaro/core": "workspace:^"
     "@vitest/coverage-v8": "npm:^0.32.2"
     vite: "npm:^4.4.2"
     vite-plugin-dts: "npm:^2.3.0"
     vitest: "npm:^0.32.2"
-  peerDependencies:
-    "@declaro/core": ^2.0.0-beta.11
   languageName: unknown
   linkType: soft
 
@@ -586,8 +587,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/express@workspace:lib/express"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.11"
-    "@declaro/di": "npm:^2.0.0-beta.11"
+    "@declaro/core": "npm:^2.0.0-beta.13"
+    "@declaro/di": "npm:^2.0.0-beta.13"
     "@types/express": "npm:^4"
     "@vitest/coverage-v8": "npm:^0.32.2"
     express: "npm:^4.21.1"
@@ -597,6 +598,24 @@ __metadata:
     vitest: "npm:^0.32.2"
   peerDependencies:
     "@declaro/core": ^2.0.0-beta.3
+  languageName: unknown
+  linkType: soft
+
+"@declaro/redis@workspace:lib/redis":
+  version: 0.0.0-use.local
+  resolution: "@declaro/redis@workspace:lib/redis"
+  dependencies:
+    "@declaro/core": "npm:^2.0.0-beta.13"
+    "@vitest/coverage-v8": "npm:^0.32.2"
+    express: "npm:^4.21.1"
+    express-openapi: "npm:^12.1.3"
+    ioredis: "npm:^5.5.0"
+    vite: "npm:^4.4.2"
+    vite-plugin-dts: "npm:^2.3.0"
+    vitest: "npm:^0.32.2"
+  peerDependencies:
+    "@declaro/core": ^2.0.0-beta.3
+    ioredis: ^5.5.0
   languageName: unknown
   linkType: soft
 
@@ -3784,6 +3803,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/webidl-conversions@npm:*":
+  version: 7.0.3
+  resolution: "@types/webidl-conversions@npm:7.0.3"
+  checksum: 10/535ead9de4d3d6c8e4f4fa14e9db780d2a31e8020debc062f337e1420a41c3265e223e4f4b628f97a11ecf3b96390962cd88a9ffe34f44e159dec583ff49aa34
+  languageName: node
+  linkType: hard
+
+"@types/whatwg-url@npm:^13.0.0":
+  version: 13.0.0
+  resolution: "@types/whatwg-url@npm:13.0.0"
+  dependencies:
+    "@types/webidl-conversions": "npm:*"
+  checksum: 10/82018c7dc057dd4b5ee6137e54a659d2d043146eaade8afc2dda472773cc66f2abad73525020a2bf399a09b1bf448504f9e519d6b2d7495e6e781bb5de686753
+  languageName: node
+  linkType: hard
+
 "@unhead/dom@npm:1.11.10":
   version: 1.11.10
   resolution: "@unhead/dom@npm:1.11.10"
@@ -4504,7 +4539,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"accepts@npm:^1.3.5, accepts@npm:~1.3.8":
+"accepts@npm:^1.3.5, accepts@npm:^1.3.7, accepts@npm:~1.3.8":
   version: 1.3.8
   resolution: "accepts@npm:1.3.8"
   dependencies:
@@ -6041,7 +6076,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"content-disposition@npm:0.5.4, content-disposition@npm:~0.5.2":
+"content-disposition@npm:0.5.4, content-disposition@npm:^0.5.3, content-disposition@npm:~0.5.2":
   version: 0.5.4
   resolution: "content-disposition@npm:0.5.4"
   dependencies:
@@ -6691,7 +6726,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"depd@npm:~1.1.2":
+"depd@npm:^1.1.0, depd@npm:~1.1.2":
   version: 1.1.2
   resolution: "depd@npm:1.1.2"
   checksum: 10/2ed6966fc14463a9e85451db330ab8ba041efed0b9a1a472dbfc6fbf2f82bab66491915f996b25d8517dddc36c8c74e24c30879b34877f3c4410733444a51d1d
@@ -8010,7 +8045,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fresh@npm:0.5.2, fresh@npm:~0.5.2":
+"fresh@npm:0.5.2, fresh@npm:^0.5.2, fresh@npm:~0.5.2":
   version: 0.5.2
   resolution: "fresh@npm:0.5.2"
   checksum: 10/64c88e489b5d08e2f29664eb3c79c705ff9a8eb15d3e597198ef76546d4ade295897a44abb0abd2700e7ef784b2e3cbf1161e4fbf16f59129193fd1030d16da1
@@ -9112,6 +9147,23 @@ __metadata:
     redis-parser: "npm:^3.0.0"
     standard-as-callback: "npm:^2.1.0"
   checksum: 10/9043b812ac58065e80c759d130602cc64490fcaeaacf93723453fda04c7ba61dab0e2f50380eacb045592378ededf44f270c0d43e13e3e8b8d7c5a8d7fecb823
+  languageName: node
+  linkType: hard
+
+"ioredis@npm:^5.5.0":
+  version: 5.5.0
+  resolution: "ioredis@npm:5.5.0"
+  dependencies:
+    "@ioredis/commands": "npm:^1.1.1"
+    cluster-key-slot: "npm:^1.1.0"
+    debug: "npm:^4.3.4"
+    denque: "npm:^2.1.0"
+    lodash.defaults: "npm:^4.2.0"
+    lodash.isarguments: "npm:^3.1.0"
+    redis-errors: "npm:^1.2.0"
+    redis-parser: "npm:^3.0.0"
+    standard-as-callback: "npm:^2.1.0"
+  checksum: 10/2f54b669974a8128c795c87909869405cefda60f4736c8eacd52597fac5e1a706ae14cd410e17ccd523142e9f7ba353a28414d1169990a2058f9ee445d51ddfd
   languageName: node
   linkType: hard
 
@@ -10597,7 +10649,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"merge-descriptors@npm:1.0.3":
+"merge-descriptors@npm:1.0.3, merge-descriptors@npm:^1.0.1":
   version: 1.0.3
   resolution: "merge-descriptors@npm:1.0.3"
   checksum: 10/52117adbe0313d5defa771c9993fe081e2d2df9b840597e966aadafde04ae8d0e3da46bac7ca4efc37d4d2b839436582659cd49c6a43eacb3fe3050896a105d1
@@ -10658,7 +10710,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mime@npm:1.6.0":
+"mime@npm:1.6.0, mime@npm:^1.3.4":
   version: 1.6.0
   resolution: "mime@npm:1.6.0"
   bin:
@@ -10715,7 +10767,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"minimatch@npm:^10.0.0":
+"minimatch@npm:^10.0.0, minimatch@npm:^10.0.1":
   version: 10.0.1
   resolution: "minimatch@npm:10.0.1"
   dependencies:
@@ -11319,6 +11371,32 @@ __metadata:
   version: 1.1.12
   resolution: "node-machine-id@npm:1.1.12"
   checksum: 10/46bf3d4fab8d0e63b24c42bcec2b6975c7ec5bc16e53d7a589d095668d0fdf0bfcbcdc28246dd1ef74cf95a37fbd774cd4b17b41f518d79dfad7fdc99f995903
+  languageName: node
+  linkType: hard
+
+"node-mocks-http@npm:^1.16.2":
+  version: 1.16.2
+  resolution: "node-mocks-http@npm:1.16.2"
+  dependencies:
+    accepts: "npm:^1.3.7"
+    content-disposition: "npm:^0.5.3"
+    depd: "npm:^1.1.0"
+    fresh: "npm:^0.5.2"
+    merge-descriptors: "npm:^1.0.1"
+    methods: "npm:^1.1.2"
+    mime: "npm:^1.3.4"
+    parseurl: "npm:^1.3.3"
+    range-parser: "npm:^1.2.0"
+    type-is: "npm:^1.6.18"
+  peerDependencies:
+    "@types/express": ^4.17.21 || ^5.0.0
+    "@types/node": "*"
+  peerDependenciesMeta:
+    "@types/express":
+      optional: true
+    "@types/node":
+      optional: true
+  checksum: 10/63269343071c389795c418468a167d92aa13eda3936aaa79f8159025e01502ec982469fd11f04395b7ad2241d2f4fd65ca84eac29973c4d941d86a4ba2e56f90
   languageName: node
   linkType: hard
 
@@ -12320,7 +12398,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"parseurl@npm:^1.3.2, parseurl@npm:~1.3.3":
+"parseurl@npm:^1.3.2, parseurl@npm:^1.3.3, parseurl@npm:~1.3.3":
   version: 1.3.3
   resolution: "parseurl@npm:1.3.3"
   checksum: 10/407cee8e0a3a4c5cd472559bca8b6a45b82c124e9a4703302326e9ab60fc1081442ada4e02628efef1eb16197ddc7f8822f5a91fd7d7c86b51f530aedb17dfa2
@@ -13408,7 +13486,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"punycode@npm:^2.1.0":
+"punycode@npm:^2.1.0, punycode@npm:^2.3.1":
   version: 2.3.1
   resolution: "punycode@npm:2.3.1"
   checksum: 10/febdc4362bead22f9e2608ff0171713230b57aff9dddc1c273aa2a651fbd366f94b7d6a71d78342a7c0819906750351ca7f2edd26ea41b626d87d6a13d1bd059
@@ -13461,7 +13539,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"range-parser@npm:~1.2.1":
+"range-parser@npm:^1.2.0, range-parser@npm:~1.2.1":
   version: 1.2.1
   resolution: "range-parser@npm:1.2.1"
   checksum: 10/ce21ef2a2dd40506893157970dc76e835c78cf56437e26e19189c48d5291e7279314477b06ac38abd6a401b661a6840f7b03bd0b1249da9b691deeaa15872c26
@@ -15235,6 +15313,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tr46@npm:^5.0.0":
+  version: 5.0.0
+  resolution: "tr46@npm:5.0.0"
+  dependencies:
+    punycode: "npm:^2.3.1"
+  checksum: 10/29155adb167d048d3c95d181f7cb5ac71948b4e8f3070ec455986e1f34634acae50ae02a3c8d448121c3afe35b76951cd46ed4c128fd80264280ca9502237a3e
+  languageName: node
+  linkType: hard
+
 "tr46@npm:~0.0.3":
   version: 0.0.3
   resolution: "tr46@npm:0.0.3"
@@ -15379,7 +15466,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"type-is@npm:^1.6.16, type-is@npm:~1.6.18":
+"type-is@npm:^1.6.16, type-is@npm:^1.6.18, type-is@npm:~1.6.18":
   version: 1.6.18
   resolution: "type-is@npm:1.6.18"
   dependencies:
@@ -16514,10 +16601,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"webidl-conversions@npm:^7.0.0":
+  version: 7.0.0
+  resolution: "webidl-conversions@npm:7.0.0"
+  checksum: 10/4c4f65472c010eddbe648c11b977d048dd96956a625f7f8b9d64e1b30c3c1f23ea1acfd654648426ce5c743c2108a5a757c0592f02902cf7367adb7d14e67721
+  languageName: node
+  linkType: hard
+
 "webpack-virtual-modules@npm:^0.6.2":
   version: 0.6.2
   resolution: "webpack-virtual-modules@npm:0.6.2"
   checksum: 10/d9a0d035f7ec0c7f1055aaf88bfe48b7f96458043916a1b2926d9012fd61de3810a6b768e31a8cd4b3c84a9b6d55824361a9dd20aaf9f5ccfb6f017af216a178
+  languageName: node
+  linkType: hard
+
+"whatwg-url@npm:^14.1.1":
+  version: 14.1.1
+  resolution: "whatwg-url@npm:14.1.1"
+  dependencies:
+    tr46: "npm:^5.0.0"
+    webidl-conversions: "npm:^7.0.0"
+  checksum: 10/803bede3ec6c8f14de0d84ac6032479646b5a2b08f5a7289366c3461caed9d7888d171e2846b59798869191037562c965235c2eed6ff2e266c05a2b4a6ce0160
   languageName: node
   linkType: hard
 

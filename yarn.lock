@@ -604,13 +604,17 @@ __metadata:
   resolution: "@declaro/redis@workspace:lib/redis"
   dependencies:
     "@declaro/core": "npm:^2.0.0-beta.16"
+    "@types/ioredis-mock": "npm:^8.2.5"
     "@vitest/coverage-v8": "npm:^0.32.2"
     ioredis: "npm:^5.5.0"
+    ioredis-mock: "npm:^8.9.0"
     vite: "npm:^4.4.2"
     vite-plugin-dts: "npm:^2.3.0"
     vitest: "npm:^0.32.2"
   peerDependencies:
     "@declaro/core": ^2.0.0-beta.3
+    "@types/ioredis-mock": ^8.9.0
+    ioredis-mock: ^8.9.0
   languageName: unknown
   linkType: soft
 
@@ -1330,7 +1334,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ioredis/commands@npm:^1.1.1":
+"@ioredis/as-callback@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "@ioredis/as-callback@npm:3.0.0"
+  checksum: 10/2835e39631497fe4f8b07d95576abea165c9f7efef81e9e55c733588051ff4edcb31eeb59f36127923dae0cb1a8e21b4e27ee3ab79a065a0baeecf861c3bc0b1
+  languageName: node
+  linkType: hard
+
+"@ioredis/commands@npm:^1.1.1, @ioredis/commands@npm:^1.2.0":
   version: 1.2.0
   resolution: "@ioredis/commands@npm:1.2.0"
   checksum: 10/a8253c9539b7e5463d4a98e6aa5b1b863fb4a4978191ba9dc42ec2c0fb5179d8d1fe4a29096d5954f91ba9600d1bdc6c1d18b044eab36f645f267fd37d7c0906
@@ -3670,6 +3681,16 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: 10/fa86d5397c021f6c824d1143a206009bfb64ff703da32fb30f6176c603daf6c24ce3a28daf26b3945c94dd10f9d76f07ea7a6a2c3e9b710e00ff42da32e08dea
+  languageName: node
+  linkType: hard
+
+"@types/ioredis-mock@npm:^8.2.5":
+  version: 8.2.5
+  resolution: "@types/ioredis-mock@npm:8.2.5"
+  dependencies:
+    "@types/node": "npm:*"
+    ioredis: "npm:>=5"
+  checksum: 10/c32a20e02f8c777780b8663ba83bc7be4a5098fe44c390dd28cb69c9b60fc6dcfa1cbc7e5f8dca3579e85b3be1a08b5b8201a5a2d6d1195e5e5840b13538caab
   languageName: node
   linkType: hard
 
@@ -7950,6 +7971,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fengari-interop@npm:^0.1.3":
+  version: 0.1.3
+  resolution: "fengari-interop@npm:0.1.3"
+  peerDependencies:
+    fengari: ^0.1.0
+  checksum: 10/17450a2f62f2bce2d1ccedcc2360630857d1b83f2874fa3e47475afd4ab0942452b35bcca26f7e55e1bfd504ad2709232406fa11efd2ce96f256ff841dd5ebd3
+  languageName: node
+  linkType: hard
+
+"fengari@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "fengari@npm:0.1.4"
+  dependencies:
+    readline-sync: "npm:^1.4.9"
+    sprintf-js: "npm:^1.1.1"
+    tmp: "npm:^0.0.33"
+  checksum: 10/50799d0159c2c35d44636bf52ca3b65a3dc2acada6dcf9505a0826b78b16a80814cca3900e35e983f30b4ba242fa520261915b79d5595757deab60e37634838c
+  languageName: node
+  linkType: hard
+
 "figures@npm:3.2.0, figures@npm:^3.0.0":
   version: 3.2.0
   resolution: "figures@npm:3.2.0"
@@ -9183,6 +9224,39 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ioredis-mock@npm:^8.9.0":
+  version: 8.9.0
+  resolution: "ioredis-mock@npm:8.9.0"
+  dependencies:
+    "@ioredis/as-callback": "npm:^3.0.0"
+    "@ioredis/commands": "npm:^1.2.0"
+    fengari: "npm:^0.1.4"
+    fengari-interop: "npm:^0.1.3"
+    semver: "npm:^7.5.4"
+  peerDependencies:
+    "@types/ioredis-mock": ^8
+    ioredis: ^5
+  checksum: 10/698bdb79ccf58da73ae957e5dfa9d9778d08d801552c89fe9c5ac40287261fb2d2c4d72071164b715ded2d5d874d623543aa98ee116c6f57419b35e50e6beebb
+  languageName: node
+  linkType: hard
+
+"ioredis@npm:>=5, ioredis@npm:^5.5.0":
+  version: 5.5.0
+  resolution: "ioredis@npm:5.5.0"
+  dependencies:
+    "@ioredis/commands": "npm:^1.1.1"
+    cluster-key-slot: "npm:^1.1.0"
+    debug: "npm:^4.3.4"
+    denque: "npm:^2.1.0"
+    lodash.defaults: "npm:^4.2.0"
+    lodash.isarguments: "npm:^3.1.0"
+    redis-errors: "npm:^1.2.0"
+    redis-parser: "npm:^3.0.0"
+    standard-as-callback: "npm:^2.1.0"
+  checksum: 10/2f54b669974a8128c795c87909869405cefda60f4736c8eacd52597fac5e1a706ae14cd410e17ccd523142e9f7ba353a28414d1169990a2058f9ee445d51ddfd
+  languageName: node
+  linkType: hard
+
 "ioredis@npm:^5.4.1":
   version: 5.4.1
   resolution: "ioredis@npm:5.4.1"
@@ -9197,23 +9271,6 @@ __metadata:
     redis-parser: "npm:^3.0.0"
     standard-as-callback: "npm:^2.1.0"
   checksum: 10/9043b812ac58065e80c759d130602cc64490fcaeaacf93723453fda04c7ba61dab0e2f50380eacb045592378ededf44f270c0d43e13e3e8b8d7c5a8d7fecb823
-  languageName: node
-  linkType: hard
-
-"ioredis@npm:^5.5.0":
-  version: 5.5.0
-  resolution: "ioredis@npm:5.5.0"
-  dependencies:
-    "@ioredis/commands": "npm:^1.1.1"
-    cluster-key-slot: "npm:^1.1.0"
-    debug: "npm:^4.3.4"
-    denque: "npm:^2.1.0"
-    lodash.defaults: "npm:^4.2.0"
-    lodash.isarguments: "npm:^3.1.0"
-    redis-errors: "npm:^1.2.0"
-    redis-parser: "npm:^3.0.0"
-    standard-as-callback: "npm:^2.1.0"
-  checksum: 10/2f54b669974a8128c795c87909869405cefda60f4736c8eacd52597fac5e1a706ae14cd410e17ccd523142e9f7ba353a28414d1169990a2058f9ee445d51ddfd
   languageName: node
   linkType: hard
 
@@ -13817,6 +13874,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"readline-sync@npm:^1.4.9":
+  version: 1.4.10
+  resolution: "readline-sync@npm:1.4.10"
+  checksum: 10/5eb6465f5c5391e32cb525022a307a910a565828cd53da87ac05fca291607df54099dd65bc9c7a513ac53a5eb4e11454d48f0dcf4ad54126d36dec5fcec4a8f0
+  languageName: node
+  linkType: hard
+
 "recast@npm:^0.23.1, recast@npm:^0.23.5":
   version: 0.23.9
   resolution: "recast@npm:0.23.9"
@@ -14253,6 +14317,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"semver@npm:^7.5.4":
+  version: 7.7.1
+  resolution: "semver@npm:7.7.1"
+  bin:
+    semver: bin/semver.js
+  checksum: 10/4cfa1eb91ef3751e20fc52e47a935a0118d56d6f15a837ab814da0c150778ba2ca4f1a4d9068b33070ea4273629e615066664c2cfcd7c272caf7a8a0f6518b2c
+  languageName: node
+  linkType: hard
+
 "semver@npm:~7.5.4":
   version: 7.5.4
   resolution: "semver@npm:7.5.4"
@@ -14655,7 +14728,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sprintf-js@npm:^1.1.3":
+"sprintf-js@npm:^1.1.1, sprintf-js@npm:^1.1.3":
   version: 1.1.3
   resolution: "sprintf-js@npm:1.1.3"
   checksum: 10/e7587128c423f7e43cc625fe2f87e6affdf5ca51c1cc468e910d8aaca46bb44a7fbcfa552f787b1d3987f7043aeb4527d1b99559e6621e01b42b3f45e5a24cbb

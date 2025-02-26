@@ -17,7 +17,7 @@ export default defineConfig({
         },
         write: true,
         rollupOptions: {
-            external: ['ioredis'],
+            external: ['ioredis', 'ioredis-mock'],
         },
     },
     plugins: [

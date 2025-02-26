@@ -38,5 +38,5 @@
     "dependencies": {
         "ioredis": "^5.5.0"
     },
-    "gitHead": "07b4123bd6b84ea360a694330ae5670c1232977f"
+    "gitHead": "0002fea00bc54fffff363d91706e0f3867831bef"
 }

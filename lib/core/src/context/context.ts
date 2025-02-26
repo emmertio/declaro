@@ -327,10 +327,16 @@ export class Context<Scope extends object = any> {
      * @param contexts
      * @returns
      */
-    extend(...contexts: Context[]) {
-        return contexts.reduce((workingState, context) => {
+    extend(...contexts: Context[]): this {
+        contexts.reduce((workingState, context) => {
             return merge(workingState, context.state)
         }, this.state)
+
+        contexts.reduce((workingScope, context) => {
+            return merge(workingScope, context.scope)
+        }, this.scope)
+
+        return this
     }
 
     /**

@@ -286,4 +286,48 @@ describe('Context', () => {
         expect(context.scope.bar).toBe(42)
         expect(context.scope.name).toBe('Person')
     })
+
+    it('should support merging scopes', async () => {
+        type ScopeA = {
+            bar: number
+            name: string
+        }
+        const context = new Context<ScopeA>()
+
+        context.registerValue('bar', 42)
+        context.registerValue('name', 'Person')
+
+        type ScopeB = ScopeA & {
+            foo: string
+        }
+
+        const context2 = new Context<ScopeB>()
+        context2.extend(context)
+
+        let factoryInstances = 0
+
+        context2.registerFactory(
+            'foo',
+            (name: string, bar: number) => {
+                factoryInstances = factoryInstances + 1
+                return `Hello ${name}, the answer is ${bar}`
+            },
+            ['name', 'bar'],
+        )
+
+        expect(factoryInstances).toBe(0)
+
+        const foo = context2.scope.foo
+
+        expect(factoryInstances).toBe(1)
+        expect(foo).toBe('Hello Person, the answer is 42')
+
+        const foo2 = context2.scope.foo
+
+        expect(factoryInstances).toBe(2)
+        expect(foo2).toBe('Hello Person, the answer is 42')
+
+        expect(context2.scope.bar).toBe(42)
+        expect(context2.scope.name).toBe('Person')
+    })
 })

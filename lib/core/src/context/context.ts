@@ -71,7 +71,7 @@ export class Context<Scope extends object = any> {
     private readonly state: ContextState<this> = {}
     private readonly emitter = new EventManager()
 
-    public readonly scope: Scope
+    public readonly scope: Scope = {} as Scope
 
     protected readonly defaultResolveOptions: ResolveOptions
 
@@ -112,6 +112,12 @@ export class Context<Scope extends object = any> {
      */
     register<K extends ScopeKey<Scope>>(key: K, dep: ContextAttribute<this, Scope[K]>) {
         this.state[key] = dep
+
+        Object.defineProperty(this.scope, key, {
+            get: () => this.resolve(key),
+            enumerable: true,
+            configurable: true,
+        })
 
         if (dep?.resolveOptions?.eager) {
             this.on('declaro:init', async () => {

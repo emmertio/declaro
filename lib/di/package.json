@@ -1,6 +1,6 @@
 {
     "name": "@declaro/di",
-    "version": "2.0.0-beta.16",
+    "version": "2.0.0-beta.17",
     "description": "Dependency injection with excellent type introspection",
     "main": "dist/pkg.cjs",
     "module": "dist/pkg.mjs",

@@ -437,7 +437,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro-apps/framework@workspace:apps/framework"
   dependencies:
-    "@declaro/di": "npm:^2.0.0-beta.16"
+    "@declaro/di": "npm:^2.0.0-beta.18"
     "@iconify-json/mdi": "npm:^1.2.0"
     "@nuxt/icon": "npm:^1.5.0"
     "@nuxtjs/storybook": "npm:^8.2.0"
@@ -495,7 +495,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/core@npm:^2.0.0-beta.16, @declaro/core@workspace:lib/core":
+"@declaro/core@npm:^2.0.0-beta.18, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
@@ -519,7 +519,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.16"
+    "@declaro/core": "npm:^2.0.0-beta.18"
     "@vitest/coverage-v8": "npm:^0.32.2"
     minimatch: "npm:^9.0.4"
     vite: "npm:^4.4.2"
@@ -570,7 +570,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@npm:^2.0.0-beta.16, @declaro/di@workspace:lib/di":
+"@declaro/di@npm:^2.0.0-beta.18, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
@@ -585,8 +585,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/express@workspace:lib/express"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.16"
-    "@declaro/di": "npm:^2.0.0-beta.16"
+    "@declaro/core": "npm:^2.0.0-beta.18"
+    "@declaro/di": "npm:^2.0.0-beta.18"
     "@types/express": "npm:^4"
     "@vitest/coverage-v8": "npm:^0.32.2"
     express: "npm:^4.21.1"
@@ -603,7 +603,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/redis@workspace:lib/redis"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.16"
+    "@declaro/core": "npm:^2.0.0-beta.18"
     "@types/ioredis-mock": "npm:^8.2.5"
     "@vitest/coverage-v8": "npm:^0.32.2"
     ioredis: "npm:^5.5.0"

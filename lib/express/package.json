@@ -41,5 +41,5 @@
         "express": "^4.21.1",
         "express-openapi": "^12.1.3"
     },
-    "gitHead": "0002fea00bc54fffff363d91706e0f3867831bef"
+    "gitHead": "67fb645b2ac9b2ef02480ebf57c8759fb09f20fd"
 }

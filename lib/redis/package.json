@@ -24,12 +24,14 @@
         "ioredis-mock": "^8.9.0",
         "vite": "^4.4.2",
         "vite-plugin-dts": "^2.3.0",
-        "vitest": "^0.32.2"
+        "vitest": "^0.32.2",
+        "ioredis": "^5.5.0"
     },
     "peerDependencies": {
         "@declaro/core": "^2.0.0-beta.3",
         "@types/ioredis-mock": "^8.9.0",
-        "ioredis-mock": "^8.9.0"
+        "ioredis-mock": "^8.9.0",
+        "ioredis": "^5.5.0"
     },
     "repository": {
         "type": "git",
@@ -39,8 +41,6 @@
         "url": "https://github.com/emmertio/declaro/issues"
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-    "dependencies": {
-        "ioredis": "^5.5.0"
-    },
-    "gitHead": "c027e0a9381e62416dda0edf28259fb2cb3a34a4"
+    "dependencies": {},
+    "gitHead": "6bb95d3b0c013e1473cc6f1a829d71db6edc3939"
 }

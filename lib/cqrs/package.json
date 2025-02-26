@@ -1,6 +1,6 @@
 {
   "name": "@declaro/cqrs",
-  "version": "2.0.0-beta.16",
+  "version": "2.0.0-beta.19",
   "description": "Declarative Business Module Definition",
   "main": "dist/pkg.cjs",
   "module": "dist/pkg.mjs",
@@ -18,7 +18,7 @@
     "test": "vitest"
   },
   "devDependencies": {
-    "@declaro/core": "^2.0.0-beta.16",
+    "@declaro/core": "^2.0.0-beta.19",
     "@vitest/coverage-v8": "^0.32.2",
     "minimatch": "^9.0.4",
     "vite": "^4.4.2",
@@ -39,5 +39,5 @@
     "url": "https://github.com/emmertio/declaro/issues"
   },
   "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-  "gitHead": "07b4123bd6b84ea360a694330ae5670c1232977f"
+  "gitHead": "67fb645b2ac9b2ef02480ebf57c8759fb09f20fd"
 }

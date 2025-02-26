@@ -1,6 +1,6 @@
 {
     "name": "@declaro/redis",
-    "version": "2.0.0-beta.16",
+    "version": "2.0.0-beta.19",
     "description": "Redis tools for Declaro",
     "main": "dist/pkg.cjs",
     "module": "dist/pkg.mjs",
@@ -18,7 +18,7 @@
         "test": "vitest"
     },
     "devDependencies": {
-        "@declaro/core": "^2.0.0-beta.16",
+        "@declaro/core": "^2.0.0-beta.19",
         "@types/ioredis-mock": "^8.2.5",
         "@vitest/coverage-v8": "^0.32.2",
         "ioredis-mock": "^8.9.0",
@@ -42,5 +42,5 @@
     "dependencies": {
         "ioredis": "^5.5.0"
     },
-    "gitHead": "07b4123bd6b84ea360a694330ae5670c1232977f"
+    "gitHead": "67fb645b2ac9b2ef02480ebf57c8759fb09f20fd"
 }

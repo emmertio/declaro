@@ -16,6 +16,9 @@ export default defineConfig({
             fileName: (format) => `pkg.${extensions[format]}`,
         },
         write: true,
+        rollupOptions: {
+            external: ['ioredis'],
+        },
     },
     plugins: [
         dts({

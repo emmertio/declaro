@@ -330,4 +330,17 @@ describe('Context', () => {
         expect(context2.scope.bar).toBe(42)
         expect(context2.scope.name).toBe('Person')
     })
+
+    it(`Should allow factories without args`, () => {
+        type Scope = {
+            foo: string
+        }
+        const context = new Context<Scope>()
+
+        context.registerFactory('foo', () => 'Hello')
+
+        const foo = context.resolve('foo')
+
+        expect(foo).toBe('Hello')
+    })
 })

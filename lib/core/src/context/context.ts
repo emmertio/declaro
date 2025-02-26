@@ -161,7 +161,7 @@ export class Context<Scope extends object = any> {
     ) {
         const attribute: ContextAttribute<this, Scope[K]> = {
             value: (context) => {
-                const args = inject?.map((key) => context.resolve(key)) as A
+                const args = (inject?.map((key) => context.resolve(key)) ?? []) as A
 
                 return factory(...args)
             },

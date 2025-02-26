@@ -1,6 +1,6 @@
 {
   "name": "@declaro/data",
-  "version": "2.0.0-beta.21",
+  "version": "2.0.0-beta.22",
   "description": "Database utils",
   "main": "dist/declaro-data.cjs",
   "module": "dist/declaro-data.mjs",

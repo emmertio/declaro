@@ -288,8 +288,8 @@ export class Context<Scope extends object = any> {
         return this._resolveValue(key) as T
     }
 
-    resolve<K extends ScopeKey<Scope>>(key: K): Scope[K] {
-        return this._resolveValue(key)
+    resolve<K extends ScopeKey<Scope>>(key: K, resolveOptions?: ResolveOptions): Scope[K] {
+        return this._resolveValue(key, resolveOptions)
     }
 
     /**

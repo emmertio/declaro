@@ -1,4 +1,4 @@
-import { Context } from '.'
+import { Context } from './context'
 import { sleep } from '../timing'
 import { ContextConsumer } from './context-consumer'
 import { describe, it, vi } from 'vitest'

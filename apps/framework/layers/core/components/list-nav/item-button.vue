@@ -2,7 +2,7 @@
     <NuxtLink
         :to="item.to"
         :href="item.href"
-        class="flex flex-row items-center gap-1.5"
+        class="flex flex-row items-center gap-1.5 no-underline"
         :class="{
             active: active,
         }"

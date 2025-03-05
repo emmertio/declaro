@@ -1,6 +1,6 @@
 <template>
     <Panel>
-        <h1>Admin</h1>
+        <h1 class="bg-red">Admin</h1>
     </Panel>
 </template>
 

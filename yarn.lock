@@ -437,7 +437,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro-apps/framework@workspace:apps/framework"
   dependencies:
-    "@declaro/di": "npm:^2.0.0-beta.20"
+    "@declaro/di": "npm:^2.0.0-beta.26"
     "@iconify-json/mdi": "npm:^1.2.0"
     "@nuxt/icon": "npm:^1.5.0"
     "@nuxtjs/storybook": "npm:^8.2.0"
@@ -495,7 +495,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@declaro/core@npm:^2.0.0-beta.20, @declaro/core@workspace:lib/core":
+"@declaro/core@npm:^2.0.0-beta.26, @declaro/core@workspace:lib/core":
   version: 0.0.0-use.local
   resolution: "@declaro/core@workspace:lib/core"
   dependencies:
@@ -519,7 +519,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/cqrs@workspace:lib/cqrs"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.20"
+    "@declaro/core": "npm:^2.0.0-beta.26"
     "@vitest/coverage-v8": "npm:^0.32.2"
     minimatch: "npm:^9.0.4"
     vite: "npm:^4.4.2"
@@ -570,7 +570,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@declaro/di@npm:^2.0.0-beta.20, @declaro/di@workspace:lib/di":
+"@declaro/di@npm:^2.0.0-beta.26, @declaro/di@workspace:lib/di":
   version: 0.0.0-use.local
   resolution: "@declaro/di@workspace:lib/di"
   dependencies:
@@ -585,8 +585,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/express@workspace:lib/express"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.20"
-    "@declaro/di": "npm:^2.0.0-beta.20"
+    "@declaro/core": "npm:^2.0.0-beta.26"
+    "@declaro/di": "npm:^2.0.0-beta.26"
     "@types/express": "npm:^4"
     "@vitest/coverage-v8": "npm:^0.32.2"
     express: "npm:^4.21.1"
@@ -603,7 +603,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@declaro/redis@workspace:lib/redis"
   dependencies:
-    "@declaro/core": "npm:^2.0.0-beta.20"
+    "@declaro/core": "npm:^2.0.0-beta.26"
     "@types/ioredis-mock": "npm:^8.2.5"
     "@vitest/coverage-v8": "npm:^0.32.2"
     ioredis: "npm:^5.5.0"
@@ -6672,6 +6672,7 @@ __metadata:
     "@tsconfig/node20": "npm:^20.1.4"
     husky: "npm:^9.1.5"
     lerna: "npm:^7.0.2"
+    rimraf: "npm:^6.0.1"
   languageName: unknown
   linkType: soft
 
@@ -8555,6 +8556,22 @@ __metadata:
   bin:
     glob: dist/esm/bin.mjs
   checksum: 10/698dfe11828b7efd0514cd11e573eaed26b2dff611f0400907281ce3eab0c1e56143ef9b35adc7c77ecc71fba74717b510c7c223d34ca8a98ec81777b293d4ac
+  languageName: node
+  linkType: hard
+
+"glob@npm:^11.0.0":
+  version: 11.0.1
+  resolution: "glob@npm:11.0.1"
+  dependencies:
+    foreground-child: "npm:^3.1.0"
+    jackspeak: "npm:^4.0.1"
+    minimatch: "npm:^10.0.0"
+    minipass: "npm:^7.1.2"
+    package-json-from-dist: "npm:^1.0.0"
+    path-scurry: "npm:^2.0.0"
+  bin:
+    glob: dist/esm/bin.mjs
+  checksum: 10/57b12a05cc25f1c38f3b24cf6ea7a8bacef11e782c4b9a8c5b0bef3e6c5bcb8c4548cb31eb4115592e0490a024c1bde7359c470565608dd061d3b21179740457
   languageName: node
   linkType: hard
 
@@ -14080,6 +14097,18 @@ __metadata:
   bin:
     rimraf: dist/cjs/src/bin.js
   checksum: 10/218ef9122145ccce9d0a71124d36a3894537de46600b37fae7dba26ccff973251eaa98aa63c2c5855a05fa04bca7cbbd7a92d4b29f2875d2203e72530ecf6ede
+  languageName: node
+  linkType: hard
+
+"rimraf@npm:^6.0.1":
+  version: 6.0.1
+  resolution: "rimraf@npm:6.0.1"
+  dependencies:
+    glob: "npm:^11.0.0"
+    package-json-from-dist: "npm:^1.0.0"
+  bin:
+    rimraf: dist/esm/bin.mjs
+  checksum: 10/0eb7edf08aa39017496c99ba675552dda11a20811ba78f8232da2ba945308c91e9cd673f95998b1a8202bc7436d33390831d23ea38ae52751038d56373ad99e2
   languageName: node
   linkType: hard
 

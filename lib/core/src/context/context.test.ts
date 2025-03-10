@@ -291,20 +291,26 @@ describe('Context', () => {
         type ScopeA = {
             bar: number
             name: string
+            foo: string
         }
         const context = new Context<ScopeA>()
 
+        let factoryInstances = 0
+
         context.registerValue('bar', 42)
         context.registerValue('name', 'Person')
+        context.registerFactory('foo', () => {
+            factoryInstances = factoryInstances + 1
+            return 'This should never run'
+        })
 
         type ScopeB = ScopeA & {
             foo: string
+            baz: number
         }
 
         const context2 = new Context<ScopeB>()
         context2.extend(context)
-
-        let factoryInstances = 0
 
         context2.registerFactory(
             'foo',
@@ -314,7 +320,9 @@ describe('Context', () => {
             },
             ['name', 'bar'],
         )
+        context2.registerValue('baz', 100)
 
+        // Ensure that merging doesn't actually run any factories
         expect(factoryInstances).toBe(0)
 
         const foo = context2.scope.foo

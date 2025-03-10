@@ -1,8 +1,7 @@
-import { validate, validateAny, type Validator } from '../validation'
 import { EventManager } from '../events/event-manager'
-import { ContextConsumer } from './context-consumer'
-import { merge } from '../dataflow'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
+import { validate, validateAny, type Validator } from '../validation'
+import { ContextConsumer } from './context-consumer'
 
 export type AppScope = {}
 export type RequestScope = {}
@@ -328,13 +327,11 @@ export class Context<Scope extends object = any> {
      * @returns
      */
     extend(...contexts: Context[]): this {
-        contexts.reduce((workingState, context) => {
-            return merge(workingState, context.state)
-        }, this.state)
-
-        contexts.reduce((workingScope, context) => {
-            return merge(workingScope, context.scope)
-        }, this.scope)
+        contexts.forEach((context) => {
+            Reflect.ownKeys(context.state).forEach((key) => {
+                this.register(key as any, context.state[key])
+            })
+        })
 
         return this
     }

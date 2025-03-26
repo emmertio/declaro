@@ -351,4 +351,123 @@ describe('Context', () => {
 
         expect(foo).toBe('Hello')
     })
+
+    it('should protect against scope leakage', async () => {
+        type BaseScope = {
+            foo: string
+            bar: string
+            base: string
+            validSingleton: string
+            validCachedSingleton: string
+        }
+
+        type ScopeA = BaseScope & {
+            baz: string
+        }
+
+        type ScopeB = BaseScope & {
+            qux: string
+        }
+
+        const baseContext = new Context<BaseScope>()
+
+        baseContext.registerFactory('foo', () => 'Hello', [], {
+            singleton: true,
+        })
+        baseContext.registerFactory('bar', () => 'World', [])
+        baseContext.registerFactory('base', (foo: string, bar: string) => `Base: ${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+        let validSingletonInstances = 0
+        baseContext.registerFactory(
+            'validSingleton',
+            () => {
+                validSingletonInstances = validSingletonInstances + 1
+                return 'Singleton'
+            },
+            [],
+            {
+                singleton: true,
+            },
+        )
+        let validCachedSingletonInstances = 0
+        baseContext.registerFactory(
+            'validCachedSingleton',
+            () => {
+                validCachedSingletonInstances = validCachedSingletonInstances + 1
+                return 'Cached Singleton'
+            },
+            [],
+            {
+                singleton: true,
+            },
+        )
+
+        // Resolve this before forking context to ensure that the cached value gets passed on.
+        const base = baseContext.resolve('base')
+        const validCachedSingleton = baseContext.resolve('validCachedSingleton')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(baseContext)
+        // Override a value that the singleton is going to depend on, but is not a singleton
+        contextA.registerFactory('bar', () => 'Robby', [])
+        // Add another property that dependes on the overridden value
+        contextA.registerFactory('baz', (foo: string, bar: string) => `${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(baseContext)
+        // Override a value that the singleton is going to depend on, and is also a singleton
+        contextB.registerFactory('foo', () => 'Goodbye', [], {
+            singleton: true,
+        })
+        // Add another property that dependes on the overridden value
+        contextB.registerFactory('qux', (foo: string, bar: string) => `${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+
+        const baseA = contextA.resolve('base')
+        const baseB = contextB.resolve('base')
+
+        const baz = contextA.resolve('baz')
+        const qux = contextB.resolve('qux')
+        const foo = baseContext.resolve('foo')
+        const bar = baseContext.resolve('bar')
+
+        const validSingleton = baseContext.resolve('validSingleton')
+        const validSingletonA = contextA.resolve('validSingleton')
+        const validSingletonB = contextB.resolve('validSingleton')
+
+        const validCachedSingletonA = contextA.resolve('validCachedSingleton')
+        const validCachedSingletonB = contextB.resolve('validCachedSingleton')
+
+        // resolve them all again
+        baseContext.resolve('validSingleton')
+        contextA.resolve('validSingleton')
+        contextB.resolve('validSingleton')
+        baseContext.resolve('validCachedSingleton')
+        contextA.resolve('validCachedSingleton')
+        contextB.resolve('validCachedSingleton')
+
+        expect(baz).toBe('Hello Robby')
+        expect(qux).toBe('Goodbye World')
+        expect(foo).toBe('Hello')
+        expect(bar).toBe('World')
+
+        expect(baseA).toBe('Base: Hello Robby')
+        expect(baseB).toBe('Base: Goodbye World')
+        expect(base).toBe('Base: Hello World')
+
+        expect(validSingleton).toBe('Singleton')
+        expect(validSingletonA).toBe('Singleton')
+        expect(validSingletonB).toBe('Singleton')
+
+        expect(validCachedSingleton).toBe('Cached Singleton')
+        expect(validCachedSingletonA).toBe('Cached Singleton')
+        expect(validCachedSingletonB).toBe('Cached Singleton')
+
+        expect(validSingletonInstances).toBe(3)
+        expect(validCachedSingletonInstances).toBe(1)
+    })
 })

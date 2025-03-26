@@ -2,6 +2,8 @@ import { EventManager } from '../events/event-manager'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
+import { cloneDeep } from 'lodash'
+import { v4 as uuid } from 'uuid'
 
 export type AppScope = {}
 export type RequestScope = {}
@@ -42,6 +44,7 @@ export type ContextAttribute<TContext extends Context<any>, TValue> = {
     type: DependencyType
     resolveOptions: ResolveOptions
     cachedValue?: TValue
+    inject: PropertyKey[]
 }
 
 export type ScopeKey<S extends object> = keyof S
@@ -98,6 +101,7 @@ export class Context<Scope extends object = any> {
                 singleton: true,
                 strict: false,
             },
+            inject: [],
         }
 
         this.state[key] = attribute
@@ -110,6 +114,7 @@ export class Context<Scope extends object = any> {
      * @param dep The dependency record
      */
     register<K extends ScopeKey<Scope>>(key: K, dep: ContextAttribute<this, Scope[K]>) {
+        const existingDep = this.state[key]
         this.state[key] = dep
 
         Object.defineProperty(this.scope, key, {
@@ -121,6 +126,17 @@ export class Context<Scope extends object = any> {
         if (dep?.resolveOptions?.eager) {
             this.on('declaro:init', async () => {
                 await this.resolve(key)
+            })
+        }
+
+        // kill any cached values that were made by a previous instance of this attribute
+        if (existingDep) {
+            const injectAttributes = Object.entries(this.state).filter(([_, attribute]) =>
+                attribute?.inject?.includes(key),
+            )
+
+            injectAttributes.forEach(([key, attribute]) => {
+                attribute.cachedValue = undefined
             })
         }
     }
@@ -137,6 +153,7 @@ export class Context<Scope extends object = any> {
             key,
             type: DependencyType.VALUE,
             resolveOptions: defaultResolveOptions,
+            inject: [],
         }
 
         this.register(key, attribute)
@@ -167,6 +184,7 @@ export class Context<Scope extends object = any> {
             key,
             type: DependencyType.FACTORY,
             resolveOptions: defaultResolveOptions,
+            inject: inject ?? [],
         }
 
         this.register(key, attribute)
@@ -189,6 +207,7 @@ export class Context<Scope extends object = any> {
             key,
             type: DependencyType.FACTORY,
             resolveOptions: defaultResolveOptions,
+            inject: inject ?? [],
         }
 
         this.register(key, attribute)
@@ -211,6 +230,7 @@ export class Context<Scope extends object = any> {
             key,
             type: DependencyType.CLASS,
             resolveOptions: defaultResolveOptions,
+            inject: inject ?? [],
         }
 
         this.register(key, attribute)
@@ -235,11 +255,30 @@ export class Context<Scope extends object = any> {
             key,
             type: DependencyType.CLASS,
             resolveOptions: defaultResolveOptions,
+            inject: inject ?? [],
         }
 
         this.register(key, attribute)
 
         return this
+    }
+
+    protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K): boolean {
+        const attribute = this.state[key]
+
+        const needsCache = attribute.resolveOptions?.singleton || attribute.resolveOptions?.eager
+
+        if (!needsCache) {
+            return true
+        }
+
+        const hasCachedValue = attribute.cachedValue !== undefined && attribute.cachedValue !== null
+
+        if (!hasCachedValue) {
+            return false
+        }
+
+        return hasCachedValue && attribute.inject?.every((key) => this._cacheIsValid(key as any))
     }
 
     protected _resolveValue<K extends ScopeKey<Scope>>(key: K, resolveOptions?: ResolveOptions): Scope[K] {
@@ -257,15 +296,16 @@ export class Context<Scope extends object = any> {
 
         let value: Scope[K]
 
-        const shouldCache = attributeResolveOptions.singleton || attributeResolveOptions.eager
+        const serveFromCache = attributeResolveOptions.singleton || attributeResolveOptions.eager
+        const dependenciesValid = attribute?.inject?.every((key) => this._cacheIsValid(key as any))
 
-        if (shouldCache && attribute?.cachedValue) {
+        if (serveFromCache && attribute?.cachedValue && dependenciesValid) {
             value = attribute.cachedValue
         } else {
             value = attribute?.value(this)
         }
 
-        if (shouldCache) {
+        if (serveFromCache) {
             attribute.cachedValue = value
         }
 
@@ -329,7 +369,8 @@ export class Context<Scope extends object = any> {
     extend(...contexts: Context[]): this {
         contexts.forEach((context) => {
             Reflect.ownKeys(context.state).forEach((key) => {
-                this.register(key as any, context.state[key])
+                const dep = cloneDeep(context.state[key])
+                this.register(key as any, dep)
             })
         })
 

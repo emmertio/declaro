@@ -21,10 +21,12 @@
         "@types/whatwg-url": "^13.0.0",
         "@vitest/coverage-v8": "^2.0.5",
         "json-schema-library": "^7.4.8",
+        "lodash": "^4.17.21",
         "minimatch": "^10.0.1",
         "node-mocks-http": "^1.16.2",
         "openapi-types": "^12.1.3",
         "typescript": "^5.5.4",
+        "uuid": "^11.1.0",
         "vite": "^5.4.1",
         "vite-plugin-dts": "^4.0.3",
         "vitest": "^2.0.5",
@@ -42,5 +44,5 @@
         "url": "https://github.com/emmertio/declaro/issues"
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-    "gitHead": "0d68491dd4b645a598046293aca36531d7f9191f"
+    "gitHead": "03b4d187e0f8c2e45c2b53e2e4cc8176245279f9"
 }

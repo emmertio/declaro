@@ -130,12 +130,10 @@ export class Context<Scope extends object = any> {
 
         // kill any cached values that were made by a previous instance of this attribute
         if (existingDep) {
-            const injectAttributes = Object.entries(this.state).filter(([_, attribute]) =>
-                attribute?.inject?.includes(key),
-            )
+            const dependents = this.getAllDependents(key)
 
-            injectAttributes.forEach(([key, attribute]) => {
-                attribute.cachedValue = undefined
+            dependents.forEach((dependent) => {
+                dependent.cachedValue = undefined
             })
         }
     }
@@ -260,6 +258,42 @@ export class Context<Scope extends object = any> {
         this.register(key, attribute)
 
         return this
+    }
+
+    getAllDependencies<K extends ScopeKey<Scope>>(key: K): ContextAttribute<this, any>[] {
+        const attribute = this.state[key]
+
+        if (!attribute) {
+            return []
+        }
+        const dependencies =
+            attribute.inject?.map((key) => this.state[key] ?? ({ key } as ContextAttribute<typeof this, any>)) ?? []
+
+        attribute.inject?.forEach((key) => {
+            const nestedDependencies = this.getAllDependencies(key as any)
+            dependencies.push(...nestedDependencies)
+        })
+
+        return dependencies
+    }
+
+    getAllDependents<K extends ScopeKey<Scope>>(key: K): ContextAttribute<this, any>[] {
+        const dependents = Object.entries(this.state)
+            .filter(([_, attribute]) => attribute.inject?.includes(key))
+            .map(([key, attribute]) => attribute)
+
+        dependents.forEach((dependent) => {
+            const nestedDependents = this.getAllDependents(dependent.key as any)
+            dependents.push(...nestedDependents)
+        })
+
+        return dependents
+    }
+
+    introspect<K extends ScopeKey<Scope>>(key: K) {
+        const attribute = this.state[key]
+
+        return attribute
     }
 
     protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K): boolean {

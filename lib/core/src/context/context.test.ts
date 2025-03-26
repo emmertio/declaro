@@ -352,6 +352,96 @@ describe('Context', () => {
         expect(foo).toBe('Hello')
     })
 
+    it('should get nested dependencies', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `${foo}, two turtle doves`, ['foo'])
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `${bar}, three French hens`, ['bar'])
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `${baz}, four calling birds`, ['baz'])
+
+        const qux = contextC.resolve('qux')
+
+        const allDependencies = contextC.getAllDependencies('qux')
+
+        expect(allDependencies[0].key).toBe('baz')
+        expect(allDependencies[1].key).toBe('bar')
+        expect(allDependencies[2].key).toBe('foo')
+
+        expect(allDependencies[0].inject).toEqual(['bar'])
+        expect(allDependencies[1].inject).toEqual(['foo'])
+        expect(allDependencies[2].inject).toEqual([])
+
+        expect(qux).toBe('A partridge in a pear tree, two turtle doves, three French hens, four calling birds')
+    })
+
+    it('should get nested dependent values', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `${foo}, two turtle doves`, ['foo'])
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `${bar}, three French hens`, ['bar'])
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `${baz}, four calling birds`, ['baz'])
+
+        const dependents = contextC.getAllDependents('foo')
+
+        expect(dependents[0].key).toBe('bar')
+        expect(dependents[1].key).toBe('baz')
+        expect(dependents[2].key).toBe('qux')
+
+        expect(dependents[0].inject).toEqual(['foo'])
+        expect(dependents[1].inject).toEqual(['bar'])
+        expect(dependents[2].inject).toEqual(['baz'])
+    })
+
     it('should protect against scope leakage', async () => {
         type BaseScope = {
             foo: string
@@ -469,5 +559,77 @@ describe('Context', () => {
 
         expect(validSingletonInstances).toBe(3)
         expect(validCachedSingletonInstances).toBe(1)
+    })
+
+    it('should invalid nested dependency caches when overriding a value', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree', [], {
+            singleton: true,
+        })
+        context.resolve('foo')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `two turtle doves, ${foo}`, ['foo'], {
+            singleton: true,
+        })
+        contextA.resolve('bar')
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `three French hens, ${bar}`, ['bar'], {
+            singleton: true,
+        })
+        contextB.resolve('baz')
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `four calling birds, ${baz}`, ['baz'], {
+            singleton: true,
+        })
+        contextC.resolve('qux')
+        contextC.registerFactory('foo', () => 'and a partridge in a pear tree', [], {
+            singleton: true,
+        })
+
+        const fooCache = contextC.introspect('foo').cachedValue
+        const barCache = contextC.introspect('bar').cachedValue
+        const bazCache = contextC.introspect('baz').cachedValue
+        const quxCache = contextC.introspect('qux').cachedValue
+
+        expect(fooCache).toBeUndefined()
+        expect(barCache).toBeUndefined()
+        expect(bazCache).toBeUndefined()
+        expect(quxCache).toBeUndefined()
+
+        contextC.resolve('qux')
+
+        const fooCache2 = contextC.introspect('foo').cachedValue
+        const barCache2 = contextC.introspect('bar').cachedValue
+        const bazCache2 = contextC.introspect('baz').cachedValue
+        const quxCache2 = contextC.introspect('qux').cachedValue
+
+        expect(fooCache2).toBe('and a partridge in a pear tree')
+        expect(barCache2).toBe('two turtle doves, and a partridge in a pear tree')
+        expect(bazCache2).toBe('three French hens, two turtle doves, and a partridge in a pear tree')
+        expect(quxCache2).toBe(
+            'four calling birds, three French hens, two turtle doves, and a partridge in a pear tree',
+        )
     })
 })

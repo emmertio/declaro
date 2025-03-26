@@ -3,7 +3,6 @@ import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
 import { cloneDeep } from 'lodash'
-import { v4 as uuid } from 'uuid'
 
 export type AppScope = {}
 export type RequestScope = {}

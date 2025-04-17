@@ -1,6 +1,6 @@
 {
     "name": "@declaro/db-drizzle",
-    "version": "2.0.0-2.0.0-beta.32.0",
+    "version": "2.0.0-beta.33.0",
     "description": "Drizzle ORM integration",
     "main": "dist/pkg.cjs",
     "module": "dist/pkg.mjs",
@@ -44,5 +44,5 @@
         "drizzle-zod": "^0.5.1",
         "lodash-es": "^4.17.21"
     },
-    "gitHead": "639b567b4f8adfb9da9c3005c3b0ac0aca10c0e6"
+    "gitHead": "30dc600aaf502d80f81bd87c6966f0323b75d89e"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@declaro/build",
-  "version": "2.0.0-beta.33.0",
+  "version": "2.0.0-beta.34",
   "description": "Build extendible business applications",
   "main": "dist/pkg.cjs",
   "module": "dist/pkg.mjs",
@@ -34,5 +34,5 @@
   "dependencies": {
     "vite": "^4.4.2"
   },
-  "gitHead": "30dc600aaf502d80f81bd87c6966f0323b75d89e"
+  "gitHead": "7f7b4b347a43b0908db9832da21ad55fc9e06bc6"
 }

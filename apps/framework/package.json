@@ -1,6 +1,6 @@
 {
     "name": "@declaro-apps/framework",
-    "version": "2.0.0-beta.33.0",
+    "version": "2.0.0-beta.34",
     "main": "./nuxt.config.ts",
     "type": "module",
     "scripts": {
@@ -14,7 +14,7 @@
         "typecheck": "nuxt typecheck"
     },
     "dependencies": {
-        "@declaro/di": "^2.0.0-beta.33.0",
+        "@declaro/di": "^2.0.0-beta.34",
         "@nuxt/icon": "^1.5.0",
         "@nuxtjs/storybook": "^8.2.0",
         "@pinia/nuxt": "^0.5.4",
@@ -43,5 +43,5 @@
         "tailwindcss": "^3.4.10",
         "vue-tsc": "^2.2.4"
     },
-    "gitHead": "30dc600aaf502d80f81bd87c6966f0323b75d89e"
+    "gitHead": "7f7b4b347a43b0908db9832da21ad55fc9e06bc6"
 }

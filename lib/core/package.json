@@ -1,6 +1,6 @@
 {
     "name": "@declaro/core",
-    "version": "2.0.0-beta.33.0",
+    "version": "2.0.0-beta.34",
     "description": "Declarative Business Module Definition",
     "main": "dist/pkg.cjs",
     "module": "dist/pkg.mjs",
@@ -43,5 +43,5 @@
         "url": "https://github.com/emmertio/declaro/issues"
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-    "gitHead": "30dc600aaf502d80f81bd87c6966f0323b75d89e"
+    "gitHead": "7f7b4b347a43b0908db9832da21ad55fc9e06bc6"
 }

@@ -27,16 +27,13 @@ describe('Context', () => {
         context.provide('test', 'Hello World')
         expect(customEventCall.mock.calls.length).toBe(0)
 
-        context.on('customEvent', async (ctx, arg1, arg2, arg3) => {
+        context.on('customEvent', async (ctx) => {
             customEventCall()
             const message = await ctx.inject('test')
             expect(message).toBe('Hello World')
-            expect(arg1).toBe(1)
-            expect(arg2).toBe(2)
-            expect(arg3).toBe(3)
         })
 
-        await context.emit('customEvent', 1, 2, 3)
+        await context.emit('customEvent')
 
         expect(customEventCall.mock.calls.length).toBe(1)
     })

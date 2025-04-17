@@ -4,7 +4,7 @@ export interface IEvent {
 
 export type Listener = (event: IEvent) => any
 
-export class EventManager {
+export class EventManager<E extends IEvent = IEvent> {
     protected readonly listeners: {
         [key: string]: Listener[]
     } = {}
@@ -37,7 +37,7 @@ export class EventManager {
         }
     }
 
-    async emitAsync<E extends IEvent>(event: E) {
+    async emitAsync(event: E) {
         await this.getListeners(event.type)
             .reduce(async (promise, listener) => {
                 await promise
@@ -48,11 +48,11 @@ export class EventManager {
             })
     }
 
-    async emitAll<E extends IEvent>(event: E) {
+    async emitAll(event: E) {
         await Promise.all(this.getListeners(event.type).map((listener) => listener(event)))
     }
 
-    emit<E extends IEvent>(event: E) {
+    emit(event: E) {
         this.getListeners(event.type).forEach((listener) => listener(event))
     }
 

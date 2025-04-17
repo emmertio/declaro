@@ -1,4 +1,4 @@
-import { EventManager } from '../events/event-manager'
+import { EventManager, type IEvent } from '../events/event-manager'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
@@ -48,7 +48,7 @@ export type ContextAttribute<TContext extends Context<any>, TValue> = {
 
 export type ScopeKey<S extends object> = keyof S
 
-export type ContextListener = (context: Context, ...args: any[]) => any
+export type ContextListener = (context: Context) => any
 
 export type ResolveOptions = {
     strict?: boolean
@@ -450,7 +450,9 @@ export class Context<Scope extends object = any> {
      * @returns
      */
     on(event: string, listener: ContextListener) {
-        return this.emitter.on(event, listener)
+        return this.emitter.on(event, (_) => {
+            return listener(this)
+        })
     }
 
     /**
@@ -460,7 +462,9 @@ export class Context<Scope extends object = any> {
      * @param args
      * @returns
      */
-    async emit(event: string, ...args: any[]) {
-        return await this.emitter.emitAsync(event, this, ...args)
+    async emit(event: string) {
+        return await this.emitter.emitAsync({
+            type: event,
+        })
     }
 }

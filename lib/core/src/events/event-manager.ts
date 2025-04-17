@@ -1,4 +1,8 @@
-export type Listener = (...args: any[]) => any
+export interface IEvent {
+    type: string
+}
+
+export type Listener = (event: IEvent) => any
 
 export class EventManager {
     protected readonly listeners: {
@@ -33,23 +37,23 @@ export class EventManager {
         }
     }
 
-    async emitAsync(event: string, ...args: any[]) {
-        await this.getListeners(event)
+    async emitAsync<E extends IEvent>(event: E) {
+        await this.getListeners(event.type)
             .reduce(async (promise, listener) => {
                 await promise
-                return await listener(...args)
+                return await listener(event)
             }, Promise.resolve())
             .catch((e) => {
                 console.error('Error in event listener', e)
             })
     }
 
-    async emitAll(event: string, ...args: any[]) {
-        await Promise.all(this.getListeners(event).map((listener) => listener(...args)))
+    async emitAll<E extends IEvent>(event: E) {
+        await Promise.all(this.getListeners(event.type).map((listener) => listener(event)))
     }
 
-    emit(event: string, ...args: any[]) {
-        this.getListeners(event).forEach((listener) => listener(...args))
+    emit<E extends IEvent>(event: E) {
+        this.getListeners(event.type).forEach((listener) => listener(event))
     }
 
     protected getListenerArray(event: string) {

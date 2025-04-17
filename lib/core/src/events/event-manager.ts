@@ -6,8 +6,10 @@ export class EventManager {
     } = {}
 
     getListeners(event: string) {
-        this.listeners[event] = Array.isArray(this.listeners[event]) ? this.listeners[event] : []
-        return this.listeners[event]
+        const eventListeners = this.getListenerArray(event)
+        const globalListeners = this.listeners['*'] || []
+
+        return [...new Set([...eventListeners, ...globalListeners])]
     }
 
     getEvents() {
@@ -15,26 +17,19 @@ export class EventManager {
     }
 
     on(event: string | string[], listener: Listener) {
-        if (Array.isArray(event)) {
-            const removeListeners = event.map((e) => {
-                this.getListeners(e).push(listener)
-                return () => {
-                    const index = this.getListeners(e).indexOf(listener)
-                    if (index > -1) {
-                        this.getListeners(e).splice(index, 1)
-                    }
-                }
-            })
-            return () => removeListeners.forEach((remove) => remove())
-        }
+        const events = Array.isArray(event) ? event : [event]
 
-        this.getListeners(event).push(listener)
+        events.forEach((e) => {
+            this.getListenerArray(e).push(listener)
+        })
 
         return () => {
-            const index = this.getListeners(event).indexOf(listener)
-            if (index > -1) {
-                this.getListeners(event).splice(index, 1)
-            }
+            events.forEach((e) => {
+                const index = this.getListeners(e).indexOf(listener)
+                if (index > -1) {
+                    this.getListenerArray(e).splice(index, 1)
+                }
+            })
         }
     }
 
@@ -55,5 +50,13 @@ export class EventManager {
 
     emit(event: string, ...args: any[]) {
         this.getListeners(event).forEach((listener) => listener(...args))
+    }
+
+    protected getListenerArray(event: string) {
+        if (!this.listeners[event]) {
+            this.listeners[event] = []
+        }
+
+        return this.listeners[event]
     }
 }

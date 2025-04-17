@@ -74,4 +74,25 @@ describe('Event manager', () => {
         expect(listener2.mock.calls.length).toBe(3)
         expect(eventManager.getEvents().length).toBe(5)
     })
+
+    it('should be able to subscribe to all events', async () => {
+        const eventManager = new EventManager()
+        const testEvent = new TestEvent()
+
+        const cb = (event: TestEvent) => {
+            expect(event).toBe(testEvent)
+        }
+
+        const listener1 = vi.fn(cb)
+        const listener2 = vi.fn(cb)
+
+        eventManager.on(['*', 'event-1'], listener1) // This should only call the listener once
+        eventManager.on('*', listener2)
+
+        await eventManager.emitAll('event-1', testEvent)
+        await eventManager.emitAll('event-2', testEvent)
+
+        expect(listener1.mock.calls.length).toBe(2)
+        expect(listener2.mock.calls.length).toBe(2)
+    })
 })

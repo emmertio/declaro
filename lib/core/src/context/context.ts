@@ -48,7 +48,7 @@ export type ContextAttribute<TContext extends Context<any>, TValue> = {
 
 export type ScopeKey<S extends object> = keyof S
 
-export type ContextListener = (context: Context) => any
+export type ContextListener<C extends Context, E extends IEvent> = (context: C, event: E) => any
 
 export type ResolveOptions = {
     strict?: boolean
@@ -405,6 +405,8 @@ export class Context<Scope extends object = any> {
                 const dep = cloneDeep(context.state[key])
                 this.register(key as any, dep)
             })
+
+            this.emitter.forwardTo(context.emitter)
         })
 
         return this
@@ -449,9 +451,9 @@ export class Context<Scope extends object = any> {
      * @param listener
      * @returns
      */
-    on(event: string, listener: ContextListener) {
-        return this.emitter.on(event, (_) => {
-            return listener(this)
+    on<E extends IEvent = IEvent>(type: IEvent['type'], listener: ContextListener<this, E>) {
+        return this.emitter.on(type, (event) => {
+            return listener(this, event as E)
         })
     }
 

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from './context'
+import type { IEvent } from '../events'
 
 describe('Context', () => {
     it('Should allow value dependency injection', async () => {
@@ -631,5 +632,73 @@ describe('Context', () => {
         expect(quxCache2).toBe(
             'four calling birds, three French hens, two turtle doves, and a partridge in a pear tree',
         )
+    })
+
+    it('should override an async factory with a new value', async () => {
+        type ScopeA = {
+            foo: Promise<string>
+            bar: Promise<number>
+        }
+
+        const contextA = new Context<ScopeA>()
+
+        contextA.registerAsyncFactory('foo', async () => 'Hello', [], {
+            singleton: true,
+        })
+        contextA.registerAsyncFactory('bar', async () => 42, [], {
+            singleton: true,
+        })
+
+        const contextB = new Context<ScopeA>()
+
+        contextB.extend(contextA)
+        contextB.registerAsyncFactory('foo', async () => 'Goodbye', [], {
+            singleton: true,
+        })
+        contextB.registerAsyncFactory('bar', async () => 100, [], {
+            singleton: true,
+        })
+
+        const foo = await contextB.resolve('foo')
+        const bar = await contextB.resolve('bar')
+
+        expect(foo).toBe('Goodbye')
+        expect(bar).toBe(100)
+    })
+
+    it('should inherit emitter listeners, passing in the new context, when extending', async () => {
+        const contextACallback = vi.fn()
+        const contextBCallback = vi.fn()
+
+        type ScopeA = {
+            foo: string
+            bar: number
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type TestEvent = IEvent & {
+            message: string
+        }
+
+        const contextA = new Context<ScopeA>()
+        contextA.registerValue('foo', 'Hello')
+        contextA.registerValue('bar', 42)
+        contextA.on<TestEvent>('test', contextACallback)
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerValue('baz', 'World')
+
+        const eventA: TestEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        await contextB.emit('test')
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
     })
 })

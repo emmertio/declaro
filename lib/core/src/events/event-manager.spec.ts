@@ -118,4 +118,40 @@ describe('Event manager', () => {
         expect(eventManager1.getListeners('test').length).toBe(1)
         expect(eventManager2.getListeners('test').length).toBe(2)
     })
+
+    it('should await nested listeners', async () => {
+        const cb1 = vi.fn(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10))
+        })
+        const cb2 = vi.fn(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10))
+        })
+
+        const eventManager1 = new EventManager()
+        eventManager1.on('test', cb1)
+
+        const eventManager2 = new EventManager()
+        eventManager2.on('test', cb2)
+
+        eventManager2.forwardTo(eventManager1)
+
+        const testEvent = new TestEvent('test')
+        await eventManager2.emitAll(testEvent)
+
+        expect(cb1.mock.calls.length).toBe(1)
+        expect(cb2.mock.calls.length).toBe(1)
+
+        // expect all callbacks to have finished
+        expect(cb1).toHaveResolved()
+        expect(cb2).toHaveResolved()
+
+        await eventManager2.emitAsync(testEvent)
+
+        expect(cb1.mock.calls.length).toBe(2)
+        expect(cb2.mock.calls.length).toBe(2)
+
+        // expect all callbacks to have finished
+        expect(cb1).toHaveResolved()
+        expect(cb2).toHaveResolved()
+    })
 })

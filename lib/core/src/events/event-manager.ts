@@ -22,7 +22,7 @@ export class EventManager<E extends IEvent = IEvent> {
 
     forwardTo(eventManager: EventManager) {
         const cancel = this.on('*', async (event) => {
-            eventManager.emitAsync(event)
+            await eventManager.emitAsync(event)
         })
 
         return cancel

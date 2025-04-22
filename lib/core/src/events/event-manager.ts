@@ -2,11 +2,11 @@ export interface IEvent {
     type: string
 }
 
-export type Listener = (event: IEvent) => any
+export type Listener<E extends IEvent> = (event: E) => any
 
 export class EventManager<E extends IEvent = IEvent> {
     protected readonly listeners: {
-        [key: string]: Listener[]
+        [key: string]: Listener<E>[]
     } = {}
 
     getListeners(event: string) {
@@ -20,7 +20,7 @@ export class EventManager<E extends IEvent = IEvent> {
         return Object.keys(this.listeners)
     }
 
-    on(event: string | string[], listener: Listener) {
+    on(event: string | string[], listener: Listener<E>) {
         const events = Array.isArray(event) ? event : [event]
 
         events.forEach((e) => {

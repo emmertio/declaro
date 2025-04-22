@@ -83,6 +83,16 @@ export class Context<Scope extends object = any> {
         }
     }
 
+    async initializeEagerDependencies() {
+        await Promise.all(
+            Object.entries(this.state)
+                .filter(([, attribute]) => attribute?.resolveOptions?.eager)
+                .map(async ([key, attribute]) => {
+                    await this.resolve(key as any)
+                }),
+        )
+    }
+
     /**
      * Set a value in context, to be injected later.
      *
@@ -121,12 +131,6 @@ export class Context<Scope extends object = any> {
             enumerable: true,
             configurable: true,
         })
-
-        if (dep?.resolveOptions?.eager) {
-            this.on('declaro:init', async () => {
-                await this.resolve(key)
-            })
-        }
 
         // kill any cached values that were made by a previous instance of this attribute
         if (existingDep) {

@@ -239,7 +239,7 @@ describe('Context', () => {
 
         expect(factoryInstances).toBe(0)
 
-        await context.emit('declaro:init')
+        await context.initializeEagerDependencies()
 
         expect(factoryInstances).toBe(1)
 
@@ -700,5 +700,44 @@ describe('Context', () => {
         await contextB.emit('test')
 
         expect(contextACallback).toHaveBeenCalledTimes(1)
+    })
+
+    it('should cancel eager initialization when a depedency is overridden', async () => {
+        type Scope = {
+            foo: string
+            bar: Promise<number>
+        }
+
+        const context = new Context<Scope>()
+
+        const context1Factory = vi.fn(() => 'Hello')
+        const context2Factory = vi.fn(() => 'Goodbye')
+        const context1AsyncFactory = vi.fn(async () => 42)
+        const context2AsyncFactory = vi.fn(async () => 100)
+
+        context.registerFactory('foo', context1Factory, [], {
+            eager: true,
+        })
+        context.registerAsyncFactory('bar', context1AsyncFactory, [], {
+            eager: true,
+        })
+
+        const context2 = new Context<Scope>()
+        context2.extend(context)
+        context2.registerFactory('foo', context2Factory, [], {
+            eager: true,
+        })
+        context2.registerAsyncFactory('bar', context2AsyncFactory, [], {
+            eager: true,
+        })
+
+        context.registerValue('foo', 'Goodbye')
+
+        await context2.initializeEagerDependencies()
+
+        expect(context1Factory).toHaveBeenCalledTimes(0)
+        expect(context2Factory).toHaveBeenCalledTimes(1)
+        expect(context1AsyncFactory).toHaveBeenCalledTimes(0)
+        expect(context2AsyncFactory).toHaveBeenCalledTimes(1)
     })
 })

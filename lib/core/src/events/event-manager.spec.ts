@@ -95,4 +95,27 @@ describe('Event manager', () => {
         expect(listener1.mock.calls.length).toBe(2)
         expect(listener2.mock.calls.length).toBe(2)
     })
+
+    it('should be able to forward events to another event manager', async () => {
+        const cb1 = vi.fn()
+        const cb2 = vi.fn()
+
+        const eventManager1 = new EventManager()
+        eventManager1.on('test', cb1)
+
+        const eventManager2 = new EventManager()
+        eventManager2.on('test', cb2)
+
+        eventManager2.forwardTo(eventManager1)
+
+        const testEvent = new TestEvent('test')
+        await eventManager2.emitAll(testEvent)
+
+        expect(cb1.mock.calls.length).toBe(1)
+        expect(cb2.mock.calls.length).toBe(1)
+        expect(cb1.mock.calls[0][0]).toBe(testEvent)
+        expect(cb2.mock.calls[0][0]).toBe(testEvent)
+        expect(eventManager1.getListeners('test').length).toBe(1)
+        expect(eventManager2.getListeners('test').length).toBe(2)
+    })
 })

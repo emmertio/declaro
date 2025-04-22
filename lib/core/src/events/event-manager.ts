@@ -20,6 +20,14 @@ export class EventManager<E extends IEvent = IEvent> {
         return Object.keys(this.listeners)
     }
 
+    forwardTo(eventManager: EventManager) {
+        const cancel = this.on('*', async (event) => {
+            eventManager.emitAsync(event)
+        })
+
+        return cancel
+    }
+
     on(event: string | string[], listener: Listener<E>) {
         const events = Array.isArray(event) ? event : [event]
 

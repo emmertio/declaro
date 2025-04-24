@@ -691,6 +691,7 @@ describe('Context', () => {
         const contextB = new Context<ScopeB>()
         contextB.extend(contextA)
         contextB.registerValue('baz', 'World')
+        contextB.on<TestEvent>('test', contextBCallback)
 
         const eventA: TestEvent = {
             type: 'test',
@@ -700,6 +701,7 @@ describe('Context', () => {
         await contextB.emit('test')
 
         expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextBCallback).toHaveBeenCalledTimes(1)
     })
 
     it('should cancel eager initialization when a depedency is overridden', async () => {

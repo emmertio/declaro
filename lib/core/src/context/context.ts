@@ -410,7 +410,7 @@ export class Context<Scope extends object = any> {
                 this.register(key as any, dep)
             })
 
-            this.emitter.forwardTo(context.emitter)
+            this.emitter.extend(context.emitter)
         })
 
         return this

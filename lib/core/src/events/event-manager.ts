@@ -21,7 +21,7 @@ export class EventManager<E extends IEvent = IEvent> {
     }
 
     extend(eventManager: EventManager) {
-        const events = this.getEvents()
+        const events = eventManager.getEvents()
         events.forEach((event) => {
             this.getListenerArray(event).push(...eventManager.getListeners(event))
         })

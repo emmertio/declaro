@@ -406,7 +406,8 @@ export class Context<Scope extends object = any> {
     extend(...contexts: Context[]): this {
         contexts.forEach((context) => {
             Reflect.ownKeys(context.state).forEach((key) => {
-                const dep = cloneDeep(context.state[key])
+                // const dep = cloneDeep(context.state[key])
+                const dep = { ...context.state[key] }
                 this.register(key as any, dep)
             })
 

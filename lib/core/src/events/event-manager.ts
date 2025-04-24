@@ -20,6 +20,13 @@ export class EventManager<E extends IEvent = IEvent> {
         return Object.keys(this.listeners)
     }
 
+    extend(eventManager: EventManager) {
+        const events = this.getEvents()
+        events.forEach((event) => {
+            this.getListenerArray(event).push(...eventManager.getListeners(event))
+        })
+    }
+
     forwardTo(eventManager: EventManager) {
         const cancel = this.on('*', async (event) => {
             await eventManager.emitAsync(event)

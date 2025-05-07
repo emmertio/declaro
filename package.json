@@ -9,7 +9,8 @@
     "scripts": {
         "dev": "bun lerna run dev --parallel",
         "typecheck": "bun lerna run typecheck --parallel",
-        "test": "bun lerna run test",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
         "build": "bun lerna run --scope \"@declaro/*\" build",
         "release": "bun typecheck && bun test && bun build && bun lerna publish --force-publish",
         "prepare": "husky"

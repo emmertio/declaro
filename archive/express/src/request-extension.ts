@@ -1,4 +1,4 @@
-import { defer, defineExtension } from '@declaro/di'
+import { defer, defineExtension } from '../../di/dist'
 import type { Request } from 'express'
 
 export const httpRequestExtension = (req: Request) =>

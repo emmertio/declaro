@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Endpoint, type OperationFunction } from './endpoint'
-import { Container } from '@declaro/di'
+import { Container } from '../../di/dist'
 import { Application, type DeclaroSchema, ForbiddenError, t } from '@declaro/core'
 import { httpRequestExtension } from './request-extension'
 

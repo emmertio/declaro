@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ExpressComposer } from './composer'
-import { Container } from '@declaro/di'
+import { Container } from '../../di/dist'
 import { httpRequestExtension } from './request-extension'
 import type { DeclaroSchema } from '@declaro/core/dist/schema/types'
 import { Application, Response, t } from '@declaro/core'

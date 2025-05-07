@@ -1,7 +1,7 @@
 import { getReferenceType, TypescriptMap, type Model } from '@declaro/core'
 import type { PluginConfig } from '../config/plugin-config'
 import path from 'path'
-import type { IModelGenerator } from '../models/model-generator'
+import type { IModelGenerator } from './model-generator'
 import { pascalCase } from 'change-case'
 import fs from 'fs'
 

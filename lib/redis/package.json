@@ -15,7 +15,7 @@
         "dev": "vite build --watch",
         "build": "vite build",
         "preview": "vite preview",
-        "test": "vitest"
+        "test": "vitest --run"
     },
     "devDependencies": {
         "@declaro/core": "^2.0.0-beta.40",

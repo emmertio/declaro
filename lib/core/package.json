@@ -15,7 +15,8 @@
         "dev": "vite build --watch",
         "build": "vite build",
         "preview": "vite preview",
-        "test": "vitest"
+        "test": "vitest --run",
+        "test:watch": "vitest"
     },
     "devDependencies": {
         "@types/whatwg-url": "^13.0.0",

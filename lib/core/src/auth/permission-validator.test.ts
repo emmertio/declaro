@@ -43,7 +43,7 @@ describe('Permission Builder', () => {
 
         const validResult = validator.safeValidate(['look', 'we', 'have', 'some', 'permissions', 'and', 'some', 'more'])
 
-        expect(validResult).to.deep.equal({
+        expect(validResult).toEqual({
             valid: true,
             errorMessage: '',
             errors: [],
@@ -51,7 +51,7 @@ describe('Permission Builder', () => {
 
         expect(() => validator.safeValidate(['we', 'are', 'not', 'authorized'])).not.toThrowError()
         const result = validator.safeValidate(['we', 'are', 'not', 'authorized'])
-        expect(result).to.deep.equal({
+        expect(result).toEqual({
             valid: false,
             errorMessage: 'Tisk tisk',
             errors: [new PermissionError('Tisk tisk', validator.rules[0], ['we', 'are', 'not', 'authorized'])],

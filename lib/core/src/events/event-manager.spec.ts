@@ -141,18 +141,18 @@ describe('Event manager', () => {
         expect(cb1.mock.calls.length).toBe(1)
         expect(cb2.mock.calls.length).toBe(1)
 
-        // expect all callbacks to have finished
-        expect(cb1).toHaveResolved()
-        expect(cb2).toHaveResolved()
+        // Ensure all callbacks have finished by checking the resolved state of the promises
+        await expect(cb1.mock.results[0].value).resolves.toBeUndefined()
+        await expect(cb2.mock.results[0].value).resolves.toBeUndefined()
 
         await eventManager2.emitAsync(testEvent)
 
         expect(cb1.mock.calls.length).toBe(2)
         expect(cb2.mock.calls.length).toBe(2)
 
-        // expect all callbacks to have finished
-        expect(cb1).toHaveResolved()
-        expect(cb2).toHaveResolved()
+        // Ensure all callbacks have finished by checking the resolved state of the promises
+        await expect(cb1.mock.results[1].value).resolves.toBeUndefined()
+        await expect(cb2.mock.results[1].value).resolves.toBeUndefined()
     })
 
     it('should extend another event manager', async () => {

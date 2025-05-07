@@ -1,5 +1,5 @@
 import { validate, validateAny } from './validator'
-import { describe, it, vi } from 'vitest'
+import { describe, it, vi, expect } from 'vitest'
 
 async function sleep(duration: number) {
     return new Promise((resolve, reject) => {
@@ -10,31 +10,25 @@ async function sleep(duration: number) {
 }
 
 describe('Validator', () => {
-    it('Should validate with valid property', async ({ expect }) => {
+    it('Should validate with valid property', async () => {
         const value = {
             message: 'Hello World',
         }
-        const valid = await validate(
-            value,
-            (val) => val.message === 'Hello World',
-        ).valid
+        const valid = await validate(value, (val) => val.message === 'Hello World').valid
 
         expect(valid).toBeTruthy()
     })
 
-    it('Should validate with invalid property', async ({ expect }) => {
+    it('Should validate with invalid property', async () => {
         const value = {
             message: 'Hello Mr. Anderson',
         }
-        const valid = await validate(
-            value,
-            (val) => val.message === 'Hello World',
-        ).valid
+        const valid = await validate(value, (val) => val.message === 'Hello World').valid
 
         expect(valid).toBeFalsy()
     })
 
-    it('Should validate with onValid callback', async ({ expect }) => {
+    it('Should validate with onValid callback', async () => {
         const valid = vi.fn((val) => {
             expect(val).toBe(42)
         })
@@ -54,7 +48,7 @@ describe('Validator', () => {
         expect(invalid.mock.calls.length).toBe(0)
     })
 
-    it('Should validate with onInvalid callback', async ({ expect }) => {
+    it('Should validate with onInvalid callback', async () => {
         const valid = vi.fn((val) => {
             expect(val).toBe(42)
         })
@@ -73,7 +67,7 @@ describe('Validator', () => {
         expect(invalid.mock.calls.length).toBe(1)
     })
 
-    it('Should validate multiple validators', async ({ expect }) => {
+    it('Should validate multiple validators', async () => {
         const value = {
             message: 'Hello Mr. Anderson',
         }
@@ -87,9 +81,7 @@ describe('Validator', () => {
         expect(valid).toBeTruthy()
     })
 
-    it('Should invalidate if one of multiple validators fails', async ({
-        expect,
-    }) => {
+    it('Should invalidate if one of multiple validators fails', async () => {
         const value = {
             message: 'Hello Mr. Anderson',
         }
@@ -103,7 +95,7 @@ describe('Validator', () => {
         expect(valid).toBeFalsy()
     })
 
-    it('Should be able to validate an any strategy', async ({ expect }) => {
+    it('Should be able to validate an any strategy', async () => {
         const value = {
             message: 'Hello Mr. Anderson',
         }
@@ -117,7 +109,7 @@ describe('Validator', () => {
         expect(valid).toBeTruthy()
     })
 
-    it('Should be able to invalidate an any strategy', async ({ expect }) => {
+    it('Should be able to invalidate an any strategy', async () => {
         const value = {
             message: 'Hello Mr. Anderson',
         }
@@ -131,7 +123,7 @@ describe('Validator', () => {
         expect(valid).toBeFalsy()
     })
 
-    it('Should validate an async validator', async ({ expect }) => {
+    it('Should validate an async validator', async () => {
         const value = {
             message: 'Hello World',
         }

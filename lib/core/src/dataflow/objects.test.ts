@@ -2,7 +2,7 @@ import { merge } from './objects'
 import { describe, expect, it } from 'vitest'
 
 describe('Object manipulation tests', () => {
-    it('Should merge objects', ({ expect }) => {
+    it('Should merge objects', () => {
         const CUSTOM_KEY = Symbol()
 
         const objectA = {
@@ -56,7 +56,7 @@ describe('Object manipulation tests', () => {
         expect(output.characters[3]).toBe('Chewie')
     })
 
-    it('Should add non-array items to matching arrays', ({ expect }) => {
+    it('Should add non-array items to matching arrays', () => {
         const a = {
             val: 4,
             arr: [1, 2],
@@ -78,7 +78,7 @@ describe('Object manipulation tests', () => {
         expect(c.arr[2]).toBe(3)
     })
 
-    it('Should handle nulls gracefully', ({ expect }) => {
+    it('Should handle nulls gracefully', () => {
         const a = {
             val: null,
             obj: undefined,

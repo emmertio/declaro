@@ -12,6 +12,11 @@ export const REDIS_PUB_KEY = Symbol()
 export const REDIS_SUB_KEY = Symbol()
 export const REDIS_OPTIONS_KEY = Symbol()
 
+/**
+ * @deprecated Use context's DI system instead
+ * @param options The options to pass to the Redis client
+ * @returns
+ */
 export const redisMiddleware = (options?: RedisOptions) => async (context: Context) => {
     context.provide(REDIS_OPTIONS_KEY, options)
 
@@ -19,15 +24,16 @@ export const redisMiddleware = (options?: RedisOptions) => async (context: Conte
         const redis = new Redis(options)
 
         context.provide(REDIS_CLIENT_KEY, redis)
-        await context.emit(RedisEvents.Connect, redis)
+        await context.emit(RedisEvents.Connect)
     })
 
     context.on(App.Events.Destroy, async (context) => {
         const redis = useRedis(context)
-        await context.emit(RedisEvents.Destroy, redis)
+        await context.emit(RedisEvents.Destroy)
     })
 
-    context.on(RedisEvents.Destroy, async (context, redis: RedisInstance) => {
+    context.on(RedisEvents.Destroy, async (context) => {
+        const redis = useRedis(context)
         await redis.quit()
     })
 }

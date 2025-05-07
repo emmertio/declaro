@@ -2,7 +2,9 @@
     "extends": ["../../tsconfig.json"],
     "compilerOptions": {
         "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "sourceMap": true
     },
     "include": ["src/*.ts", "src/**/*.ts", "src/**/*.d.ts"],
     "buildOptions": {

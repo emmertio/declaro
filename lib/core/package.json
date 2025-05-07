@@ -1,6 +1,6 @@
 {
     "name": "@declaro/core",
-    "version": "2.0.0-beta.41",
+    "version": "2.0.0-beta.42",
     "description": "Declarative Business Module Definition",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
@@ -47,7 +47,7 @@
         "url": "https://github.com/emmertio/declaro/issues"
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-    "gitHead": "97e929b156d8d4f8b622573637411c6da5afb60b",
+    "gitHead": "7e6ea0623a29e76603adab78bdbb704bdb10394e",
     "files": [
         "dist/**/*",
         "src/**/*"

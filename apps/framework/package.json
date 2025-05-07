@@ -1,8 +1,9 @@
 {
     "name": "@declaro-apps/framework",
-    "version": "2.0.0-beta.41",
+    "version": "2.0.0-beta.42",
     "main": "./nuxt.config.ts",
     "type": "module",
+    "private": true,
     "scripts": {
         "build": "nuxt build",
         "dev": "nuxt dev",
@@ -43,5 +44,5 @@
         "tailwindcss": "^3.4.10",
         "vue-tsc": "^2.2.4"
     },
-    "gitHead": "97e929b156d8d4f8b622573637411c6da5afb60b"
+    "gitHead": "7e6ea0623a29e76603adab78bdbb704bdb10394e"
 }

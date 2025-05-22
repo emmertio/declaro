@@ -469,9 +469,9 @@ export class Context<Scope extends object = any> {
      * @param args
      * @returns
      */
-    async emit(event: string) {
-        return await this.emitter.emitAsync({
-            type: event,
-        })
+    async emit(event: string | IEvent) {
+        const eventObject = typeof event === 'string' ? { type: event } : event
+
+        return await this.emitter.emitAsync(eventObject)
     }
 }

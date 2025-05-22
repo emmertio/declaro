@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from './context'
+import { Context, type AppScope } from './context'
 import type { IEvent } from '../events'
 
 describe('Context', () => {
@@ -741,5 +741,28 @@ describe('Context', () => {
         expect(context2Factory).toHaveBeenCalledTimes(1)
         expect(context1AsyncFactory).toHaveBeenCalledTimes(0)
         expect(context2AsyncFactory).toHaveBeenCalledTimes(1)
+    })
+
+    it('should dispatch event objects and event strings', async () => {
+        interface CustomEvent extends IEvent {
+            type: 'test'
+            message: string
+        }
+        const event: CustomEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        const contextACallback = vi.fn()
+
+        const contextA = new Context<AppScope>()
+
+        contextA.on<CustomEvent>('test', contextACallback)
+
+        await contextA.emit(event)
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextACallback.mock.calls[0][1]).toEqual(event)
+        expect(contextACallback.mock.calls[0][0]).toBe(contextA)
     })
 })

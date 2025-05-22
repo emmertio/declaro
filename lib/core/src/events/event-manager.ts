@@ -35,7 +35,7 @@ export class EventManager<E extends IEvent = IEvent> {
         return cancel
     }
 
-    on(event: string | string[], listener: Listener<E>) {
+    on<Event extends E>(event: Event['type'] | Event['type'][], listener: Listener<Event>) {
         const events = Array.isArray(event) ? event : [event]
 
         events.forEach((e) => {

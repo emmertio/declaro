@@ -765,4 +765,26 @@ describe('Context', () => {
         expect(contextACallback.mock.calls[0][1]).toEqual(event)
         expect(contextACallback.mock.calls[0][0]).toBe(contextA)
     })
+
+    it('should be able to emit events directly through the emitter', async () => {
+        interface CustomEvent extends IEvent {
+            type: 'test'
+            message: string
+        }
+        const event: CustomEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        const contextACallback = vi.fn()
+
+        const contextA = new Context<AppScope>()
+
+        contextA.events.on('test', contextACallback)
+
+        await contextA.events.emitAsync(event)
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextACallback.mock.calls[0][0]).toEqual(event)
+    })
 })

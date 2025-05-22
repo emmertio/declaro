@@ -83,6 +83,10 @@ export class Context<Scope extends object = any> {
         }
     }
 
+    get events() {
+        return this.emitter
+    }
+
     async initializeEagerDependencies() {
         await Promise.all(
             Object.entries(this.state)

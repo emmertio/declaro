@@ -349,7 +349,7 @@ export class Context<Scope extends object = any> {
         if (serveFromCache && attribute?.cachedValue && dependenciesValid) {
             value = attribute.cachedValue
         } else {
-            value = typeof attribute.value === 'function' ? attribute.value(this) : undefined
+            value = typeof attribute?.value === 'function' ? attribute.value(this) : undefined
         }
 
         if (serveFromCache) {

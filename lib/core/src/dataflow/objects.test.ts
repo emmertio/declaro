@@ -94,11 +94,11 @@ describe('Object manipulation tests', () => {
 
         const c = merge(a, b)
 
-        expect(c.val[0]).toBe(5)
-        expect(c.val[1]).toBe(6)
+        expect(c.val?.[0]).toBe(5)
+        expect(c.val?.[1]).toBe(6)
 
-        expect(c.obj.a).toBe(1)
-        expect(c.obj.b).toBe(2)
+        expect(c.obj?.a).toBe(1)
+        expect(c.obj?.b).toBe(2)
     })
 
     // it('Should handle circular structures', () => {

@@ -1,5 +1,5 @@
 export interface IEvent {
-    type: string
+    type: Readonly<string>
 }
 
 export type Listener<E extends IEvent> = (event: E) => any
@@ -39,12 +39,12 @@ export class EventManager<E extends IEvent = IEvent> {
         const events = Array.isArray(event) ? event : [event]
 
         events.forEach((e) => {
-            this.getListenerArray(e).push(listener)
+            this.getListenerArray(e).push(listener as Listener<E>)
         })
 
         return () => {
             events.forEach((e) => {
-                const index = this.getListeners(e).indexOf(listener)
+                const index = this.getListeners(e).indexOf(listener as Listener<E>)
                 if (index > -1) {
                     this.getListenerArray(e).splice(index, 1)
                 }

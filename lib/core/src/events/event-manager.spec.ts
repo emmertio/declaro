@@ -14,6 +14,10 @@ describe('Event manager', () => {
             expect(event).toBe(testEvent)
         })
 
+        eventManager.on<TestEvent>('testx', (event) => {
+            const t = event.type
+        })
+
         eventManager.on('test', mockListener)
 
         await eventManager.emitAll(testEvent)
@@ -174,5 +178,26 @@ describe('Event manager', () => {
         expect(cb2.mock.calls.length).toBe(1)
         expect(cb1.mock.calls[0][0]).toBe(testEvent)
         expect(cb2.mock.calls[0][0]).toBe(testEvent)
+    })
+
+    it('should correctly type the event listeners', async () => {
+        const eventManager = new EventManager()
+
+        interface CustomEvent extends IEvent {
+            type: 'custom'
+            data: string
+        }
+
+        const customListener = vi.fn((event: CustomEvent) => {
+            expect(event.type).toBe('custom')
+            expect(event.data).toBe('test data')
+        })
+
+        eventManager.on<CustomEvent>('custom', customListener)
+
+        const testEvent: CustomEvent = { type: 'custom', data: 'test data' }
+        await eventManager.emitAll(testEvent)
+
+        expect(customListener.mock.calls.length).toBe(1)
     })
 })

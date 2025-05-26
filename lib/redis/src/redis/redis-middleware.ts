@@ -17,7 +17,7 @@ export const REDIS_OPTIONS_KEY = Symbol()
  * @param options The options to pass to the Redis client
  * @returns
  */
-export const redisMiddleware = (options?: RedisOptions) => async (context: Context) => {
+export const redisMiddleware = (options: RedisOptions) => async (context: Context) => {
     context.provide(REDIS_OPTIONS_KEY, options)
 
     context.on(App.Events.Init, async (context) => {
@@ -63,7 +63,7 @@ export function useRedis(context: Context): RedisInstance {
 export function useRedisOptions(context: Context): RedisOptions {
     const options = context.inject<RedisOptions>(REDIS_OPTIONS_KEY)
 
-    return options
+    return options!
 }
 
 /**

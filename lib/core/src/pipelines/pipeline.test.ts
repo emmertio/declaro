@@ -94,14 +94,16 @@ describe('Pipelines', () => {
                 number,
             }),
         )
-        const message = vi.fn((meta?: Meta) =>
-            meta?.positive
+        const message = vi.fn((meta: Meta | string): string =>
+            typeof meta === 'string'
+                ? meta
+                : meta?.positive
                 ? `${meta.number} is positive`
-                : meta.negative
+                : meta?.negative
                 ? `${meta.number} is negative`
-                : meta.zero
-                ? `${meta.number} is zero`
-                : `${meta.number} is not a number`,
+                : meta?.zero
+                ? `${meta?.number} is zero`
+                : `${meta?.number} is not a number`,
         )
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)
@@ -165,11 +167,11 @@ describe('Pipelines', () => {
 
             return meta?.positive
                 ? `${meta.number} is positive`
-                : meta.negative
+                : meta?.negative
                 ? `${meta.number} is negative`
-                : meta.zero
+                : meta?.zero
                 ? `${meta.number} is zero`
-                : `${meta.number} is not a number`
+                : `${meta?.number} is not a number`
         })
 
         const originalPipeline = new Pipeline(initialInput<number>()).pipe(meta)

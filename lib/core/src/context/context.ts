@@ -41,7 +41,7 @@ export type ContextAttribute<TContext extends Context<any>, TValue> = {
     key: PropertyKey
     value?: ValueLoader<TContext, TValue>
     type: DependencyType
-    resolveOptions: ResolveOptions
+    resolveOptions?: ResolveOptions
     cachedValue?: TValue
     inject: PropertyKey[]
 }
@@ -220,7 +220,10 @@ export class Context<Scope extends object = any> {
         return this
     }
 
-    registerClass<K extends FilterKeysByType<Scope, InstanceType<T>>, T extends Class<Scope[K]>>(
+    registerClass<
+        K extends FilterKeysByType<Scope, InstanceType<T>>,
+        T extends Class<Scope[K] extends {} ? Scope[K] : never>,
+    >(
         key: K,
         Class: T,
         inject?: FilterArgsByType<Scope, ConstructorParameters<T>>,
@@ -243,7 +246,10 @@ export class Context<Scope extends object = any> {
         return this
     }
 
-    registerAsyncClass<K extends FilterKeysByType<Scope, InstanceType<any>>, T extends Class<UnwrapPromise<Scope[K]>>>(
+    registerAsyncClass<
+        K extends FilterKeysByType<Scope, InstanceType<any>>,
+        T extends Class<UnwrapPromise<Scope[K]> extends {} ? UnwrapPromise<Scope[K]> : never>,
+    >(
         key: K,
         Class: T,
         inject?: FilterAsyncArgsByType<Scope, ConstructorParameters<T>>,
@@ -343,7 +349,7 @@ export class Context<Scope extends object = any> {
         if (serveFromCache && attribute?.cachedValue && dependenciesValid) {
             value = attribute.cachedValue
         } else {
-            value = attribute?.value(this)
+            value = typeof attribute.value === 'function' ? attribute.value(this) : undefined
         }
 
         if (serveFromCache) {
@@ -431,6 +437,8 @@ export class Context<Scope extends object = any> {
         return middleware.reduce(async (promise, middleware) => {
             await promise
             await middleware(this)
+
+            return undefined
         }, Promise.resolve(undefined))
     }
 

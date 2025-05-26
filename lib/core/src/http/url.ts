@@ -2,11 +2,11 @@ import { Context } from '../context/context'
 import { URL } from 'whatwg-url'
 import { useRequest } from './request'
 
-export function useRequestURL(context: Context) {
+export function useRequestURL(context: Context): URL | undefined {
     const request = useRequest(context)
     const url = request?.url && new URL(request?.url)
 
-    return url
+    return url as URL
 }
 
 export function useRequestURLString(context: Context) {
@@ -33,7 +33,7 @@ export function useRequestQuery(context: Context): Record<string, string> {
     const qs = url?.searchParams
 
     // convert qs to an object of key value pairs
-    const qsMap = [...qs?.entries()].reduce((qsMap, [key, value]) => {
+    const qsMap = [...(qs?.entries() as any)].reduce((qsMap, [key, value]) => {
         qsMap[key] = value
         return qsMap
     }, {} as Record<string, string>)

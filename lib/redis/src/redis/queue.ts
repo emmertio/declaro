@@ -33,11 +33,12 @@ export async function onFulfillMessage<T>(context: Context, channel: string, han
     let shouldContinue = true
 
     while (shouldContinue) {
-        const [msgChannel, message] = await conn.brpop(channel, 1000)
+        const result = await conn.brpop(channel, 1000)
+        const [msgChannel, message] = result ?? []
 
         try {
-            const payload = unserialize<T>(message)
-            await handler(payload)
+            const payload = unserialize<T>(message ?? '')
+            await handler(payload ?? undefined)
         } catch (e) {
             pushMessage(context, channel, message)
         }

@@ -67,6 +67,17 @@
         "whatwg-url": "^14.1.1",
       },
     },
+    "lib/data": {
+      "name": "@declaro/data",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@declaro/core": "workspace:^",
+        "typescript": "^5.8.3",
+      },
+      "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.42",
+      },
+    },
     "lib/redis": {
       "name": "@declaro/redis",
       "version": "2.0.0-beta.40",
@@ -166,6 +177,8 @@
     "@declaro-apps/framework": ["@declaro-apps/framework@workspace:apps/framework"],
 
     "@declaro/core": ["@declaro/core@workspace:lib/core"],
+
+    "@declaro/data": ["@declaro/data@workspace:lib/data"],
 
     "@declaro/di": ["@declaro/di@2.0.0-beta.40", "", {}, "sha512-ouibkYrUW6hH5eVXkjm1WjeWCtY5F6peyFjoDZCzguqCu8psmidfkc1P2+0WvMuxbYB6A1/nZw/iyqzwOoXtfQ=="],
 

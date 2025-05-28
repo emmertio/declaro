@@ -1,0 +1,36 @@
+{
+    "name": "@declaro/data",
+    "version": "0.1.0",
+    "description": "A data-mapper framework for managing application data across integrated systems.",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "dev": "bun run scripts/build.ts --watch",
+        "clean": "bun rimraf dist",
+        "build:typedefs": "bun tsc --emitDeclarationOnly --outDir dist/ts -p tsconfig.json",
+        "build:js": "bun run scripts/build.ts",
+        "build": "bun run clean && bun run build:js && bun run build:typedefs",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
+        "typecheck": "bun tsc --noEmit"
+    },
+    "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.42"
+    },
+    "devDependencies": {
+        "typescript": "^5.8.3",
+        "@declaro/core": "workspace:^"
+    },
+    "author": "Your Name",
+    "license": "MIT",
+    "files": [
+        "dist/**/*",
+        "src/**/*"
+    ],
+    "exports": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "bun": "./dist/index.js"
+    }
+}

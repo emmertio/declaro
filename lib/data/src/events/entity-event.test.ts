@@ -9,7 +9,7 @@ describe('EntityEvent', () => {
     }
 
     it('should set and get entity', () => {
-        const event = new EntityEvent<Book>(EntityEventType.Update)
+        const event = new EntityEvent(Book, EntityEventType.Update)
         const book = new Book()
         book.title = '1984'
         book.year = 1949
@@ -20,13 +20,15 @@ describe('EntityEvent', () => {
     })
 
     it('should patch entity', () => {
-        const event = new EntityEvent<Book>(EntityEventType.Update)
+        const event = new EntityEvent(Book, EntityEventType.Update)
         const book = new Book()
         book.title = '1984'
         book.year = 1949
 
         event.set(book)
-        event.patch({ title: 'Animal Farm' })
+        event.patch({
+            title: 'Animal Farm',
+        })
 
         expect(event.entity?.title).toBe('Animal Farm')
         expect(event.entity?.year).toBe(1949)

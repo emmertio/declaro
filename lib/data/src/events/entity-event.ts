@@ -1,12 +1,14 @@
-import { type DeepPartial, type IEvent, type Maybe } from '@declaro/core'
+import { type Class, type DeepPartial, type IEvent, type Maybe } from '@declaro/core'
 import type { EntityEventType } from './entity-event-type'
 
 export class EntityEvent<T extends object> implements IEvent {
+    public readonly EntityClass: Class<T>
     public readonly type: EntityEventType
 
     protected _entity?: Maybe<T>
 
-    constructor(type: EntityEventType) {
+    constructor(entity: Class<T>, type: EntityEventType) {
+        this.EntityClass = entity
         this.type = type
     }
 

@@ -16,6 +16,10 @@ Basic library structure:
     -   description: A brief description of the library.
     -   license: The license for the library, typically MIT.
     -   scripts: Include scripts for building, cleaning, testing, and if necessary developing the library. Reference the core package as a good example of how to do this. The scripts attribute of the core package should be almost exactly copy-pastable to other packages.
+    -   devDependencies: Make sure to include the necessary packages for the build script to run. Be sure to use the latest version of each package, explicitly referenced in package.json with ^. Do not use the :latest tag where possible. Get the official numbers from NPM.
+        -   @types/bun
+        -   typescript
+        -   any additional dependencies required to make the build script work, or as prompted.
 -   scripts/
     -   build.ts: Copy this from the core package. You can copy this file vurbatim.
 -   tsconfig.json: Use the core package's tsconfig.json as a template. You can typically copy this file verbatim.

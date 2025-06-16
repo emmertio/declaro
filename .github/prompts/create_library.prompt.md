@@ -1,0 +1,28 @@
+---
+mode: agent
+---
+
+Create a new library package with the given name.
+
+Package Naming:
+Package.json: Ensure the library package name is prefixed with @declaro/ unless specified otherwise. Example: @declaro/my-library
+Library folder: Libraries should be stored in the libs folder. Example: libs/my-library.
+
+Basic library structure:
+
+-   package.json
+    -   name: Be sure the package is named according to the package naming rules.
+    -   version: The version of all packages is pegged to the monorepo version. See lerna.json for the current version.
+    -   description: A brief description of the library.
+    -   license: The license for the library, typically MIT.
+    -   scripts: Include scripts for building, cleaning, testing, and if necessary developing the library. Reference the core package as a good example of how to do this. The scripts attribute of the core package should be almost exactly copy-pastable to other packages.
+-   scripts/
+    -   build.ts: Copy this from the core package. You can copy this file vurbatim.
+-   tsconfig.json: Use the core package's tsconfig.json as a template. You can typically copy this file verbatim.
+-   src/
+    -   index.ts: This is the entry point for the library. You can copy this from the core package.
+    -   other files: Add any additional files needed for the library, based on the prompt from the user.
+-   README.md: A basic README file that describes the library, its purpose, and how to use it. You can copy the structure from the core package's README.
+-   .gitignore: Copy the .gitignore from the core package to ensure that common files are ignored.
+
+Ensure that the library is set up to be built and tested correctly, and that it follows the conventions used in the core package.

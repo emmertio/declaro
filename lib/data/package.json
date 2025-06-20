@@ -1,9 +1,10 @@
 {
     "name": "@declaro/data",
-    "version": "2.0.0-beta.43",
+    "version": "2.0.0-beta.44",
     "description": "A data-mapper framework for managing application data across integrated systems.",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "main": "dist/node/index.cjs",
+    "module": "dist/browser/index.js",
+    "types": "dist/ts/index.d.ts",
     "scripts": {
         "dev": "bun run scripts/build.ts --watch",
         "clean": "bun rimraf dist",
@@ -28,9 +29,12 @@
         "src/**/*"
     ],
     "exports": {
-        "import": "./dist/index.js",
-        "require": "./dist/index.js",
-        "types": "./dist/index.d.ts",
-        "bun": "./dist/index.js"
+        "import": {
+            "node": "./dist/node/index.js",
+            "default": "./dist/browser/index.js"
+        },
+        "require": "./dist/node/index.cjs",
+        "types": "./dist/ts/index.d.ts",
+        "bun": "./dist/bun/index.js"
     }
 }

@@ -13,6 +13,16 @@ await Promise.all([
         splitting: true,
         outdir: 'dist/node',
         sourcemap: 'linked',
+        naming: '[dir]/[name].cjs'
+    }),
+    build({
+        ...defaults,
+        target: 'node',
+        format: 'esm',
+        splitting: true,
+        outdir: 'dist/node',
+        sourcemap: 'linked',
+        naming: '[dir]/[name].js'
     }),
     build({
         ...defaults,

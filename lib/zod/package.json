@@ -1,0 +1,33 @@
+{
+    "name": "@declaro/zod",
+    "version": "2.0.0-beta.44",
+    "description": "A library for Zod-based models in the Declaro ecosystem.",
+    "main": "dist/node/index.js",
+    "module": "dist/node/index.js",
+    "types": "dist/ts/index.d.ts",
+    "author": "Emmert Technology LLC",
+    "type": "module",
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "dev": "bun run scripts/build.ts --watch",
+        "clean": "bun rimraf dist",
+        "build:typedefs": "bun tsc --emitDeclarationOnly --outDir dist/ts -p tsconfig.json",
+        "build:js": "bun run scripts/build.ts",
+        "build": "bun run clean && bun run build:js && bun run build:typedefs",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
+        "typecheck": "bun tsc --noEmit"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.2.12",
+        "typescript": "^5.5.4",
+        "zod": "^3.25.67"
+    },
+    "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.44",
+        "zod": "^3.25.67"
+    }
+}

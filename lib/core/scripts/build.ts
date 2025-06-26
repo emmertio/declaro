@@ -13,7 +13,7 @@ await Promise.all([
         splitting: true,
         outdir: 'dist/node',
         sourcemap: 'linked',
-        naming: '[dir]/[name].cjs'
+        naming: '[dir]/[name].cjs',
     }),
     build({
         ...defaults,
@@ -22,7 +22,7 @@ await Promise.all([
         splitting: true,
         outdir: 'dist/node',
         sourcemap: 'linked',
-        naming: '[dir]/[name].js'
+        naming: '[dir]/[name].js',
     }),
     build({
         ...defaults,
@@ -30,12 +30,5 @@ await Promise.all([
         outdir: 'dist/browser',
         sourcemap: 'linked',
         minify: true,
-    }),
-    build({
-        ...defaults,
-        target: 'bun',
-        splitting: true,
-        outdir: 'dist/bun',
-        sourcemap: 'linked',
     }),
 ])

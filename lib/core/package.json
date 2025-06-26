@@ -22,7 +22,9 @@
         "typecheck": "bun tsc --noEmit"
     },
     "devDependencies": {
+        "@standard-schema/spec": "^1.0.0",
         "@types/bun": "^1.2.12",
+        "@types/json-schema": "^7.0.15",
         "@types/whatwg-url": "^13.0.0",
         "@vitest/coverage-v8": "^2.0.5",
         "json-schema-library": "^7.4.8",
@@ -54,9 +56,9 @@
         "src/**/*"
     ],
     "exports": {
-        "import": "./dist/browser/index.js",
-        "require": "./dist/node/index.cjs",
+        "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
-        "bun": "./dist/bun/index.js"
+        "import": "./dist/browser/index.js",
+        "require": "./dist/node/index.cjs"
     }
 }

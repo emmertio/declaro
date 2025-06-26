@@ -1,11 +1,13 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+
 export interface IError {
     code: number
     message: string
-    meta: any
+    meta?: any
 }
 
 export abstract class BaseError extends Error implements IError {
-    public readonly meta: any
+    public readonly meta?: any // Made optional
     public readonly code: number = 500
 
     constructor(message: string, meta?: any) {
@@ -36,12 +38,26 @@ export class SystemError extends BaseError {
     }
 }
 
+export interface ValidationErrorMeta {
+    result: StandardSchemaV1.Result<any>
+    [key: string]: any
+}
+
 export class ValidationError extends BaseError {
     public readonly code: number = 400
+    public readonly meta?: ValidationErrorMeta
 
-    constructor(message: string, meta?: any) {
+    constructor(message: string, meta?: ValidationErrorMeta) {
         super(message, meta)
         this.name = 'ValidationError'
+        this.meta = meta
+    }
+
+    public toJSON() {
+        return {
+            ...super.toJSON(),
+            result: this.meta?.result,
+        }
     }
 }
 

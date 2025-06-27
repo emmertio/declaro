@@ -31,11 +31,4 @@ await Promise.all([
         sourcemap: 'linked',
         minify: true,
     }),
-    build({
-        ...defaults,
-        target: 'bun',
-        splitting: true,
-        outdir: 'dist/bun',
-        sourcemap: 'linked',
-    }),
 ])

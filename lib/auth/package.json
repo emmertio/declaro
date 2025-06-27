@@ -1,0 +1,43 @@
+{
+    "name": "@declaro/auth",
+    "version": "2.0.0-beta.42",
+    "description": "A simple authentication library for Declaro projects.",
+    "main": "dist/node/index.js",
+    "module": "dist/node/index.js",
+    "types": "dist/ts/index.d.ts",
+    "author": "Emmert Technology LLC",
+    "type": "module",
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "dev": "bun run scripts/build.ts --watch",
+        "clean": "bun rimraf dist",
+        "build:typedefs": "bun tsc --emitDeclarationOnly --outDir dist/ts -p tsconfig.json",
+        "build:js": "bun run scripts/build.ts",
+        "build": "bun run clean && bun run build:js && bun run build:typedefs",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
+        "typecheck": "bun tsc --noEmit"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.2.12",
+        "@types/jsonwebtoken": "^9.0.10",
+        "jsonwebtoken": "^9.0.2",
+        "typescript": "^5.5.4",
+        "@declaro/core": "workspace:^",
+        "@declaro/redis": "workspace:^",
+        "ioredis": "^5.6.1"
+    },
+    "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.44",
+        "@declaro/build": "2.0.0-beta.44",
+        "ioredis": "^5.6.1"
+    },
+    "exports": {
+        "types": "./dist/ts/index.d.ts",
+        "import": "./dist/node/index.js",
+        "require": "./dist/node/index.js"
+    }
+}

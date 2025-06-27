@@ -1,0 +1,6 @@
+export interface AuthConfig {
+    /**
+     * The duration (in seconds) for which the authentication session is valid.
+     */
+    authTimeout: number // in seconds
+}

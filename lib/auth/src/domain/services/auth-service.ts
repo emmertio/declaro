@@ -1,0 +1,75 @@
+import jwt from 'jsonwebtoken'
+import { v4 as uuid } from 'uuid'
+import type { IAuthPayload, IAuthSession, IAuthSessionInput } from '../models/auth-session'
+import { ForbiddenError } from '@declaro/core'
+import type { AuthConfig } from '../interfaces/auth-config'
+
+export abstract class AuthService {
+    protected readonly sessionPrefix: string = 'auth-session'
+
+    constructor(protected readonly authConfig: AuthConfig) {}
+
+    async createSession(payload: IAuthSessionInput): Promise<IAuthSession> {
+        const session: IAuthSession = {
+            id: this.getSessionId(payload),
+            jwt: payload.jwt,
+            jwtPayload: await this.decodeJWT(payload.jwt),
+            expires: new Date(new Date().getTime() + 1000 * 60 * 60 * 24), // Default to 24 hours
+            issued: new Date(),
+            roles: payload.roles ?? [],
+            claims: payload.claims ?? [],
+        }
+
+        await this.saveSession(session)
+
+        return session
+    }
+
+    async decodeJWT(token: string): Promise<IAuthPayload> {
+        const result = jwt.decode(token)
+
+        if (!result || typeof result !== 'object') {
+            throw new ForbiddenError('Invalid JWT token')
+        }
+
+        return result as IAuthPayload
+    }
+
+    async validateJWT(token: string): Promise<IAuthPayload> {
+        const preliminaryPayload = await this.decodeJWT(token)
+
+        if (preliminaryPayload?.exp && preliminaryPayload.exp < new Date().getTime()) {
+            throw new ForbiddenError('JWT token has expired')
+        }
+
+        try {
+            const result = jwt.verify(token, await this.getSecret())
+
+            if (!result || typeof result !== 'object') {
+                throw new ForbiddenError('Invalid JWT token')
+            }
+
+            return result as IAuthPayload
+        } catch (error) {
+            throw new ForbiddenError('JWT token is invalid', error)
+        }
+    }
+
+    async getSecret(): Promise<string> {
+        if (!process.env.APP_SECRET) {
+            console.warn('APP_SECRET is not set, using a default secret for development purposes.')
+        }
+        if (!process.env.APP_SECRET && process.env.NODE_ENV !== 'production') {
+            return 'shhhhh'
+        }
+        return process.env.APP_SECRET!
+    }
+
+    getSessionId(payload?: IAuthSessionInput) {
+        return payload?.id ?? `${this.sessionPrefix}-${uuid()}`
+    }
+
+    abstract saveSession(session: IAuthSession): Promise<IAuthSession>
+    abstract getSession(id: string): Promise<IAuthSession | null>
+    abstract deleteSession(id: string): Promise<void>
+}

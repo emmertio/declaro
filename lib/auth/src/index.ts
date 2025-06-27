@@ -1,4 +1,3 @@
-import './src/@types/auth-context.d.ts'
 export * from './domain/models/auth-session'
 export * from './domain/interfaces/auth-config'
 export * from './domain/services/auth-service'

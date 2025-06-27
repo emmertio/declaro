@@ -1,6 +1,6 @@
 {
     "name": "@declaro/auth",
-    "version": "2.0.0-beta.42",
+    "version": "2.0.0-beta.44",
     "description": "A simple authentication library for Declaro projects.",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
@@ -37,6 +37,9 @@
         "@declaro/zod": "^2.0.0-beta.44",
         "ioredis": "^5.6.1",
         "zod": "^3.25.67"
+    },
+    "optionalDependencies": {
+        "@declaro/redis": "^2.0.0-beta.44"
     },
     "exports": {
         "types": "./dist/ts/index.d.ts",

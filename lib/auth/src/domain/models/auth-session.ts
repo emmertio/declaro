@@ -1,3 +1,7 @@
+import { ModelSchema, type InferModelOutput } from '@declaro/core'
+import { ZodModel } from '@declaro/zod'
+import { z } from 'zod/v4'
+
 export enum AuthSubject {
     ACCESS = 'ACCESS',
     CONFIRM = 'CONFIRM',
@@ -6,31 +10,49 @@ export enum AuthSubject {
     REFRESH = 'REFRESH',
 }
 
-export interface IAuthPayload {
-    id: string
-    email: string
-    nickname: string
-    given_name?: string
-    family_name?: string
-    name: string
-    iat: number
-    exp: number
-    sub: AuthSubject
-}
+export const AuthPayloadModel = new ZodModel(
+    'AuthPayload' as const,
+    z.object({
+        id: z.string(),
+        email: z.email(),
+        nickname: z.string(),
+        given_name: z.string().optional(),
+        family_name: z.string().optional(),
+        name: z.string(),
+        iat: z.number(),
+        exp: z.number(),
+        sub: z.enum(AuthSubject),
+    }),
+)
+export type IAuthPayload = InferModelOutput<typeof AuthPayloadModel>
 
-export interface IAuthSession {
-    id: string
-    jwt: string
-    jwtPayload: IAuthPayload
-    expires: Date
-    issued: Date
-    roles: string[]
-    claims: string[]
-}
+const AuthSessionInputModel = new ZodModel(
+    'AuthSessionInput' as const,
+    z.object({
+        id: z.string().optional(),
+        jwt: z.jwt(),
+        claims: z.array(z.string()).optional(),
+        roles: z.array(z.string()).optional(),
+    }),
+)
+export type IAuthSessionInput = InferModelOutput<typeof AuthSessionInputModel>
 
-export interface IAuthSessionInput {
-    id?: string
-    jwt: string
-    claims?: string[]
-    roles?: string[]
-}
+export const AuthSessionModel = new ZodModel(
+    'AuthSession' as const,
+    z.object({
+        id: z.string(),
+        jwt: z.jwt(),
+        jwtPayload: AuthPayloadModel.schema,
+        expires: z.date(),
+        issued: z.date(),
+        roles: z.array(z.string()).optional(),
+        claims: z.array(z.string()).optional(),
+    }),
+)
+export type IAuthSession = InferModelOutput<typeof AuthSessionModel>
+
+export const AuthSessionSchema = ModelSchema.create('AuthSession' as const).custom({
+    authPayload: () => AuthPayloadModel,
+    authSessionInput: () => AuthSessionInputModel,
+    authSession: () => AuthSessionModel,
+})

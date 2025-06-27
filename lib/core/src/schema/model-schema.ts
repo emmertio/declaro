@@ -37,6 +37,9 @@ const readMixin = defineMixin((h) => ({
 }))
 export type ReadMixin<TName extends Readonly<string>> = ReturnType<typeof readMixin<TName>>
 
+const defaultMixin = defineMixin((h) => ({}))
+export type DefaultMixin<TName extends Readonly<string>> = ReturnType<typeof defaultMixin<TName>>
+
 const searchMixin = defineMixin((h) => ({
     listItem: { name: `${h.name}ListItem` as const },
     filters: { name: `${h.name}Filters` as const },
@@ -77,6 +80,15 @@ export class ModelSchema<TName extends Readonly<string>, T extends IAnyMixin = {
         return {
             name: this.name,
         }
+    }
+
+    custom<IInput extends IMixinInput>(input: IInput): ModelSchema<TName, Simplify<T & IMixin<IInput>>> {
+        const helpers = defaultMixin(this.helper)
+        const definition = buildMixin(helpers, input)
+        return new ModelSchema(this.name, {
+            ...this.definition,
+            ...definition,
+        } as Simplify<T & IMixin<IInput>>)
     }
 
     read<TInput extends InferMixinInput<ReadMixin<TName>>>(

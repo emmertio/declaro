@@ -11,7 +11,12 @@ export abstract class Model<TName extends Readonly<string>, TSchema extends Stan
     implements StandardSchemaV1<StandardSchemaV1.InferInput<TSchema>, StandardSchemaV1.InferOutput<TSchema>>
 {
     public readonly name: TName
-    protected readonly schema: TSchema
+    /**
+     * @warning You may not need to use this property directly.
+     * Use the `validate` method instead to ensure proper validation and error handling.
+     * Use the `toJSONSchema` method to get the JSON Schema representation for introspection or documentation.
+     */
+    public readonly schema: TSchema
 
     constructor(name: TName, schema: TSchema) {
         if (!schema || !schema['~standard'] || schema['~standard'].version !== 1) {

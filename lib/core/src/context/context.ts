@@ -4,8 +4,8 @@ import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
 import { cloneDeep } from 'lodash'
 
-export type AppScope = {}
-export type RequestScope = {}
+export interface AppScope {}
+export interface RequestScope extends AppScope {}
 export type AppContext = Context<AppScope>
 export type RequestContext = Context<RequestScope>
 
@@ -313,13 +313,13 @@ export class Context<Scope extends object = any> {
     protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K): boolean {
         const attribute = this.state[key]
 
-        const needsCache = attribute.resolveOptions?.singleton || attribute.resolveOptions?.eager
+        const needsCache = attribute?.resolveOptions?.singleton || attribute?.resolveOptions?.eager
 
         if (!needsCache) {
             return true
         }
 
-        const hasCachedValue = attribute.cachedValue !== undefined && attribute.cachedValue !== null
+        const hasCachedValue = attribute?.cachedValue !== undefined && attribute?.cachedValue !== null
 
         if (!hasCachedValue) {
             return false

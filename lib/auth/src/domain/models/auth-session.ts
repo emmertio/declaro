@@ -1,0 +1,58 @@
+import { ModelSchema, type InferModelOutput } from '@declaro/core'
+import { ZodModel } from '@declaro/zod'
+import { z } from 'zod/v4'
+
+export enum AuthSubject {
+    ACCESS = 'ACCESS',
+    CONFIRM = 'CONFIRM',
+    INVITE = 'INVITE',
+    RECOVER = 'RECOVER',
+    REFRESH = 'REFRESH',
+}
+
+export const AuthPayloadModel = new ZodModel(
+    'AuthPayload' as const,
+    z.object({
+        id: z.string(),
+        email: z.email(),
+        nickname: z.string(),
+        given_name: z.string().optional(),
+        family_name: z.string().optional(),
+        name: z.string(),
+        iat: z.number(),
+        exp: z.number(),
+        sub: z.enum(AuthSubject),
+    }),
+)
+export type IAuthPayload = InferModelOutput<typeof AuthPayloadModel>
+
+const AuthSessionInputModel = new ZodModel(
+    'AuthSessionInput' as const,
+    z.object({
+        id: z.string().optional(),
+        jwt: z.jwt(),
+        claims: z.array(z.string()).optional(),
+        roles: z.array(z.string()).optional(),
+    }),
+)
+export type IAuthSessionInput = InferModelOutput<typeof AuthSessionInputModel>
+
+export const AuthSessionModel = new ZodModel(
+    'AuthSession' as const,
+    z.object({
+        id: z.string(),
+        jwt: z.jwt(),
+        jwtPayload: AuthPayloadModel.schema,
+        expires: z.date(),
+        issued: z.date(),
+        roles: z.array(z.string()).optional(),
+        claims: z.array(z.string()).optional(),
+    }),
+)
+export type IAuthSession = InferModelOutput<typeof AuthSessionModel>
+
+export const AuthSessionSchema = ModelSchema.create('AuthSession' as const).custom({
+    authPayload: () => AuthPayloadModel,
+    authSessionInput: () => AuthSessionInputModel,
+    authSession: () => AuthSessionModel,
+})

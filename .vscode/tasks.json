@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Debug Tests with Bun",
+            "command": "bun test",
+            "args": ["--inspect"],
+            "group": "test",
+            "isBackground": false,
+            "problemMatcher": ["$bun"],
+            "workspaceFolder": "/Users/robby/emmert.io/declaro/declaro"
+        }
+    ]
+}

@@ -27,7 +27,7 @@ export function authModule(config: AuthConfig) {
                     const token = bearer?.replace(/^(Bearer|bearer)\s+/g, '')
 
                     if (token) {
-                        const authPayload = await authService.validateJWT(token)
+                        const authPayload = authService.validateJWT(token)
                         const session = await authService.getSession(authPayload.id)
 
                         return session ?? null

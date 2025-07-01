@@ -13,8 +13,8 @@ export abstract class AuthService {
         const session: IAuthSession = {
             id: this.getSessionId(payload),
             jwt: payload.jwt,
-            jwtPayload: await this.decodeJWT(payload.jwt),
-            expires: new Date(new Date().getTime() + 1000 * 60 * 60 * 24), // Default to 24 hours
+            jwtPayload: this.decodeJWT(payload.jwt),
+            expires: new Date(new Date().getTime() + (this.authConfig.authTimeout ?? 60 * 60 * 24)), // Default to 24 hours
             issued: new Date(),
             roles: payload.roles ?? [],
             claims: payload.claims ?? [],
@@ -25,7 +25,7 @@ export abstract class AuthService {
         return session
     }
 
-    async decodeJWT(token: string): Promise<IAuthPayload> {
+    decodeJWT(token: string): IAuthPayload {
         const result = jwt.decode(token)
 
         if (!result || typeof result !== 'object') {
@@ -35,15 +35,15 @@ export abstract class AuthService {
         return result as IAuthPayload
     }
 
-    async validateJWT(token: string): Promise<IAuthPayload> {
-        const preliminaryPayload = await this.decodeJWT(token)
+    validateJWT(token: string): IAuthPayload {
+        const preliminaryPayload = this.decodeJWT(token)
 
-        if (preliminaryPayload?.exp && preliminaryPayload.exp < new Date().getTime()) {
+        if (preliminaryPayload?.exp && preliminaryPayload.exp < new Date().getTime() / 1000) {
             throw new ForbiddenError('JWT token has expired')
         }
 
         try {
-            const result = jwt.verify(token, await this.getSecret())
+            const result = jwt.verify(token, this.getSecret())
 
             if (!result || typeof result !== 'object') {
                 throw new ForbiddenError('Invalid JWT token')
@@ -55,7 +55,7 @@ export abstract class AuthService {
         }
     }
 
-    async getSecret(): Promise<string> {
+    getSecret(): string {
         if (!process.env.APP_SECRET) {
             console.warn('APP_SECRET is not set, using a default secret for development purposes.')
         }

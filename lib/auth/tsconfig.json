@@ -4,7 +4,9 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "declaration": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
     },
     "include": ["src/*.ts", "src/**/*.ts", "src/**/*.d.ts"],
     "buildOptions": {

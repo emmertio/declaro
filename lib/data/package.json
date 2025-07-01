@@ -16,11 +16,15 @@
         "typecheck": "bun tsc --noEmit"
     },
     "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.44"
+        "@declaro/core": "^2.0.0-beta.44",
+        "@declaro/auth": "^2.0.0-beta.44"
     },
     "devDependencies": {
         "@declaro/core": "workspace:^",
-        "typescript": "^5.8.3"
+        "@declaro/auth": "workspace:^",
+        "typescript": "^5.8.3",
+        "uuid": "^11.1.0",
+        "zod": "^3.25.67"
     },
     "author": "Your Name",
     "license": "MIT",

@@ -30,12 +30,12 @@ describe('Module', () => {
         expect(await context.scope.authService).toBeInstanceOf(AuthService)
     })
 
-    it('should register authSession as null initially', () => {
-        expect(context.scope.authSession).toBeNull()
+    it('should register authSession as null initially', async () => {
+        expect(await context.scope.authSession).toBeNull()
     })
 
     it('should provide authSession in request context', async () => {
-        const authSession = requestContext.scope.authSession
+        const authSession = await requestContext.scope.authSession
         expect(authSession).toBeDefined()
 
         expect(authSession?.id).toBeDefined()

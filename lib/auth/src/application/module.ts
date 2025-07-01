@@ -3,6 +3,7 @@ import type Redis from 'ioredis'
 import type { AuthConfig } from '../domain/interfaces/auth-config'
 import { RedisAuthService } from '../infrastructure/impl/redis-auth-service'
 import type { AuthDependencies } from './auth-context'
+import type { AuthService } from '../domain/services/auth-service'
 
 export function authModule(config: AuthConfig) {
     return (context: Context<AppScope & AuthDependencies>) => {
@@ -16,21 +17,26 @@ export function authModule(config: AuthConfig) {
             ['authConfig', 'redis'],
         )
 
-        context.registerValue('authSession', null) // Initialize authSession as null
+        context.registerAsyncFactory('authSession', async () => null) // Initialize authSession as null
 
         provideRequestMiddleware(context, async (context: Context<RequestScope>) => {
-            const bearer = useHeader(context, 'authorization') as string | undefined
-            const token = bearer?.replace(/^(Bearer|bearer)\s+/g, '')
-            const authService = await context.scope.authService
+            context.registerAsyncFactory(
+                'authSession',
+                async (authService: AuthService) => {
+                    const bearer = useHeader(context, 'authorization') as string | undefined
+                    const token = bearer?.replace(/^(Bearer|bearer)\s+/g, '')
 
-            if (token) {
-                const authPayload = await authService.validateJWT(token)
-                const session = await authService.getSession(authPayload.id)
+                    if (token) {
+                        const authPayload = await authService.validateJWT(token)
+                        const session = await authService.getSession(authPayload.id)
 
-                context.registerValue('authSession', session)
-            }
+                        return session ?? null
+                    }
 
-            context.registerValue('authSession', null) // Initialize authSession as null
+                    return null
+                },
+                ['authService'],
+            )
         })
     }
 }

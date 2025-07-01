@@ -20,6 +20,8 @@ Use bun's native test framework where possible.
 
 Some legacy code may use tests defined in vitest or jest. These should be upgraded to bun's native testing framework where practical. Otherwise, they can stay as they are, but new tests should be written using bun's native test framework.
 
+Store tests next to their implementation files. If a `test` directory exists nearby, you can place mock implementations and test utils in there, but the tests should be in the same directory as the implementation files.
+
 ## Documentation
 
 -   Use JSDoc for inline documentation.

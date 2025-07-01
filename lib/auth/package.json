@@ -4,7 +4,6 @@
     "description": "A simple authentication library for Declaro projects.",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
-    "types": "dist/ts/index.d.ts",
     "author": "Emmert Technology LLC",
     "type": "module",
     "license": "MIT",
@@ -43,6 +42,7 @@
         "@declaro/redis": "^2.0.0-beta.44"
     },
     "exports": {
+        "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.js"

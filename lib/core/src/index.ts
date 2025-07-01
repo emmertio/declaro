@@ -21,3 +21,6 @@ export * from './schema/json-schema'
 export * from './schema/labels'
 export * from './schema/model-schema'
 export * from './schema/schema-mixin'
+export * from './schema/test/mock-model'
+
+export * from './shared/utils/action-descriptor'

@@ -1,5 +1,5 @@
 import { getLabels, type ModelLabels } from './labels'
-import type { InferModelOutput, ModelFactory } from './model'
+import type { InferModelInput, InferModelOutput } from './model'
 import {
     buildMixin,
     defineMixin,
@@ -14,11 +14,6 @@ export type Subset<T> = {
     [K in keyof T]?: T[K]
 }
 export type Simplify<T> = { [K in keyof T]: T[K] } & {}
-
-export interface IReadModelDefinition<TName extends Readonly<string>> extends IMixinInput {
-    detail: ModelFactory<TName>
-    lookup: ModelFactory<`${TName}Lookup`>
-}
 
 export function getReadHelpers<TName extends Readonly<string>>(h: IMixinHelper<TName>) {
     return {
@@ -41,7 +36,7 @@ const defaultMixin = defineMixin((h) => ({}))
 export type DefaultMixin<TName extends Readonly<string>> = ReturnType<typeof defaultMixin<TName>>
 
 const searchMixin = defineMixin((h) => ({
-    listItem: { name: `${h.name}ListItem` as const },
+    summary: { name: `${h.name}Summary` as const },
     filters: { name: `${h.name}Filters` as const },
 }))
 export type SearchMixin<TName extends Readonly<string>> = ReturnType<typeof searchMixin<TName>>
@@ -51,15 +46,11 @@ const writeMixin = defineMixin((h) => ({
 }))
 export type WriteMixin<TName extends Readonly<string>> = ReturnType<typeof writeMixin<TName>>
 
-export type InferModelDetailValue<T extends IReadModelDefinition<any>> = InferModelOutput<ReturnType<T['detail']>>
-
-export type InferModelLookupValue<T extends IReadModelDefinition<any>> = InferModelOutput<ReturnType<T['lookup']>>
-
 export type IModelNames<T extends object> = {
     [K in keyof T]: Readonly<string>
 }
 
-export class ModelSchema<TName extends Readonly<string>, T extends IAnyMixin = {}> {
+export class ModelSchema<TName extends Readonly<string> = Readonly<string>, T extends IAnyMixin = IAnyMixin> {
     static create<TName extends Readonly<string>>(name: TName): ModelSchema<TName> {
         return new ModelSchema(name)
     }

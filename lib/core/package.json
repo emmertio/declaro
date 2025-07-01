@@ -4,7 +4,6 @@
     "description": "Declarative Business Module Definition",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
-    "types": "dist/ts/index.d.ts",
     "author": "Emmert Technology LLC",
     "type": "module",
     "license": "MIT",
@@ -36,7 +35,8 @@
         "vite": "^5.4.1",
         "vite-plugin-dts": "^4.0.3",
         "vitest": "^2.0.5",
-        "whatwg-url": "^14.1.1"
+        "whatwg-url": "^14.1.1",
+        "uuid": "^11.1.0"
     },
     "dependencies": {
         "change-case": "^4.1.2",

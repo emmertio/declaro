@@ -2,10 +2,11 @@ import { beforeAll, describe, expect, it } from 'bun:test'
 import type { AuthService } from './auth-service'
 import { MockAuthService } from '../../test/mock/auth-service'
 import { mockAuthConfig } from '../../test/mock/auth-config'
-import { mockJwt } from '../../test/mock/auth-session'
+import { getMockJWT } from '../../test/mock/auth-session'
 
 describe('AuthService', () => {
     let authService: AuthService
+    const mockJwt = getMockJWT()
 
     beforeAll(() => {
         authService = new MockAuthService(mockAuthConfig)

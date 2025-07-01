@@ -7,7 +7,7 @@ declare module '@declaro/core' {
     export interface AppScope {
         authConfig: AuthConfig
         authService: Promise<AuthService>
-        authSession: IAuthSession | null
+        authSession: Promise<IAuthSession | null>
     }
 
     export interface RequestScope {}

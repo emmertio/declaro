@@ -2,10 +2,12 @@ import Redis from 'ioredis-mock'
 import { beforeAll, describe, it, expect } from 'bun:test'
 import { RedisAuthService } from './redis-auth-service'
 import { mockAuthConfig } from '../../test/mock/auth-config'
-import { mockJwt } from '../../test/mock/auth-session'
+import { getMockJWT } from '../../test/mock/auth-session'
 
 describe('RedisAuthService', () => {
     let redisAuthService: RedisAuthService
+
+    const mockJwt = getMockJWT()
 
     beforeAll(() => {
         const redis = new Redis()

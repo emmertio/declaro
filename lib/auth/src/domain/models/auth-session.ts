@@ -19,7 +19,13 @@ export const AuthPayloadModel = new ZodModel(
         given_name: z.string().optional(),
         family_name: z.string().optional(),
         name: z.string(),
+        /**
+         * Issued at time in seconds since epoch
+         */
         iat: z.number(),
+        /**
+         * Expiration time in seconds since epoch
+         */
         exp: z.number(),
         sub: z.enum(AuthSubject),
     }),

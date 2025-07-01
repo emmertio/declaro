@@ -47,3 +47,5 @@ export function defineMixin<TInput extends IMixinHelpers<any>, Fn extends MixinF
 export type InferMixinInput<T extends IMixinHelpers<any>> = {
     [K in keyof T]: T[K] extends IMixinHelper<infer TName> ? ModelFactory<TName> : never
 }
+
+export type InferMixinSchema<TMixin extends IMixinHelpers<any>> = IMixin<InferMixinInput<TMixin>>

@@ -1,0 +1,48 @@
+import type { ModelSchema } from '@declaro/core'
+import {} from '@declaro/auth'
+import type { ILoadOptions, ReadOnlyModelService } from '../domain/services/read-only-model-service'
+import type { AuthValidator, IAuthSession } from '@declaro/auth'
+import type {
+    InferDetail,
+    InferFilters,
+    InferLookup,
+    InferSearchResults,
+    InferSummary,
+} from '../shared/utils/schema-inference'
+
+export class ReadOnlyModelController<TSchema extends ModelSchema> {
+    constructor(
+        protected readonly service: ReadOnlyModelService<TSchema>,
+        protected readonly authValidator: AuthValidator,
+    ) {}
+
+    async load(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferDetail<TSchema>> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([
+                this.service.getDescriptor('load', '*').toString(),
+                this.service.getDescriptor('read', '*').toString(),
+            ]),
+        )
+        return this.service.load(lookup, options)
+    }
+
+    async loadMany(lookups: InferLookup<TSchema>[], options?: ILoadOptions): Promise<InferDetail<TSchema>[]> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([
+                this.service.getDescriptor('loadMany', '*').toString(),
+                this.service.getDescriptor('read', '*').toString(),
+            ]),
+        )
+        return this.service.loadMany(lookups, options)
+    }
+
+    async search(input: InferFilters<TSchema>, options?: ILoadOptions): Promise<InferSearchResults<TSchema>> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([
+                this.service.getDescriptor('search', '*').toString(),
+                this.service.getDescriptor('read', '*').toString(),
+            ]),
+        )
+        return this.service.search(input, options)
+    }
+}

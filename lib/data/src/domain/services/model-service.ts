@@ -1,11 +1,11 @@
 import type { ModelSchema } from '@declaro/core'
-import type { InferDetail, InferInput, InferSummary, InferLookup } from '../../shared/utils/schema-inference'
+import type { InferDetail, InferInput, InferLookup, InferSummary } from '../../shared/utils/schema-inference'
 import { ModelMutationAction } from '../events/event-types'
 import { MutationEvent } from '../events/mutation-event'
-import { BaseModelService } from './base-model-service'
 import type { IModelServiceArgs } from './model-service-args'
+import { ReadOnlyModelService } from './read-only-model-service'
 
-export class ModelService<TSchema extends ModelSchema<any, any>> extends BaseModelService<TSchema> {
+export class ModelService<TSchema extends ModelSchema<any, any>> extends ReadOnlyModelService<TSchema> {
     constructor(args: IModelServiceArgs<TSchema>) {
         super(args)
     }

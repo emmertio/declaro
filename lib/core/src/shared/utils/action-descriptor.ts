@@ -1,3 +1,5 @@
+import { kebabCase } from 'change-case'
+
 export interface IActionDescriptorInput {
     namespace?: string
     resource?: string
@@ -16,14 +18,15 @@ export class ActionDescriptor implements IActionDescriptor {
     protected readonly descriptor: IActionDescriptorInput
 
     constructor(input: IActionDescriptorInput) {
-        this.descriptor = input
+        this.descriptor = {}
+        this.update(input)
     }
 
     update(input: IActionDescriptorInput) {
-        this.descriptor.namespace = input.namespace ?? this.descriptor.namespace
-        this.descriptor.resource = input.resource ?? this.descriptor.resource
+        this.descriptor.namespace = this.parameterize(input.namespace ?? this.descriptor.namespace)
+        this.descriptor.resource = this.parameterize(input.resource ?? this.descriptor.resource)
         this.descriptor.action = input.action ?? this.descriptor.action
-        this.descriptor.scope = input.scope ?? this.descriptor.scope
+        this.descriptor.scope = this.parameterize(input.scope ?? this.descriptor.scope)
 
         return this
     }
@@ -88,5 +91,12 @@ export class ActionDescriptor implements IActionDescriptor {
 
     static fromJSON(json: IActionDescriptorInput): ActionDescriptor {
         return new ActionDescriptor(json)
+    }
+
+    protected parameterize(string?: string) {
+        if (!string || string === '*') {
+            return string
+        }
+        return kebabCase(string)
     }
 }

@@ -1,4 +1,4 @@
-import { capitalCase, camelCase, paramCase, pascalCase, sentenceCase } from 'change-case'
+import { capitalCase, camelCase, kebabCase, pascalCase, sentenceCase } from 'change-case'
 import pluralize from 'pluralize'
 
 export type ModelLabels = {
@@ -22,8 +22,8 @@ export function getLabels(modelName: string, labels: Partial<ModelLabels> = {}):
         pluralSentence: sentenceCase(pluralize(labels.pluralLabel ?? modelName, 10)),
         singularParameter: camelCase(pluralize(labels.singularParameter ?? modelName, 1)),
         pluralParameter: camelCase(pluralize(labels.pluralParameter ?? modelName, 10)),
-        singularSlug: paramCase(pluralize(labels.singularSlug ?? modelName, 1)),
-        pluralSlug: paramCase(pluralize(labels.pluralSlug ?? modelName, 10)),
+        singularSlug: kebabCase(pluralize(labels.singularSlug ?? modelName, 1)),
+        pluralSlug: kebabCase(pluralize(labels.pluralSlug ?? modelName, 10)),
         singularEntityName: pascalCase(pluralize(labels.singularEntityName ?? modelName, 1)),
         pluralEntityName: pascalCase(pluralize(labels.pluralEntityName ?? modelName, 10)),
     }

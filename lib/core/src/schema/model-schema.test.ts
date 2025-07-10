@@ -44,4 +44,17 @@ describe('ModelSchema', () => {
         expect(schema.definition.input).toBeInstanceOf(MockModel)
         expect(schema.definition.input.name).toBe('BookInput')
     })
+
+    it('should define a primary key', () => {
+        const schema = ModelSchema.create('Book')
+            .read({
+                detail: (h) => new MockModel(h.name, z.object({ id: z.string(), name: z.string() })),
+                lookup: (h) => new MockModel(h.name, z.object({ id: z.string(), name: z.string() })),
+            })
+            .entity({
+                primaryKey: 'id',
+            })
+
+        expect(schema.getEntityMetadata().primaryKey).toBe('id')
+    })
 })

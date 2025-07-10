@@ -1,16 +1,10 @@
-import type { ModelSchema } from '@declaro/core'
+import type { AuthValidator } from '@declaro/auth'
 import {} from '@declaro/auth'
+import type { AnyModelSchema } from '@declaro/core'
 import type { ILoadOptions, ReadOnlyModelService } from '../domain/services/read-only-model-service'
-import type { AuthValidator, IAuthSession } from '@declaro/auth'
-import type {
-    InferDetail,
-    InferFilters,
-    InferLookup,
-    InferSearchResults,
-    InferSummary,
-} from '../shared/utils/schema-inference'
+import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../shared/utils/schema-inference'
 
-export class ReadOnlyModelController<TSchema extends ModelSchema> {
+export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     constructor(
         protected readonly service: ReadOnlyModelService<TSchema>,
         protected readonly authValidator: AuthValidator,

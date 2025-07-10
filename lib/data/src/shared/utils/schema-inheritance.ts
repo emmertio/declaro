@@ -1,4 +1,5 @@
-import type { Model, ModelSchema } from '@declaro/core'
+import type { AnyModelSchema, Model, ModelSchema } from '@declaro/core'
+import type { InferEntityMetadata } from './schema-inference'
 
 /**
  * Represents a child schema that inherits from a parent schema.
@@ -18,9 +19,10 @@ import type { Model, ModelSchema } from '@declaro/core'
  *     }
  * }
  */
-export type ChildSchema<TSchema extends ModelSchema> = ModelSchema<
+export type ChildSchema<TSchema extends AnyModelSchema> = ModelSchema<
     string,
     {
         [K in keyof TSchema['definition']]: Model<string, TSchema['definition'][K]['schema']>
-    }
+    },
+    InferEntityMetadata<TSchema>
 >

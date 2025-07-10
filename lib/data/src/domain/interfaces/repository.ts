@@ -1,15 +1,15 @@
-import type { Model, ModelSchema } from '@declaro/core'
+import type { AnyModelSchema } from '@declaro/core'
 import type {
     InferDetail,
     InferFilters,
     InferInput,
-    InferSummary,
     InferLookup,
     InferSearchResults,
+    InferSummary,
 } from '../../shared/utils/schema-inference'
 import type { IPaginationInput } from '../models/pagination'
 
-export interface IRepository<TSchema extends ModelSchema<any, any>> {
+export interface IRepository<TSchema extends AnyModelSchema> {
     /**
      * Loads a single element based on the provided lookup.
      *

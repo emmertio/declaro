@@ -8,7 +8,7 @@ export const MockBookSchema = ModelSchema.create('Book')
             new ZodModel(
                 h.name,
                 z.object({
-                    id: z.string(),
+                    id: z.number().int().positive(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
                     publishedDate: z.date(),
@@ -18,7 +18,7 @@ export const MockBookSchema = ModelSchema.create('Book')
             new ZodModel(
                 h.name,
                 z.object({
-                    id: z.string(),
+                    id: z.number().int().positive(),
                 }),
             ),
     })
@@ -34,7 +34,7 @@ export const MockBookSchema = ModelSchema.create('Book')
             new ZodModel(
                 h.name,
                 z.object({
-                    id: z.string(),
+                    id: z.number().int().positive(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
                     publishedDate: z.date(),
@@ -46,10 +46,13 @@ export const MockBookSchema = ModelSchema.create('Book')
             new ZodModel(
                 h.name,
                 z.object({
-                    id: z.string().optional(),
+                    id: z.number().int().positive().optional(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
                     publishedDate: z.date(),
                 }),
             ),
+    })
+    .entity({
+        primaryKey: 'id',
     })

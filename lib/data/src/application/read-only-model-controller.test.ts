@@ -1,14 +1,13 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test'
-import { ReadOnlyModelController } from './read-only-model-controller'
+import { AuthValidator, getMockAuthSession, mockAuthConfig, MockAuthService } from '@declaro/auth'
+import { EventManager, PermissionError } from '@declaro/core'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { ReadOnlyModelService } from '../domain/services/read-only-model-service'
-import { MockMemoryRepository } from '../test/mock/repositories/mock-memory-repository'
 import { MockBookSchema } from '../test/mock/models/mock-book-models'
-import { AuthService, AuthValidator, getMockAuthSession, mockAuthConfig, MockAuthService } from '@declaro/auth'
-import { EventManager, PermissionError, UnauthorizedError } from '@declaro/core'
+import { MockMemoryRepository } from '../test/mock/repositories/mock-memory-repository'
+import { ReadOnlyModelController } from './read-only-model-controller'
 
 describe('ReadOnlyModelController', () => {
     const namespace = 'books'
-    const primaryKey = 'id'
     const mockSchema = MockBookSchema
     const authService = new MockAuthService(mockAuthConfig)
 
@@ -18,7 +17,7 @@ describe('ReadOnlyModelController', () => {
     let invalidAuthValidator: AuthValidator
 
     beforeEach(() => {
-        repository = new MockMemoryRepository({ primaryKey, schema: mockSchema })
+        repository = new MockMemoryRepository({ schema: mockSchema })
         authValidator = new AuthValidator(
             getMockAuthSession({
                 claims: ['books::book.read:all'],
@@ -42,10 +41,10 @@ describe('ReadOnlyModelController', () => {
     it('should load a single record if permissions are valid', async () => {
         const controller = new ReadOnlyModelController(service, authValidator)
 
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
-        const record = await controller.load({ id: '42' })
+        const record = await controller.load({ id: 42 })
 
         expect(record).toEqual(input)
     })
@@ -53,18 +52,18 @@ describe('ReadOnlyModelController', () => {
     it('should throw PermissionError if permissions are invalid for load', async () => {
         const controller = new ReadOnlyModelController(service, invalidAuthValidator)
 
-        await expect(controller.load({ id: '42' })).rejects.toThrow(PermissionError)
+        await expect(controller.load({ id: 42 })).rejects.toThrow(PermissionError)
     })
 
     it('should load multiple records if permissions are valid', async () => {
         const controller = new ReadOnlyModelController(service, authValidator)
 
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 
-        const records = await controller.loadMany([{ id: '42' }, { id: '43' }])
+        const records = await controller.loadMany([{ id: 42 }, { id: 43 }])
 
         expect(records).toEqual([input1, input2])
     })
@@ -72,14 +71,14 @@ describe('ReadOnlyModelController', () => {
     it('should throw PermissionError if permissions are invalid for loadMany', async () => {
         const controller = new ReadOnlyModelController(service, invalidAuthValidator)
 
-        await expect(controller.loadMany([{ id: '42' }, { id: '43' }])).rejects.toThrow(PermissionError)
+        await expect(controller.loadMany([{ id: 42 }, { id: 43 }])).rejects.toThrow(PermissionError)
     })
 
     it('should search for records if permissions are valid', async () => {
         const controller = new ReadOnlyModelController(service, authValidator)
 
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 

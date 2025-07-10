@@ -1,13 +1,13 @@
-import type { ModelSchema } from '@declaro/core'
+import type { AnyModelSchema } from '@declaro/core'
 import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../../shared/utils/schema-inference'
-import { BaseModelService, type IActionOptions } from './base-model-service'
-import { QueryEvent } from '../events/query-event'
 import { ModelQueryEvent } from '../events/event-types'
+import { QueryEvent } from '../events/query-event'
+import { BaseModelService, type IActionOptions } from './base-model-service'
 
 export interface ILoadOptions extends IActionOptions {}
 export interface ISearchOptions extends IActionOptions {}
 
-export class ReadOnlyModelService<TSchema extends ModelSchema<any, any>> extends BaseModelService<TSchema> {
+export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
     /**
      * Load a single record by its lookup criteria.
      * @param lookup The lookup criteria to find the record.

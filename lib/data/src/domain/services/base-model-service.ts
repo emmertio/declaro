@@ -1,4 +1,4 @@
-import { ActionDescriptor, type ModelSchema } from '@declaro/core'
+import { ActionDescriptor, type AnyModelSchema, type ModelSchema } from '@declaro/core'
 import type { IModelServiceArgs } from './model-service-args'
 import type { IRepository } from '../interfaces/repository'
 
@@ -9,7 +9,7 @@ export interface IActionOptions {
     scope?: string
 }
 
-export class BaseModelService<TSchema extends ModelSchema<any, any>> {
+export class BaseModelService<TSchema extends AnyModelSchema> {
     protected readonly namespace: string
     protected readonly schema: TSchema
     protected readonly emitter: IModelServiceArgs<TSchema>['emitter']

@@ -5,6 +5,7 @@
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
     "author": "Emmert Technology LLC",
+    "types": "dist/ts/index.d.ts",
     "type": "module",
     "license": "MIT",
     "publishConfig": {

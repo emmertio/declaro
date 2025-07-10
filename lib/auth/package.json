@@ -7,6 +7,7 @@
     "author": "Emmert Technology LLC",
     "type": "module",
     "license": "MIT",
+    "types": "dist/ts/index.d.ts",
     "publishConfig": {
         "access": "public"
     },

@@ -4,6 +4,7 @@
     "description": "A data-mapper framework for managing application data across integrated systems.",
     "main": "dist/node/index.cjs",
     "module": "dist/browser/index.js",
+    "types": "dist/ts/index.d.ts",
     "scripts": {
         "dev": "bun run scripts/build.ts --watch",
         "clean": "bun rimraf dist",

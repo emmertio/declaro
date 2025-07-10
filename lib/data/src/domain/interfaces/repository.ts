@@ -14,9 +14,9 @@ export interface IRepository<TSchema extends AnyModelSchema> {
      * Loads a single element based on the provided lookup.
      *
      * @param input - The lookup criteria for the element.
-     * @returns A promise resolving to the detailed element.
+     * @returns A promise resolving to the detailed element or null if not found.
      */
-    load(input: InferLookup<TSchema>): Promise<InferDetail<TSchema>>
+    load(input: InferLookup<TSchema>): Promise<InferDetail<TSchema> | null>
 
     /**
      * Loads multiple elements based on the provided lookups.

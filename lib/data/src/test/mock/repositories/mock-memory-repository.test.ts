@@ -52,7 +52,8 @@ describe('MockMemoryRepository', () => {
         const removedItem = await repository.remove({ id: createdItem.id })
 
         expect(removedItem).toEqual(input)
-        await expect(repository.load({ id: createdItem.id })).rejects.toThrow('Item not found')
+        const loadedItem = await repository.load({ id: createdItem.id })
+        expect(loadedItem).toBeNull()
     })
 
     it('should restore a removed item', async () => {
@@ -91,5 +92,10 @@ describe('MockMemoryRepository', () => {
         expect(createdItem2.id).toBe(2)
         expect(await repository.load({ id: createdItem1.id })).toEqual(createdItem1)
         expect(await repository.load({ id: createdItem2.id })).toEqual(createdItem2)
+    })
+
+    it('should return null when loading a non-existent item', async () => {
+        const result = await repository.load({ id: 999 })
+        expect(result).toBeNull()
     })
 })

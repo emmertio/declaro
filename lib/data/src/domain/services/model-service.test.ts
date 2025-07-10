@@ -72,7 +72,7 @@ describe('ModelService', () => {
         const removedRecord = await service.remove({ id: 42 })
 
         expect(removedRecord).toEqual(input)
-        await expect(repository.load({ id: 42 })).rejects.toThrow('Item not found')
+        expect(await repository.load({ id: 42 })).toBeNull()
     })
 
     it('should restore a record', async () => {
@@ -136,5 +136,14 @@ describe('ModelService', () => {
         expect(beforeRestoreSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeRestore' }))
         expect(afterRestoreSpy).toHaveBeenCalledTimes(1)
         expect(afterRestoreSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterRestore' }))
+    })
+
+    it('should throw an error when attempting to remove a non-existent record', async () => {
+        await expect(service.remove({ id: 999 })).rejects.toThrow('Item not found')
+    })
+
+    it('should throw an error when attempting to update a non-existent record', async () => {
+        const updatedInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
+        await expect(service.update({ id: 999 }, updatedInput)).rejects.toThrow('Item not found')
     })
 })

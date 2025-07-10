@@ -28,17 +28,13 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         }
     }
 
-    async load(input: InferLookup<TSchema>): Promise<InferDetail<TSchema>> {
+    async load(input: InferLookup<TSchema>): Promise<InferDetail<TSchema> | null> {
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
         const item = await this.data.get(input[this.entityMetadata.primaryKey])
-        if (!item) {
-            throw new Error('Item not found')
-        }
-
-        return item
+        return item || null
     }
     async loadMany(inputs: InferLookup<TSchema>[]): Promise<InferDetail<TSchema>[]> {
         if (!this.entityMetadata?.primaryKey) {

@@ -83,8 +83,10 @@ describe('ReadOnlyModelService', () => {
         expect(record).toEqual(input)
     })
 
-    it('should throw an error when loading a non-existent record', async () => {
-        await expect(service.load({ id: 42 })).rejects.toThrow('Item not found')
+    it('should return null when loading a non-existent record', async () => {
+        const record = await service.load({ id: 999 })
+
+        expect(record).toBeNull()
     })
 
     it('should load multiple records', async () => {

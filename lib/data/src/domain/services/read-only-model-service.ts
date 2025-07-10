@@ -1,11 +1,19 @@
 import type { AnyModelSchema } from '@declaro/core'
-import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../../shared/utils/schema-inference'
+import type {
+    InferDetail,
+    InferFilters,
+    InferLookup,
+    InferSearchResults,
+    InferSort,
+} from '../../shared/utils/schema-inference'
 import { ModelQueryEvent } from '../events/event-types'
 import { QueryEvent } from '../events/query-event'
 import { BaseModelService, type IActionOptions } from './base-model-service'
 
 export interface ILoadOptions extends IActionOptions {}
-export interface ISearchOptions extends IActionOptions {}
+export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
+    sort?: InferSort<TSchema>
+}
 
 export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
     /**
@@ -68,7 +76,10 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      * @param options Additional options for the search operation.
      * @returns The search results.
      */
-    async search(filters: InferFilters<TSchema>, options?: ISearchOptions): Promise<InferSearchResults<TSchema>> {
+    async search(
+        filters: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<InferSearchResults<TSchema>> {
         // Emit the before search event
         const beforeSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
             this.getDescriptor(ModelQueryEvent.BeforeSearch, options?.scope),

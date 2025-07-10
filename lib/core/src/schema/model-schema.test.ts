@@ -28,6 +28,8 @@ describe('ModelSchema', () => {
             filters: (h) =>
                 new MockModel(h.name, z.object({ title: z.string().optional(), author: z.string().optional() })),
             summary: (h) => new MockModel(h.name, z.object({ id: z.string(), title: z.string() })),
+            sort: (h) =>
+                new MockModel(h.name, z.object({ title: z.enum(['asc', 'desc']), author: z.enum(['asc', 'desc']) })),
         })
 
         expect(schema.definition.filters).toBeInstanceOf(MockModel)

@@ -38,6 +38,7 @@ export type DefaultMixin<TName extends Readonly<string>> = ReturnType<typeof def
 const searchMixin = defineMixin((h) => ({
     summary: { name: `${h.name}Summary` as const },
     filters: { name: `${h.name}Filters` as const },
+    sort: { name: `${h.name}Sort` as const },
 }))
 export type SearchMixin<TName extends Readonly<string>> = ReturnType<typeof searchMixin<TName>>
 

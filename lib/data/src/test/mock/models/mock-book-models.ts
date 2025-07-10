@@ -1,5 +1,5 @@
 import { ModelSchema } from '@declaro/core'
-import { ZodModel } from '@declaro/zod'
+import { sortArray, ZodModel } from '@declaro/zod'
 import { z } from 'zod/v4'
 
 export const MockBookSchema = ModelSchema.create('Book')
@@ -40,6 +40,7 @@ export const MockBookSchema = ModelSchema.create('Book')
                     publishedDate: z.date(),
                 }),
             ),
+        sort: (h) => new ZodModel(h.name, sortArray(['title', 'author'])),
     })
     .write({
         input: (h) =>

@@ -8,7 +8,6 @@ import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from 
 
 describe('ReadOnlyModelService', () => {
     const namespace = 'books'
-    const primaryKey = 'id'
     const mockSchema = MockBookSchema
 
     let repository: MockMemoryRepository<typeof mockSchema>
@@ -35,7 +34,7 @@ describe('ReadOnlyModelService', () => {
     )
 
     beforeEach(() => {
-        repository = new MockMemoryRepository({ primaryKey, schema: mockSchema })
+        repository = new MockMemoryRepository({ schema: mockSchema })
         emitter = new EventManager()
 
         beforeLoadSpy.mockClear()
@@ -76,36 +75,48 @@ describe('ReadOnlyModelService', () => {
     })
 
     it('should load a single record', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
-        const record = await service.load({ id: '42' })
+        const record = await service.load({ id: 42 })
 
         expect(record).toEqual(input)
     })
 
     it('should throw an error when loading a non-existent record', async () => {
-        await expect(service.load({ id: '42' })).rejects.toThrow('Item not found')
+        await expect(service.load({ id: 42 })).rejects.toThrow('Item not found')
     })
 
     it('should load multiple records', async () => {
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 
-        const records = await service.loadMany([{ id: '42' }, { id: '43' }])
+        const records = await service.loadMany([{ id: 42 }, { id: 43 }])
 
         expect(records).toEqual([input1, input2])
     })
 
     it('should search for records', async () => {
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 
-        const results = await service.search({ text: 'Test' })
+        const results = await service.search(
+            { text: 'Test' },
+            {
+                sort: [
+                    {
+                        title: 'asc',
+                    },
+                    {
+                        author: 'desc',
+                    },
+                ],
+            },
+        )
 
         expect(results.results).toEqual([input1, input2])
         expect(results.pagination.total).toBe(2)
@@ -119,10 +130,10 @@ describe('ReadOnlyModelService', () => {
     })
 
     it('should trigger before and after events for load', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
-        const record = await service.load({ id: '42' })
+        const record = await service.load({ id: 42 })
 
         expect(record).toEqual(input)
         expect(beforeLoadSpy).toHaveBeenCalledTimes(1)
@@ -132,12 +143,12 @@ describe('ReadOnlyModelService', () => {
     })
 
     it('should trigger before and after events for loadMany', async () => {
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 
-        const records = await service.loadMany([{ id: '42' }, { id: '43' }])
+        const records = await service.loadMany([{ id: 42 }, { id: 43 }])
 
         expect(records).toEqual([input1, input2])
         expect(beforeLoadManySpy).toHaveBeenCalledTimes(1)
@@ -147,8 +158,8 @@ describe('ReadOnlyModelService', () => {
     })
 
     it('should trigger before and after events for search', async () => {
-        const input1 = { id: '42', title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
-        const input2 = { id: '43', title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+        const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+        const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
         await repository.create(input1)
         await repository.create(input2)
 

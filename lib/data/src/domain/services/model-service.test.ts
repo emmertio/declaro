@@ -7,7 +7,6 @@ import { mock } from 'bun:test'
 
 describe('ModelService', () => {
     const namespace = 'books'
-    const primaryKey = 'id'
     const mockSchema = MockBookSchema
 
     let repository: MockMemoryRepository<typeof mockSchema>
@@ -15,7 +14,7 @@ describe('ModelService', () => {
     let service: ModelService<typeof mockSchema>
 
     beforeEach(() => {
-        repository = new MockMemoryRepository({ primaryKey, schema: mockSchema })
+        repository = new MockMemoryRepository({ schema: mockSchema })
         emitter = new EventManager()
         service = new ModelService({ repository, emitter, schema: mockSchema, namespace })
     })
@@ -50,45 +49,45 @@ describe('ModelService', () => {
     })
 
     it('should create a record', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         const createdRecord = await service.create(input)
 
         expect(createdRecord).toEqual(input)
     })
 
     it('should update a record', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
         const updatedInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
-        const updatedRecord = await service.update({ id: '42' }, updatedInput)
+        const updatedRecord = await service.update({ id: 42 }, updatedInput)
 
-        expect(updatedRecord).toEqual({ id: '42', ...updatedInput })
+        expect(updatedRecord).toEqual({ id: 42, ...updatedInput })
     })
 
     it('should remove a record', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
-        const removedRecord = await service.remove({ id: '42' })
+        const removedRecord = await service.remove({ id: 42 })
 
         expect(removedRecord).toEqual(input)
-        await expect(repository.load({ id: '42' })).rejects.toThrow('Item not found')
+        await expect(repository.load({ id: 42 })).rejects.toThrow('Item not found')
     })
 
     it('should restore a record', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
-        await repository.remove({ id: '42' })
+        await repository.remove({ id: 42 })
 
-        const restoredRecord = await service.restore({ id: '42' })
+        const restoredRecord = await service.restore({ id: 42 })
 
         expect(restoredRecord).toEqual(input)
-        expect(await repository.load({ id: '42' })).toEqual(input)
+        expect(await repository.load({ id: 42 })).toEqual(input)
     })
 
     it('should trigger before and after events for create', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         const createdRecord = await service.create(input)
 
         expect(createdRecord).toEqual(input)
@@ -99,13 +98,13 @@ describe('ModelService', () => {
     })
 
     it('should trigger before and after events for update', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
         const updatedInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
-        const updatedRecord = await service.update({ id: '42' }, updatedInput)
+        const updatedRecord = await service.update({ id: 42 }, updatedInput)
 
-        expect(updatedRecord).toEqual({ id: '42', ...updatedInput })
+        expect(updatedRecord).toEqual({ id: 42, ...updatedInput })
         expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
         expect(beforeUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeUpdate' }))
         expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
@@ -113,10 +112,10 @@ describe('ModelService', () => {
     })
 
     it('should trigger before and after events for remove', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
 
-        const removedRecord = await service.remove({ id: '42' })
+        const removedRecord = await service.remove({ id: 42 })
 
         expect(removedRecord).toEqual(input)
         expect(beforeRemoveSpy).toHaveBeenCalledTimes(1)
@@ -126,11 +125,11 @@ describe('ModelService', () => {
     })
 
     it('should trigger before and after events for restore', async () => {
-        const input = { id: '42', title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)
-        await repository.remove({ id: '42' })
+        await repository.remove({ id: 42 })
 
-        const restoredRecord = await service.restore({ id: '42' })
+        const restoredRecord = await service.restore({ id: 42 })
 
         expect(restoredRecord).toEqual(input)
         expect(beforeRestoreSpy).toHaveBeenCalledTimes(1)

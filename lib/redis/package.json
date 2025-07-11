@@ -1,6 +1,6 @@
 {
     "name": "@declaro/redis",
-    "version": "2.0.0-beta.50",
+    "version": "2.0.0-beta.51",
     "description": "Redis tools for Declaro",
     "main": "dist/node/index.cjs",
     "module": "dist/browser/index.js",
@@ -32,7 +32,7 @@
         "vitest": "^0.32.2"
     },
     "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.46",
+        "@declaro/core": "^2.0.0-beta.50",
         "@types/ioredis-mock": "^8.9.0",
         "ioredis": "^5.5.0",
         "ioredis-mock": "^8.9.0"

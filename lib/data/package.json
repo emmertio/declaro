@@ -1,6 +1,6 @@
 {
     "name": "@declaro/data",
-    "version": "2.0.0-beta.50",
+    "version": "2.0.0-beta.51",
     "description": "A data-mapper framework for managing application data across integrated systems.",
     "main": "dist/node/index.cjs",
     "module": "dist/browser/index.js",
@@ -16,8 +16,8 @@
         "typecheck": "bun tsc --noEmit"
     },
     "peerDependencies": {
-        "@declaro/auth": "^2.0.0-beta.46",
-        "@declaro/core": "^2.0.0-beta.46"
+        "@declaro/auth": "^2.0.0-beta.50",
+        "@declaro/core": "^2.0.0-beta.50"
     },
     "devDependencies": {
         "@declaro/auth": "workspace:^",

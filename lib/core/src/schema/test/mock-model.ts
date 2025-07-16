@@ -1,18 +1,15 @@
-import type { StandardSchemaV1 } from '@standard-schema/spec'
-import { Model } from '../model'
+import { z } from 'zod/v4'
+import type { $ZodType } from 'zod/v4/core'
 import type { JSONSchema } from '../json-schema'
+import { Model } from '../model'
 
-export class MockModel<TName extends Readonly<string>, TSchema extends StandardSchemaV1> extends Model<TName, TSchema> {
+export class MockModel<TName extends Readonly<string>, TSchema extends $ZodType<any>> extends Model<TName, TSchema> {
     constructor(name: TName, schema: TSchema) {
         super(name, schema)
     }
 
     toJSONSchema(): JSONSchema {
-        return {
-            $id: `https://example.com/schemas/${this.name}.json`,
-            type: 'object',
-            properties: {},
-            required: [],
-        }
+        const jsonSchema = z.toJSONSchema(this.schema)
+        return jsonSchema as JSONSchema
     }
 }

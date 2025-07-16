@@ -13,17 +13,19 @@ import { v4 as uuid } from 'uuid'
 
 export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
     schema: TSchema
+    lookup?: (data: InferDetail<TSchema>, lookup: InferLookup<TSchema>) => boolean
+    filter?: (data: InferSummary<TSchema>, filters: InferFilters<TSchema>) => boolean
 }
 
 export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRepository<TSchema> {
     protected data = new Map<string, InferDetail<TSchema>>()
     protected trash = new Map<string, InferDetail<TSchema>>()
-    protected entityMetadata: IModelEntityMetadata<any>
+    protected entityMetadata: IModelEntityMetadata
     protected nextId: number = 0
 
     constructor(protected args: IMockMemoryRepositoryArgs<TSchema>) {
         this.entityMetadata = this.args.schema.getEntityMetadata()
-        if (!this.entityMetadata.primaryKey) {
+        if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key must be specified for MockMemoryRepository')
         }
     }
@@ -33,7 +35,14 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        const item = await this.data.get(input[this.entityMetadata.primaryKey])
+        let item: InferDetail<TSchema> | undefined
+        if (typeof this.args.lookup === 'function') {
+            item = Array.from(this.data.values()).find((data) => this.args.lookup!(data, input))
+        } else {
+            // Default lookup by primary key
+            item = await this.data.get(input[this.entityMetadata.primaryKey])
+        }
+
         return item || null
     }
     async loadMany(inputs: InferLookup<TSchema>[]): Promise<InferDetail<TSchema>[]> {
@@ -47,7 +56,11 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
     async search(input: InferFilters<TSchema>, pagination?: IPaginationInput): Promise<InferSearchResults<TSchema>> {
         const items = Array.from(this.data.values()).filter((item) => {
             // Apply filtering logic based on the input
-            return true
+            if (typeof this.args.filter === 'function') {
+                return this.args.filter(item, input)
+            } else {
+                return true
+            }
         })
         return {
             results: items.slice(

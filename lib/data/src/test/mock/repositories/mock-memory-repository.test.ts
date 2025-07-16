@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it } from 'bun:test'
+import { beforeEach, describe, expect, it, mock } from 'bun:test'
 import { MockBookSchema } from '../models/mock-book-models'
 import { MockMemoryRepository } from './mock-memory-repository'
+import { z } from 'zod/v4'
+import { ZodModel } from '@declaro/zod'
 
 describe('MockMemoryRepository', () => {
     const mockSchema = MockBookSchema
@@ -97,5 +99,31 @@ describe('MockMemoryRepository', () => {
     it('should return null when loading a non-existent item', async () => {
         const result = await repository.load({ id: 999 })
         expect(result).toBeNull()
+    })
+
+    it('should be able to load items from a custom filter', async () => {
+        // Creating a hypothetical schema with a custom filter, and a title lookup attribute
+        const repository = new MockMemoryRepository({
+            schema: mockSchema.custom({
+                lookup: (h) =>
+                    new ZodModel(
+                        h.name,
+                        z.object({
+                            id: z.number().optional(),
+                            title: z.string().optional(),
+                        }),
+                    ),
+            }),
+            lookup: (data, lookup) =>
+                data.id === lookup.id || data.title?.toLowerCase() === lookup.title?.toLowerCase(),
+        })
+
+        const input = { title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const createdItem = await repository.create(input)
+
+        const loadedItem = await repository.load({ id: createdItem.id })
+        const titleLoadedItem = await repository.load({ title: createdItem.title })
+        expect(loadedItem).toEqual(createdItem)
+        expect(titleLoadedItem).toEqual(createdItem)
     })
 })

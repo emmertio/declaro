@@ -29,3 +29,18 @@ export type Merge<A, B> = {
         ? A[K]
         : never
 }
+
+/**
+ * Shallow merge two object types, replacing types of properties instead of merging them.
+ * Properties in B will completely replace properties in A.
+ */
+export type ShallowMerge<A extends object, B extends object> = {
+    [K in UniqueKeys<keyof A, keyof B>]: A[K]
+} & {
+    [K in keyof B]: B[K]
+}
+
+/**
+ * Extract keys from A that are not present in B
+ */
+export type UniqueKeys<A, B> = A extends B ? never : A

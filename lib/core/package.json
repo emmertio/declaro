@@ -1,6 +1,6 @@
 {
     "name": "@declaro/core",
-    "version": "2.0.0-beta.51",
+    "version": "2.0.0-beta.52",
     "description": "Declarative Business Module Definition",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
@@ -40,9 +40,9 @@
         "whatwg-url": "^14.1.1"
     },
     "dependencies": {
+        "@types/json-schema": "^7.0.15",
         "change-case": "^5.4.4",
-        "pluralize": "^8.0.0",
-        "@types/json-schema": "^7.0.15"
+        "pluralize": "^8.0.0"
     },
     "repository": {
         "type": "git",

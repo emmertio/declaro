@@ -7,7 +7,7 @@ export class MockModel<TName extends Readonly<string>, TSchema extends StandardS
         super(name, schema)
     }
 
-    async toJSONSchema(): Promise<JSONSchema> {
+    toJSONSchema(): JSONSchema {
         return {
             $id: `https://example.com/schemas/${this.name}.json`,
             type: 'object',

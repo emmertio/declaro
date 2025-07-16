@@ -8,7 +8,7 @@ export class ZodModel<TName extends Readonly<string>, TSchema extends $ZodType<a
         super(name, schema)
     }
 
-    async toJSONSchema(): Promise<JSONSchema> {
+    toJSONSchema(): JSONSchema {
         const jsonSchema = z.toJSONSchema(this.schema)
         return jsonSchema as JSONSchema
     }

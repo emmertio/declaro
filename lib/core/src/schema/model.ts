@@ -34,7 +34,7 @@ export abstract class Model<TName extends Readonly<string>, TSchema extends Stan
         const result = await this.schema['~standard'].validate(value)
 
         if (result.issues) {
-            const meta = await this.toJSONSchema()
+            const meta = this.toJSONSchema()
 
             const issues = result.issues.map((issue) => {
                 let schema: JSONSchema | undefined = meta
@@ -82,7 +82,7 @@ export abstract class Model<TName extends Readonly<string>, TSchema extends Stan
         return getLabels(this.name)
     }
 
-    abstract toJSONSchema(): Promise<JSONSchema>
+    abstract toJSONSchema(): JSONSchema
 
     // Implementing StandardSchemaV1 interface
     get version(): number {

@@ -53,14 +53,10 @@ export class EventManager<E extends IEvent = IEvent> {
     }
 
     async emitAsync(event: E) {
-        await this.getListeners(event.type)
-            .reduce(async (promise, listener) => {
-                await promise
-                return await listener(event)
-            }, Promise.resolve())
-            .catch((e) => {
-                console.error('Error in event listener', e)
-            })
+        await this.getListeners(event.type).reduce(async (promise, listener) => {
+            await promise
+            return await listener(event)
+        }, Promise.resolve())
     }
 
     async emitAll(event: E) {

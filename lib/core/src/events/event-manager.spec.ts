@@ -200,4 +200,28 @@ describe('Event manager', () => {
 
         expect(customListener.mock.calls.length).toBe(1)
     })
+
+    it('should bubble up errors from listeners', async () => {
+        const eventManager = new EventManager()
+        const testEvent = new TestEvent('test')
+        const errorMessage = 'Test error from listener'
+
+        // Test that emitAll bubbles up errors
+        const throwingListener = vi.fn(() => {
+            throw new Error(errorMessage)
+        })
+
+        eventManager.on('test', throwingListener)
+
+        await expect(eventManager.emitAll(testEvent)).rejects.toThrow(errorMessage)
+        expect(throwingListener.mock.calls.length).toBe(1)
+
+        // Test synchronous emit throws immediately
+        expect(() => eventManager.emit(testEvent)).toThrow(errorMessage)
+        expect(throwingListener.mock.calls.length).toBe(2)
+
+        // Test that emitAsync also bubbles up errors
+        await expect(eventManager.emitAsync(testEvent)).rejects.toThrow(errorMessage)
+        expect(throwingListener.mock.calls.length).toBe(3)
+    })
 })

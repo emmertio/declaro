@@ -12,7 +12,7 @@
     },
     "apps/framework": {
       "name": "@declaro-apps/framework",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "dependencies": {
         "@declaro/di": "^2.0.0-beta.40",
         "@nuxt/icon": "^1.5.0",
@@ -46,7 +46,7 @@
     },
     "lib/auth": {
       "name": "@declaro/auth",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "devDependencies": {
         "@declaro/core": "workspace:^",
         "@declaro/redis": "workspace:^",
@@ -60,19 +60,20 @@
         "zod": "^3.25.67",
       },
       "optionalDependencies": {
-        "@declaro/redis": "^2.0.0-beta.44",
+        "@declaro/redis": "^2.0.0-beta.50",
       },
       "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.44",
-        "@declaro/zod": "^2.0.0-beta.44",
+        "@declaro/core": "^2.0.0-beta.50",
+        "@declaro/zod": "^2.0.0-beta.50",
         "ioredis": "^5.6.1",
         "zod": "^3.25.67",
       },
     },
     "lib/core": {
       "name": "@declaro/core",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "dependencies": {
+        "@types/json-schema": "^7.0.15",
         "change-case": "^5.4.4",
         "pluralize": "^8.0.0",
       },
@@ -97,22 +98,24 @@
     },
     "lib/data": {
       "name": "@declaro/data",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "devDependencies": {
         "@declaro/auth": "workspace:^",
         "@declaro/core": "workspace:^",
+        "@declaro/zod": "workspace:^",
         "typescript": "^5.8.3",
         "uuid": "^11.1.0",
         "zod": "^3.25.67",
       },
       "peerDependencies": {
-        "@declaro/auth": "^2.0.0-beta.44",
-        "@declaro/core": "^2.0.0-beta.44",
+        "@declaro/auth": "^2.0.0-beta.50",
+        "@declaro/core": "^2.0.0-beta.50",
+        "@declaro/zod": "2.0.0-beta.51",
       },
     },
     "lib/redis": {
       "name": "@declaro/redis",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "devDependencies": {
         "@declaro/core": "workspace:^",
         "@types/ioredis-mock": "^8.2.5",
@@ -124,7 +127,7 @@
         "vitest": "^0.32.2",
       },
       "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.44",
+        "@declaro/core": "^2.0.0-beta.50",
         "@types/ioredis-mock": "^8.9.0",
         "ioredis": "^5.5.0",
         "ioredis-mock": "^8.9.0",
@@ -132,7 +135,7 @@
     },
     "lib/zod": {
       "name": "@declaro/zod",
-      "version": "2.0.0-beta.50",
+      "version": "2.0.0-beta.52",
       "devDependencies": {
         "@declaro/core": "workspace:^",
         "@types/bun": "^1.2.12",
@@ -140,7 +143,7 @@
         "zod": "^3.25.67",
       },
       "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.44",
+        "@declaro/core": "^2.0.0-beta.50",
         "zod": "^3.25.67",
       },
     },

@@ -52,6 +52,7 @@
         "require": "./dist/node/index.js"
     },
     "browser": {
-        "crypto": "crypto-browserify"
+        "crypto": "crypto-browserify",
+        "node:crypto": "crypto-browserify"
     }
 }

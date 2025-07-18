@@ -32,7 +32,8 @@
         "zod": "^3.25.67"
     },
     "browser": {
-        "crypto": "crypto-browserify"
+        "crypto": "crypto-browserify",
+        "node:crypto": "crypto-browserify"
     },
     "author": "Your Name",
     "license": "MIT",

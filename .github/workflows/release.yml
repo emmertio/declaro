@@ -47,10 +47,14 @@ jobs:
 
             - name: Run release
               run: |
-                  # Run build first, then typecheck and test
+                  # Clean and build packages
                   bun run build
-                  bun typecheck
-                  bun test
+
+                  # Typecheck
+                  bun run typecheck
+
+                  # Run tests
+                  bun run test
 
                   # Run lerna publish with prerelease increments (beta.X)
                   bun lerna publish prerelease \

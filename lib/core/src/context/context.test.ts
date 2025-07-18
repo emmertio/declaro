@@ -787,4 +787,17 @@ describe('Context', () => {
         expect(contextACallback).toHaveBeenCalledTimes(1)
         expect(contextACallback.mock.calls[0][0]).toEqual(event)
     })
+
+    it('should not squash errors in event handlers', async () => {
+        const context = new Context<AppScope>()
+        const callback = vi.fn()
+
+        context.on('test', () => {
+            callback()
+            throw new Error('Test error')
+        })
+
+        expect(callback).not.toHaveBeenCalled()
+        await expect(context.emit('test')).rejects.toThrow('Test error')
+    })
 })

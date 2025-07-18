@@ -33,6 +33,9 @@
         "uuid": "^11.1.0",
         "zod": "^3.25.67"
     },
+    "dependencies": {
+        "crypto-browserify": "^3.12.1"
+    },
     "peerDependencies": {
         "@declaro/core": "^2.0.0-beta.50",
         "@declaro/zod": "^2.0.0-beta.50",
@@ -47,5 +50,8 @@
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.js"
+    },
+    "browser": {
+        "crypto": "crypto-browserify"
     }
 }

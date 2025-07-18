@@ -14,6 +14,7 @@ await Promise.all([
         outdir: 'dist/node',
         sourcemap: 'linked',
         naming: '[dir]/[name].cjs',
+        external: ['crypto', 'node:crypto'],
     }),
     build({
         ...defaults,
@@ -23,6 +24,7 @@ await Promise.all([
         outdir: 'dist/node',
         sourcemap: 'linked',
         naming: '[dir]/[name].js',
+        external: ['crypto', 'node:crypto'],
     }),
     build({
         ...defaults,

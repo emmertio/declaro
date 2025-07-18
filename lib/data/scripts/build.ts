@@ -30,6 +30,6 @@ await Promise.all([
         outdir: 'dist/browser',
         sourcemap: 'linked',
         minify: true,
-        external: ['crypto'], // We will polyfill this ourselves
+        external: ['crypto', 'node:crypto'], // We will polyfill this ourselves
     }),
 ])

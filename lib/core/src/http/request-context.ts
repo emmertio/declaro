@@ -9,8 +9,8 @@ export function useRequestMiddleware(context: Context<AppScope>) {
     return middleware ?? []
 }
 
-export function provideRequestMiddleware(
-    context: Context<AppScope>,
+export function provideRequestMiddleware<C extends Context>(
+    context: C,
     ...middleware: ContextMiddleware<Context<RequestScope>>[]
 ) {
     const existingMiddleware = useRequestMiddleware(context)

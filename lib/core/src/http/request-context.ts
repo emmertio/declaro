@@ -1,43 +1,46 @@
-import { Context, type ContextMiddleware } from '../context/context'
 import type { IncomingMessage, ServerResponse } from 'http'
+import { Context, type AppScope, type ContextMiddleware, type RequestScope } from '../context/context'
 
-export const REQUEST_CONTEXT_MIDDLEWARE = Symbol('declaro:request-context-middleware')
-
-export function useRequestMiddleware(context: Context) {
-    const middleware = context.inject<ContextMiddleware[]>(REQUEST_CONTEXT_MIDDLEWARE)
+export function useRequestMiddleware(context: Context<AppScope>) {
+    const middleware = context.resolve('requestMiddleware', {
+        strict: false,
+    })
 
     return middleware ?? []
 }
 
-export function provideRequestMiddleware(context: Context, ...middleware: ContextMiddleware[]) {
+export function provideRequestMiddleware(
+    context: Context<AppScope>,
+    ...middleware: ContextMiddleware<Context<RequestScope>>[]
+) {
     const existingMiddleware = useRequestMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
 
-    context.provide(REQUEST_CONTEXT_MIDDLEWARE, extendedMiddleware)
+    context.registerValue('requestMiddleware', extendedMiddleware)
 
     return extendedMiddleware
 }
-
-export const REQUEST_NODE_MIDDLEWARE = Symbol('declaro:request-node-middleware')
 
 export type NodeListener = (req: IncomingMessage, res: ServerResponse) => void
 export type NodePromisifiedHandler = (req: IncomingMessage, res: ServerResponse) => Promise<any>
 export type NodeMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: Error) => any) => any
 export type AllNodeMiddleware = NodeListener | NodePromisifiedHandler | NodeMiddleware
 
-export function useNodeMiddleware(context: Context) {
-    const middleware = context.inject<AllNodeMiddleware[]>(REQUEST_NODE_MIDDLEWARE)
+export function useNodeMiddleware(context: Context<AppScope>) {
+    const middleware = context.resolve('nodeMiddleware', {
+        strict: false,
+    })
 
     return middleware ?? []
 }
 
-export function provideNodeMiddleware(context: Context, ...middleware: AllNodeMiddleware[]) {
+export function provideNodeMiddleware(context: Context<AppScope>, ...middleware: AllNodeMiddleware[]) {
     const existingMiddleware = useNodeMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
 
-    context.provide(REQUEST_NODE_MIDDLEWARE, extendedMiddleware)
+    context.registerValue('nodeMiddleware', extendedMiddleware)
 
     return extendedMiddleware
 }

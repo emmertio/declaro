@@ -1,15 +1,24 @@
+import { type IncomingHttpHeaders } from 'http'
 import { EventManager, type IEvent } from '../events/event-manager'
+import type { Request } from '../http/request'
+import type { AllNodeMiddleware } from '../http/request-context'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
-import { cloneDeep } from 'lodash'
 
-export interface AppScope {}
-export interface RequestScope extends AppScope {}
+export interface AppScope {
+    requestMiddleware: ContextMiddleware<RequestContext>[]
+    nodeMiddleware: AllNodeMiddleware[]
+}
+export interface RequestScope extends AppScope {
+    request: Request
+    headers: IncomingHttpHeaders
+    header: <K extends keyof IncomingHttpHeaders>(header: K) => IncomingHttpHeaders[K] | undefined
+}
 export type AppContext = Context<AppScope>
 export type RequestContext = Context<RequestScope>
 
-export type ContextMiddleware = (context: Context) => any | Promise<any>
+export type ContextMiddleware<C extends Context = Context> = (context: C) => any | Promise<any>
 export type ContextState<TContext extends Context> = Record<PropertyKey, ContextAttribute<TContext, StateValue<any>>>
 
 export type ContextResolver<T> = (context: Context) => StateValue<T>
@@ -433,7 +442,7 @@ export class Context<Scope extends object = any> {
      * @param middleware
      * @returns
      */
-    async use(...middleware: ContextMiddleware[]) {
+    async use(...middleware: ContextMiddleware<Context<Scope>>[]) {
         return middleware.reduce(async (promise, middleware) => {
             await promise
             await middleware(this)

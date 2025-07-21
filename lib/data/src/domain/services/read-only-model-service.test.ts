@@ -131,6 +131,125 @@ describe('ReadOnlyModelService', () => {
         expect(results.pagination.total).toBe(0)
     })
 
+    it('should handle pagination options correctly', async () => {
+        // Create 5 items
+        for (let i = 1; i <= 5; i++) {
+            await repository.create({
+                id: i,
+                title: `Test Book ${i}`,
+                author: `Author ${i}`,
+                publishedDate: new Date(),
+            })
+        }
+
+        // Test first page with pageSize 2
+        const page1 = await service.search(
+            {},
+            {
+                pagination: { page: 1, pageSize: 2 },
+            },
+        )
+        expect(page1.results).toHaveLength(2)
+        expect(page1.pagination.page).toBe(1)
+        expect(page1.pagination.pageSize).toBe(2)
+        expect(page1.pagination.total).toBe(5)
+        expect(page1.pagination.totalPages).toBe(3)
+
+        // Test second page
+        const page2 = await service.search(
+            {},
+            {
+                pagination: { page: 2, pageSize: 2 },
+            },
+        )
+        expect(page2.results).toHaveLength(2)
+        expect(page2.pagination.page).toBe(2)
+
+        // Test last page
+        const page3 = await service.search(
+            {},
+            {
+                pagination: { page: 3, pageSize: 2 },
+            },
+        )
+        expect(page3.results).toHaveLength(1)
+        expect(page3.pagination.page).toBe(3)
+    })
+
+    it('should handle sort options correctly', async () => {
+        const input1 = { id: 1, title: 'Z Book', author: 'Author A', publishedDate: new Date('2023-01-01') }
+        const input2 = { id: 2, title: 'A Book', author: 'Author B', publishedDate: new Date('2023-02-01') }
+        const input3 = { id: 3, title: 'M Book', author: 'Author C', publishedDate: new Date('2023-03-01') }
+
+        await repository.create(input1)
+        await repository.create(input2)
+        await repository.create(input3)
+
+        // Sort by title ascending
+        const titleAscResults = await service.search(
+            {},
+            {
+                sort: [{ title: 'asc' }],
+            },
+        )
+        expect(titleAscResults.results.map((r) => r.title)).toEqual(['A Book', 'M Book', 'Z Book'])
+
+        // Sort by title descending
+        const titleDescResults = await service.search(
+            {},
+            {
+                sort: [{ title: 'desc' }],
+            },
+        )
+        expect(titleDescResults.results.map((r) => r.title)).toEqual(['Z Book', 'M Book', 'A Book'])
+
+        // Sort by author ascending
+        const authorAscResults = await service.search(
+            {},
+            {
+                sort: [{ author: 'asc' }],
+            },
+        )
+        expect(authorAscResults.results.map((r) => r.author)).toEqual(['Author A', 'Author B', 'Author C'])
+    })
+
+    it('should handle combined filtering, sorting, and pagination', async () => {
+        const repositoryWithFilter = new MockMemoryRepository({
+            schema: mockSchema,
+            filter: (data, filters) => {
+                if (filters.text) {
+                    return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                }
+                return true
+            },
+        })
+
+        const serviceWithFilter = new ReadOnlyModelService({
+            repository: repositoryWithFilter,
+            emitter,
+            namespace,
+            schema: mockSchema,
+        })
+
+        await repositoryWithFilter.create({ title: 'Test Z Book', author: 'Author 1', publishedDate: new Date() })
+        await repositoryWithFilter.create({ title: 'Test A Book', author: 'Author 2', publishedDate: new Date() })
+        await repositoryWithFilter.create({ title: 'Other Book', author: 'Author 3', publishedDate: new Date() })
+        await repositoryWithFilter.create({ title: 'Test M Book', author: 'Author 4', publishedDate: new Date() })
+
+        const results = await serviceWithFilter.search(
+            { text: 'Test' },
+            {
+                sort: [{ title: 'asc' }],
+                pagination: { page: 1, pageSize: 2 },
+            },
+        )
+
+        expect(results.results).toHaveLength(2)
+        expect(results.results.map((r) => r.title)).toEqual(['Test A Book', 'Test M Book'])
+        expect(results.pagination.total).toBe(3) // 3 "Test" books total
+        expect(results.pagination.totalPages).toBe(2)
+    })
+
     it('should trigger before and after events for load', async () => {
         const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
         await repository.create(input)

@@ -4,6 +4,10 @@ import { ModelMutationAction } from '../events/event-types'
 import { MutationEvent } from '../events/mutation-event'
 import type { IModelServiceArgs } from './model-service-args'
 import { ReadOnlyModelService } from './read-only-model-service'
+import type { IActionOptions } from './base-model-service'
+
+export interface ICreateOptions extends IActionOptions {}
+export interface IUpdateOptions extends IActionOptions {}
 
 export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelService<TSchema> {
     constructor(args: IModelServiceArgs<TSchema>) {

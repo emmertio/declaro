@@ -1,7 +1,7 @@
 import type { AuthValidator } from '@declaro/auth'
 import {} from '@declaro/auth'
 import type { AnyModelSchema } from '@declaro/core'
-import type { ILoadOptions, ReadOnlyModelService } from '../domain/services/read-only-model-service'
+import type { ILoadOptions, ISearchOptions, ReadOnlyModelService } from '../domain/services/read-only-model-service'
 import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../shared/utils/schema-inference'
 
 export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
@@ -30,7 +30,10 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
         return this.service.loadMany(lookups, options)
     }
 
-    async search(input: InferFilters<TSchema>, options?: ILoadOptions): Promise<InferSearchResults<TSchema>> {
+    async search(
+        input: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<InferSearchResults<TSchema>> {
         this.authValidator.validatePermissions((v) =>
             v.someOf([
                 this.service.getDescriptor('search', '*').toString(),

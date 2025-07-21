@@ -10,6 +10,7 @@ import type {
     InferSummary,
 } from '../../../shared/utils/schema-inference'
 import { v4 as uuid } from 'uuid'
+import type { ISearchOptions } from '../../../domain/services/read-only-model-service'
 
 export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
     schema: TSchema
@@ -53,8 +54,12 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         const items = await Promise.all(inputs.map((input) => this.data.get(input[this.entityMetadata.primaryKey!])))
         return items
     }
-    async search(input: InferFilters<TSchema>, pagination?: IPaginationInput): Promise<InferSearchResults<TSchema>> {
-        const items = Array.from(this.data.values()).filter((item) => {
+    async search(
+        input: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<InferSearchResults<TSchema>> {
+        const pagination = options?.pagination || { page: 1, pageSize: 25 }
+        let items = Array.from(this.data.values()).filter((item) => {
             // Apply filtering logic based on the input
             if (typeof this.args.filter === 'function') {
                 return this.args.filter(item, input)
@@ -62,9 +67,35 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
                 return true
             }
         })
+
+        // Apply sorting if provided
+        if (options?.sort && Array.isArray(options.sort)) {
+            items = items.sort((a, b) => {
+                for (const sortField of options.sort! as any[]) {
+                    for (const [field, direction] of Object.entries(sortField)) {
+                        if (!direction || typeof direction !== 'string') continue
+
+                        const aValue = a[field as keyof typeof a]
+                        const bValue = b[field as keyof typeof b]
+
+                        let comparison = 0
+                        if (aValue < bValue) comparison = -1
+                        else if (aValue > bValue) comparison = 1
+
+                        if (comparison !== 0) {
+                            // Handle different sort directions
+                            const isDesc = direction.includes('desc')
+                            return isDesc ? -comparison : comparison
+                        }
+                    }
+                }
+                return 0
+            })
+        }
+
         return {
             results: items.slice(
-                (pagination?.page ?? 1 - 1) * (pagination?.pageSize ?? 25),
+                ((pagination?.page ?? 1) - 1) * (pagination?.pageSize ?? 25),
                 (pagination?.page ?? 1) * (pagination?.pageSize ?? 25),
             ),
             pagination: {

@@ -9,9 +9,11 @@ import type {
 import { ModelQueryEvent } from '../events/event-types'
 import { QueryEvent } from '../events/query-event'
 import { BaseModelService, type IActionOptions } from './base-model-service'
+import type { IPaginationInput } from '../models/pagination'
 
 export interface ILoadOptions extends IActionOptions {}
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
+    pagination?: IPaginationInput
     sort?: InferSort<TSchema>
 }
 
@@ -88,7 +90,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         await this.emitter.emitAsync(beforeSearchEvent)
 
         // Search the repository with the provided filters
-        const results = await this.repository.search(filters)
+        const results = await this.repository.search(filters, options)
 
         // Emit the after search event
         const afterSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(

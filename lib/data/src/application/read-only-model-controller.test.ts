@@ -93,4 +93,88 @@ describe('ReadOnlyModelController', () => {
 
         await expect(controller.search({ text: 'Test' })).rejects.toThrow(PermissionError)
     })
+
+    it('should handle search with pagination options', async () => {
+        const controller = new ReadOnlyModelController(service, authValidator)
+
+        // Create 5 items
+        for (let i = 1; i <= 5; i++) {
+            await repository.create({
+                id: i,
+                title: `Test Book ${i}`,
+                author: `Author ${i}`,
+                publishedDate: new Date(),
+            })
+        }
+
+        const results = await controller.search(
+            {},
+            {
+                pagination: { page: 1, pageSize: 2 },
+            },
+        )
+
+        expect(results.results).toHaveLength(2)
+        expect(results.pagination.page).toBe(1)
+        expect(results.pagination.pageSize).toBe(2)
+        expect(results.pagination.total).toBe(5)
+        expect(results.pagination.totalPages).toBe(3)
+    })
+
+    it('should handle search with sort options', async () => {
+        const controller = new ReadOnlyModelController(service, authValidator)
+
+        const input1 = { id: 1, title: 'Z Book', author: 'Author A', publishedDate: new Date() }
+        const input2 = { id: 2, title: 'A Book', author: 'Author B', publishedDate: new Date() }
+        await repository.create(input1)
+        await repository.create(input2)
+
+        const results = await controller.search(
+            {},
+            {
+                sort: [{ title: 'asc' }],
+            },
+        )
+
+        expect(results.results.map((r) => r.title)).toEqual(['A Book', 'Z Book'])
+        expect(results.pagination.total).toBe(2)
+    })
+
+    it('should handle search with combined options', async () => {
+        const repositoryWithFilter = new MockMemoryRepository({
+            schema: mockSchema,
+            filter: (data, filters) => {
+                if (filters.text) {
+                    return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                }
+                return true
+            },
+        })
+
+        const serviceWithFilter = new ReadOnlyModelService({
+            repository: repositoryWithFilter,
+            emitter: new EventManager(),
+            namespace,
+            schema: mockSchema,
+        })
+
+        const controller = new ReadOnlyModelController(serviceWithFilter, authValidator)
+
+        await repositoryWithFilter.create({ title: 'Test Z Book', author: 'Author 1', publishedDate: new Date() })
+        await repositoryWithFilter.create({ title: 'Test A Book', author: 'Author 2', publishedDate: new Date() })
+        await repositoryWithFilter.create({ title: 'Other Book', author: 'Author 3', publishedDate: new Date() })
+
+        const results = await controller.search(
+            { text: 'Test' },
+            {
+                sort: [{ title: 'asc' }],
+                pagination: { page: 1, pageSize: 1 },
+            },
+        )
+
+        expect(results.results).toHaveLength(1)
+        expect(results.results[0].title).toBe('Test A Book')
+        expect(results.pagination.total).toBe(2)
+        expect(results.pagination.totalPages).toBe(2)
+    })
 })

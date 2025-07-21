@@ -23,7 +23,7 @@ export function authModule(config: AuthConfig) {
             context.registerAsyncFactory(
                 'authSession',
                 async (authService: AuthService) => {
-                    const bearer = useHeader(context, 'authorization') as string | undefined
+                    const bearer = context.scope.header('authorization')
                     const token = bearer?.replace(/^(Bearer|bearer)\s+/g, '')
 
                     if (token) {

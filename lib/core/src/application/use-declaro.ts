@@ -8,6 +8,8 @@ export function useDeclaro() {
         context.registerValue('nodeMiddleware', [])
 
         provideRequestMiddleware(context, async (context) => {
+            // TODO: Register headers
+            // TODO: Support modern web Request type, and Headers instance for full fetch compatibility
             context.registerValue('header', (header: keyof IncomingHttpHeaders) => {
                 const headers = context.resolve('headers')
                 return headers[header]

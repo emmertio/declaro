@@ -1,10 +1,11 @@
 import { Context, type AppScope, type RequestScope } from '@declaro/core'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import type { AuthDependencies } from './auth-context'
+import type { AuthDependencies } from './auth-dependencies'
 import { authModule } from './module'
 import { AuthService } from '../domain/services/auth-service'
 import { createTestRequestContext } from '../test/utils/test-request'
 import { getMockJWT } from '../test/mock/auth-session'
+import { AuthValidator } from '../shared/utils/auth-validator'
 
 describe('Module', () => {
     let context: Context<AppScope & AuthDependencies>
@@ -52,5 +53,17 @@ describe('Module', () => {
         expect(authSession?.issued).toBeInstanceOf(Date)
         expect(authSession?.roles).toEqual(['role1', 'role2'])
         expect(authSession?.claims).toEqual(['claim1', 'claim2'])
+    })
+
+    it('should provide authValidator in request context', async () => {
+        const authValidator = await requestContext.scope.authValidator
+        expect(authValidator).toBeDefined()
+        expect(authValidator).toBeInstanceOf(AuthValidator)
+
+        const authSession = await requestContext.scope.authSession
+        expect(authValidator.getAuthSession()?.id).toEqual(authSession?.id!)
+
+        const isValid = authValidator.validateSession(false)
+        expect(isValid).toBe(true)
     })
 })

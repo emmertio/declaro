@@ -2,9 +2,11 @@ import { provideRequestMiddleware, useHeader, type AppScope, type Context, type 
 import type Redis from 'ioredis'
 import type { AuthConfig } from '../domain/interfaces/auth-config'
 import { RedisAuthService } from '../infrastructure/impl/redis-auth-service'
-import type { AuthDependencies } from './auth-context'
+import type { AuthDependencies } from './auth-dependencies'
 import type { AuthService } from '../domain/services/auth-service'
 import '../types/auth-context' // Ensure types are added to AppScope and RequestScope
+import { AuthValidator } from '../shared/utils/auth-validator'
+import type { IAuthSession } from '../domain/models/auth-session'
 
 export function authModule(config: AuthConfig) {
     return (context: Context<AppScope & AuthDependencies>) => {
@@ -37,6 +39,14 @@ export function authModule(config: AuthConfig) {
                     return null
                 },
                 ['authService'],
+            )
+
+            context.registerAsyncFactory(
+                'authValidator',
+                async (authSession: IAuthSession | null, authService: AuthService) => {
+                    return new AuthValidator(authSession, authService)
+                },
+                ['authSession', 'authService'],
             )
         })
     }

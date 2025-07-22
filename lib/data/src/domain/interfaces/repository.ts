@@ -71,4 +71,12 @@ export interface IRepository<TSchema extends AnyModelSchema> {
         input: InferInput<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>>
+
+    /**
+     * Counts the number of elements matching the provided search criteria.
+     *
+     * @param search - The search criteria to apply.
+     * @returns A promise resolving to the count of matching elements.
+     */
+    count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number>
 }

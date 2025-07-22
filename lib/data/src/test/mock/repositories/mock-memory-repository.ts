@@ -59,14 +59,7 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         options?: ISearchOptions<TSchema>,
     ): Promise<InferSearchResults<TSchema>> {
         const pagination = options?.pagination || { page: 1, pageSize: 25 }
-        let items = Array.from(this.data.values()).filter((item) => {
-            // Apply filtering logic based on the input
-            if (typeof this.args.filter === 'function') {
-                return this.args.filter(item, input)
-            } else {
-                return true
-            }
-        })
+        let items = this.applyFilters(input)
 
         // Apply sorting if provided
         if (options?.sort && Array.isArray(options.sort)) {
@@ -176,6 +169,27 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         const updatedItem = Object.assign({}, existingItem, input) as InferDetail<TSchema>
         this.data.set(primaryKeyValue, updatedItem)
         return updatedItem
+    }
+
+    async count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema> | undefined): Promise<number> {
+        const filteredItems = this.applyFilters(search)
+        return filteredItems.length
+    }
+
+    /**
+     * Apply filtering logic to all items based on the provided search criteria
+     * @param input - The search/filter criteria
+     * @returns Filtered array of items
+     */
+    protected applyFilters(input: InferFilters<TSchema>): InferDetail<TSchema>[] {
+        return Array.from(this.data.values()).filter((item) => {
+            // Apply filtering logic based on the input
+            if (typeof this.args.filter === 'function') {
+                return this.args.filter(item, input)
+            } else {
+                return true
+            }
+        })
     }
 
     protected async generatePrimaryKey() {

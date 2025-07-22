@@ -177,4 +177,23 @@ describe('ReadOnlyModelController', () => {
         expect(results.pagination.total).toBe(2)
         expect(results.pagination.totalPages).toBe(2)
     })
+
+    it('should count records if permissions are valid', async () => {
+        const controller = new ReadOnlyModelController(service, authValidator)
+
+        const input1 = { id: 1, title: 'Test Book 1', author: 'Author Name', publishedDate: new Date() }
+        const input2 = { id: 2, title: 'Test Book 2', author: 'Author Name', publishedDate: new Date() }
+        await repository.create(input1)
+        await repository.create(input2)
+
+        const count = await controller.count({})
+
+        expect(count).toBe(2)
+    })
+
+    it('should throw PermissionError if permissions are invalid for count', async () => {
+        const controller = new ReadOnlyModelController(service, invalidAuthValidator)
+
+        await expect(controller.count({})).rejects.toThrow(PermissionError)
+    })
 })

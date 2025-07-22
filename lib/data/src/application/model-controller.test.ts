@@ -207,4 +207,64 @@ describe('ModelController', () => {
         expect(filteredResult.results).toHaveLength(1)
         expect(filteredResult.results[0].title).toBe('Test Book')
     })
+
+    it('should upsert a record if permissions are valid', async () => {
+        const controller = new ModelController(service, authValidator)
+
+        // Test creating a new record via upsert
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+        const upsertedRecord = await controller.upsert(input)
+
+        expect(upsertedRecord).toEqual(input)
+
+        // Test updating an existing record via upsert
+        const updateInput = { id: 42, title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
+        const updatedRecord = await controller.upsert(updateInput)
+
+        expect(updatedRecord).toEqual(updateInput)
+    })
+
+    it('should throw PermissionError if permissions are invalid for upsert', async () => {
+        const controller = new ModelController(service, invalidAuthValidator)
+
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+
+        await expect(controller.upsert(input)).rejects.toThrow(PermissionError)
+    })
+
+    it('should bulk upsert records if permissions are valid', async () => {
+        const controller = new ModelController(service, authValidator)
+
+        const inputs = [
+            { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+            { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+        ]
+
+        const upsertedRecords = await controller.bulkUpsert(inputs)
+
+        expect(upsertedRecords).toHaveLength(2)
+        expect(upsertedRecords).toEqual(inputs)
+
+        // Test updating existing records via bulk upsert
+        const updateInputs = [
+            { id: 1, title: 'Updated Book 1', author: 'Updated Author 1', publishedDate: new Date() },
+            { id: 2, title: 'Updated Book 2', author: 'Updated Author 2', publishedDate: new Date() },
+        ]
+
+        const updatedRecords = await controller.bulkUpsert(updateInputs)
+
+        expect(updatedRecords).toHaveLength(2)
+        expect(updatedRecords).toEqual(updateInputs)
+    })
+
+    it('should throw PermissionError if permissions are invalid for bulkUpsert', async () => {
+        const controller = new ModelController(service, invalidAuthValidator)
+
+        const inputs = [
+            { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+            { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+        ]
+
+        await expect(controller.bulkUpsert(inputs)).rejects.toThrow(PermissionError)
+    })
 })

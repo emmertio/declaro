@@ -42,4 +42,20 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
         )
         return this.service.search(input, options)
     }
+
+    /**
+     * Count the number of records matching the given filters.
+     * @param input The filters to apply to the count operation.
+     * @param options Additional options for the count operation.
+     * @returns The count of matching records.
+     */
+    async count(input: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([
+                this.service.getDescriptor('count', '*').toString(),
+                this.service.getDescriptor('read', '*').toString(),
+            ]),
+        )
+        return this.service.count(input, options)
+    }
 }

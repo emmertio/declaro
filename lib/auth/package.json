@@ -1,6 +1,6 @@
 {
     "name": "@declaro/auth",
-    "version": "2.0.0-beta.61",
+    "version": "2.0.0-beta.62",
     "description": "A simple authentication library for Declaro projects.",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",

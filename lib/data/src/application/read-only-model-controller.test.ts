@@ -196,4 +196,132 @@ describe('ReadOnlyModelController', () => {
 
         await expect(controller.count({})).rejects.toThrow(PermissionError)
     })
+
+    describe('granular permission testing', () => {
+        it('should allow load with specific load permission', async () => {
+            const loadOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.load:all'],
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, loadOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input)
+
+            const record = await controller.load({ id: 42 })
+
+            expect(record).toEqual(input)
+        })
+
+        it('should allow loadMany with specific loadMany permission', async () => {
+            const loadManyOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.loadMany:all'],
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, loadManyOnlyValidator)
+
+            const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+            const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+            await repository.create(input1)
+            await repository.create(input2)
+
+            const records = await controller.loadMany([{ id: 42 }, { id: 43 }])
+
+            expect(records).toEqual([input1, input2])
+        })
+
+        it('should allow search with specific search permission', async () => {
+            const searchOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.search:all'],
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, searchOnlyValidator)
+
+            const input1 = { id: 42, title: 'Test Book 1', author: 'Author Name 1', publishedDate: new Date() }
+            const input2 = { id: 43, title: 'Test Book 2', author: 'Author Name 2', publishedDate: new Date() }
+            await repository.create(input1)
+            await repository.create(input2)
+
+            const results = await controller.search({ text: 'Test' })
+
+            expect(results.results).toEqual([input1, input2])
+            expect(results.pagination.total).toBe(2)
+        })
+
+        it('should allow count with specific count permission', async () => {
+            const countOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.count:all'],
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, countOnlyValidator)
+
+            const input1 = { id: 1, title: 'Test Book 1', author: 'Author Name', publishedDate: new Date() }
+            const input2 = { id: 2, title: 'Test Book 2', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input1)
+            await repository.create(input2)
+
+            const count = await controller.count({})
+
+            expect(count).toBe(2)
+        })
+
+        it('should reject operations with wrong namespace permissions', async () => {
+            const wrongNamespaceValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['users::user.read:all'], // Wrong namespace
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, wrongNamespaceValidator)
+
+            await expect(controller.load({ id: 42 })).rejects.toThrow(PermissionError)
+            await expect(controller.loadMany([{ id: 42 }])).rejects.toThrow(PermissionError)
+            await expect(controller.search({})).rejects.toThrow(PermissionError)
+            await expect(controller.count({})).rejects.toThrow(PermissionError)
+        })
+
+        it('should reject operations with wrong resource permissions', async () => {
+            const wrongResourceValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::author.read:all'], // Wrong resource
+                }),
+                authService,
+            )
+            const controller = new ReadOnlyModelController(service, wrongResourceValidator)
+
+            await expect(controller.load({ id: 42 })).rejects.toThrow(PermissionError)
+            await expect(controller.loadMany([{ id: 42 }])).rejects.toThrow(PermissionError)
+            await expect(controller.search({})).rejects.toThrow(PermissionError)
+            await expect(controller.count({})).rejects.toThrow(PermissionError)
+        })
+
+        it('should allow all read operations with general read permission', async () => {
+            // This is already tested in the main tests, but including here for completeness
+            const controller = new ReadOnlyModelController(service, authValidator) // authValidator has read:all
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input)
+
+            // Test all operations work with general read permission
+            const loadResult = await controller.load({ id: 42 })
+            expect(loadResult).toEqual(input)
+
+            const loadManyResult = await controller.loadMany([{ id: 42 }])
+            expect(loadManyResult).toEqual([input])
+
+            const searchResult = await controller.search({})
+            expect(searchResult.results).toEqual([input])
+
+            const countResult = await controller.count({})
+            expect(countResult).toBe(1)
+        })
+    })
 })

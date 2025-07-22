@@ -267,4 +267,222 @@ describe('ModelController', () => {
 
         await expect(controller.bulkUpsert(inputs)).rejects.toThrow(PermissionError)
     })
+
+    describe('upsert and bulkUpsert permission logic', () => {
+        it('should allow upsert with create AND update permissions', async () => {
+            const createUpdateValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.create:all', 'books::book.update:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, createUpdateValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            const upsertedRecord = await controller.upsert(input)
+
+            expect(upsertedRecord).toEqual(input)
+        })
+
+        it('should allow bulkUpsert with create AND update permissions', async () => {
+            const createUpdateValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.create:all', 'books::book.update:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, createUpdateValidator)
+
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+            ]
+
+            const upsertedRecords = await controller.bulkUpsert(inputs)
+
+            expect(upsertedRecords).toEqual(inputs)
+        })
+
+        it('should reject upsert with only create permission', async () => {
+            const createOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.create:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, createOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+
+            await expect(controller.upsert(input)).rejects.toThrow(PermissionError)
+        })
+
+        it('should reject upsert with only update permission', async () => {
+            const updateOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.update:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, updateOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+
+            await expect(controller.upsert(input)).rejects.toThrow(PermissionError)
+        })
+
+        it('should reject bulkUpsert with only create permission', async () => {
+            const createOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.create:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, createOnlyValidator)
+
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+            ]
+
+            await expect(controller.bulkUpsert(inputs)).rejects.toThrow(PermissionError)
+        })
+
+        it('should reject bulkUpsert with only update permission', async () => {
+            const updateOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.update:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, updateOnlyValidator)
+
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+            ]
+
+            await expect(controller.bulkUpsert(inputs)).rejects.toThrow(PermissionError)
+        })
+
+        it('should allow upsert and bulkUpsert with write permission', async () => {
+            // This is already tested in the main tests, but including here for completeness
+            const controller = new ModelController(service, authValidator) // authValidator has write:all
+
+            // Test upsert
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            const upsertedRecord = await controller.upsert(input)
+            expect(upsertedRecord).toEqual(input)
+
+            // Test bulkUpsert
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+            ]
+            const upsertedRecords = await controller.bulkUpsert(inputs)
+            expect(upsertedRecords).toEqual(inputs)
+        })
+    })
+
+    describe('granular permission testing', () => {
+        it('should allow create with specific create permission', async () => {
+            const createOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.create:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, createOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            const record = await controller.create(input)
+
+            expect(record).toEqual(input)
+        })
+
+        it('should allow update with specific update permission', async () => {
+            const updateOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.update:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, updateOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input)
+
+            const updatedInput = { title: 'Updated Title', author: 'Updated Author', publishedDate: new Date() }
+            const updatedRecord = await controller.update({ id: 42 }, updatedInput)
+
+            expect(updatedRecord).toEqual({ id: 42, ...updatedInput })
+        })
+
+        it('should allow remove with specific remove permission', async () => {
+            const removeOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.remove:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, removeOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input)
+
+            const removedRecord = await controller.remove({ id: 42 })
+
+            expect(removedRecord).toEqual(input)
+        })
+
+        it('should allow restore with specific restore permission', async () => {
+            const restoreOnlyValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.restore:all'],
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, restoreOnlyValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(input)
+            await service.remove({ id: 42 })
+
+            const restoredRecord = await controller.restore({ id: 42 })
+
+            expect(restoredRecord).toEqual(input)
+        })
+
+        it('should reject operations with wrong namespace permissions', async () => {
+            const wrongNamespaceValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['users::user.write:all'], // Wrong namespace
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, wrongNamespaceValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+
+            await expect(controller.create(input)).rejects.toThrow(PermissionError)
+            await expect(controller.upsert(input)).rejects.toThrow(PermissionError)
+            await expect(controller.bulkUpsert([input])).rejects.toThrow(PermissionError)
+        })
+
+        it('should reject operations with wrong resource permissions', async () => {
+            const wrongResourceValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::author.write:all'], // Wrong resource
+                }),
+                authService,
+            )
+            const controller = new ModelController(service, wrongResourceValidator)
+
+            const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+
+            await expect(controller.create(input)).rejects.toThrow(PermissionError)
+            await expect(controller.upsert(input)).rejects.toThrow(PermissionError)
+            await expect(controller.bulkUpsert([input])).rejects.toThrow(PermissionError)
+        })
+    })
 })

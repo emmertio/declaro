@@ -1,5 +1,5 @@
 import type { AuthValidator } from '@declaro/auth'
-import type { AnyModelSchema } from '@declaro/core'
+import { PermissionValidator, type AnyModelSchema } from '@declaro/core'
 import type { ModelService, ICreateOptions, IUpdateOptions } from '../domain/services/model-service'
 import type { InferDetail, InferInput, InferLookup, InferSummary } from '../shared/utils/schema-inference'
 import { ReadOnlyModelController } from './read-only-model-controller'
@@ -56,14 +56,14 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
      * @returns The upserted record.
      */
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
+        // Create nested validator for (create AND update) permissions
+        const createAndUpdateValidator = PermissionValidator.create().allOf([
+            this.service.getDescriptor('create', '*').toString(),
+            this.service.getDescriptor('update', '*').toString(),
+        ])
+
         this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                v.allOf([
-                    this.service.getDescriptor('create', '*').toString(),
-                    this.service.getDescriptor('update', '*').toString(),
-                ]),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
+            v.someOf([createAndUpdateValidator, this.service.getDescriptor('write', '*').toString()]),
         )
         return this.service.upsert(input, options)
     }
@@ -78,14 +78,14 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
         inputs: InferInput<TSchema>[],
         options?: ICreateOptions | IUpdateOptions,
     ): Promise<InferDetail<TSchema>[]> {
+        // Create nested validator for (create AND update) permissions
+        const createAndUpdateValidator = PermissionValidator.create().allOf([
+            this.service.getDescriptor('create', '*').toString(),
+            this.service.getDescriptor('update', '*').toString(),
+        ])
+
         this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                v.allOf([
-                    this.service.getDescriptor('create', '*').toString(),
-                    this.service.getDescriptor('update', '*').toString(),
-                ]),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
+            v.someOf([createAndUpdateValidator, this.service.getDescriptor('write', '*').toString()]),
         )
         return this.service.bulkUpsert(inputs, options)
     }

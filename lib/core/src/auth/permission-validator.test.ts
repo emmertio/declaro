@@ -357,6 +357,31 @@ describe('Permission Builder', () => {
             expect(validator.safeValidate(['read:all']).valid).toBe(false)
         })
 
+        it('should support the exact syntax mentioned: someOf with nested allOf for OR-AND logic', () => {
+            // Test the exact pattern: baseValidator.someOf(['permission1', baseValidator.someOf(['permission2', 'permission3'])])
+            // This creates: permission1 OR (permission2 AND permission3)
+            const nestedValidator = PermissionValidator.create().allOf(['permission2', 'permission3'])
+            const validator = PermissionValidator.create().someOf(['permission1', nestedValidator])
+
+            // Test permission1 only - should pass
+            expect(validator.safeValidate(['permission1']).valid).toBe(true)
+
+            // Test permission2 and permission3 - should pass
+            expect(validator.safeValidate(['permission2', 'permission3']).valid).toBe(true)
+
+            // Test all permissions - should pass
+            expect(validator.safeValidate(['permission1', 'permission2', 'permission3']).valid).toBe(true)
+
+            // Test permission2 only - should fail
+            expect(validator.safeValidate(['permission2']).valid).toBe(false)
+
+            // Test permission3 only - should fail
+            expect(validator.safeValidate(['permission3']).valid).toBe(false)
+
+            // Test no permissions - should fail
+            expect(validator.safeValidate([]).valid).toBe(false)
+        })
+
         it('should work with wildcards in nested validators', () => {
             // Create validator: admin:* OR (books:read AND books:write)
             const booksReadWrite = PermissionValidator.create().allOf(['books:read', 'books:write'])
@@ -381,6 +406,40 @@ describe('Permission Builder', () => {
 
             // Test with other permissions - should fail
             expect(validator.safeValidate(['users:read']).valid).toBe(false)
+        })
+
+        it('should demonstrate practical usage for upsert/bulkUpsert permissions', () => {
+            // Create validator for upsert/bulkUpsert: books:write:all OR (books:create:all AND books:update:all)
+            const createAndUpdate = PermissionValidator.create().allOf(['books:create:all', 'books:update:all'])
+            const upsertValidator = PermissionValidator.create().someOf(
+                ['books:write:all', createAndUpdate],
+                'Need books:write:all OR (books:create:all AND books:update:all)',
+            )
+
+            // Test with write permission - should pass
+            expect(upsertValidator.safeValidate(['books:write:all']).valid).toBe(true)
+
+            // Test with create and update permissions - should pass
+            expect(upsertValidator.safeValidate(['books:create:all', 'books:update:all']).valid).toBe(true)
+
+            // Test with all permissions - should pass
+            expect(
+                upsertValidator.safeValidate(['books:write:all', 'books:create:all', 'books:update:all']).valid,
+            ).toBe(true)
+
+            // Test with create only - should fail
+            expect(upsertValidator.safeValidate(['books:create:all']).valid).toBe(false)
+
+            // Test with update only - should fail
+            expect(upsertValidator.safeValidate(['books:update:all']).valid).toBe(false)
+
+            // Test with read only - should fail
+            expect(upsertValidator.safeValidate(['books:read:all']).valid).toBe(false)
+
+            // Test error message
+            const result = upsertValidator.safeValidate(['books:create:all'])
+            expect(result.valid).toBe(false)
+            expect(result.errorMessage).toBe('Need books:write:all OR (books:create:all AND books:update:all)')
         })
     })
 })

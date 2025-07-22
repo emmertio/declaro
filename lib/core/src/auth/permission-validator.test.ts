@@ -206,4 +206,181 @@ describe('Permission Builder', () => {
         expect(validator3.safeValidate(['namespace::resource.action1:write']).valid).toBe(true)
         expect(validator3.safeValidate(['namespace::resource.action2:delete']).valid).toBe(true)
     })
+
+    describe('Nested Permission Validators', () => {
+        it('should support nesting validators with someOf for OR logic', () => {
+            // Create nested validator: permission1 OR (permission2 AND permission3)
+            const nestedValidator = PermissionValidator.create().allOf(['permission2', 'permission3'])
+            const validator = PermissionValidator.create().someOf(
+                ['permission1', nestedValidator],
+                'Need permission1 OR (permission2 AND permission3)',
+            )
+
+            // Test with permission1 only - should pass
+            expect(validator.safeValidate(['permission1']).valid).toBe(true)
+
+            // Test with permission2 and permission3 - should pass
+            expect(validator.safeValidate(['permission2', 'permission3']).valid).toBe(true)
+
+            // Test with all permissions - should pass
+            expect(validator.safeValidate(['permission1', 'permission2', 'permission3']).valid).toBe(true)
+
+            // Test with permission2 only - should fail
+            expect(validator.safeValidate(['permission2']).valid).toBe(false)
+
+            // Test with permission3 only - should fail
+            expect(validator.safeValidate(['permission3']).valid).toBe(false)
+
+            // Test with no permissions - should fail
+            expect(validator.safeValidate([]).valid).toBe(false)
+        })
+
+        it('should support nesting validators with allOf for AND logic', () => {
+            // Create nested validator: permission1 AND (permission2 OR permission3)
+            const nestedValidator = PermissionValidator.create().someOf(['permission2', 'permission3'])
+            const validator = PermissionValidator.create().allOf(
+                ['permission1', nestedValidator],
+                'Need permission1 AND (permission2 OR permission3)',
+            )
+
+            // Test with permission1 and permission2 - should pass
+            expect(validator.safeValidate(['permission1', 'permission2']).valid).toBe(true)
+
+            // Test with permission1 and permission3 - should pass
+            expect(validator.safeValidate(['permission1', 'permission3']).valid).toBe(true)
+
+            // Test with all permissions - should pass
+            expect(validator.safeValidate(['permission1', 'permission2', 'permission3']).valid).toBe(true)
+
+            // Test with permission1 only - should fail
+            expect(validator.safeValidate(['permission1']).valid).toBe(false)
+
+            // Test with permission2 only - should fail
+            expect(validator.safeValidate(['permission2']).valid).toBe(false)
+
+            // Test with permission2 and permission3 only - should fail
+            expect(validator.safeValidate(['permission2', 'permission3']).valid).toBe(false)
+        })
+
+        it('should support multiple levels of nesting', () => {
+            // Create complex nested validator: permission1 OR (permission2 AND (permission3 OR permission4))
+            const deepNestedValidator = PermissionValidator.create().someOf(['permission3', 'permission4'])
+            const nestedValidator = PermissionValidator.create().allOf(['permission2', deepNestedValidator])
+            const validator = PermissionValidator.create().someOf(
+                ['permission1', nestedValidator],
+                'Complex permission logic failed',
+            )
+
+            // Test with permission1 only - should pass
+            expect(validator.safeValidate(['permission1']).valid).toBe(true)
+
+            // Test with permission2 and permission3 - should pass
+            expect(validator.safeValidate(['permission2', 'permission3']).valid).toBe(true)
+
+            // Test with permission2 and permission4 - should pass
+            expect(validator.safeValidate(['permission2', 'permission4']).valid).toBe(true)
+
+            // Test with permission2, permission3, and permission4 - should pass
+            expect(validator.safeValidate(['permission2', 'permission3', 'permission4']).valid).toBe(true)
+
+            // Test with permission2 only - should fail
+            expect(validator.safeValidate(['permission2']).valid).toBe(false)
+
+            // Test with permission3 and permission4 only - should fail
+            expect(validator.safeValidate(['permission3', 'permission4']).valid).toBe(false)
+        })
+
+        it('should support nesting with noneOf for exclusion logic', () => {
+            // Create validator: permission1 AND NOT(permission2 OR permission3)
+            const excludeValidator = PermissionValidator.create().someOf(['permission2', 'permission3'])
+            const validator = PermissionValidator.create()
+                .allOf(['permission1'], 'Must have permission1')
+                .noneOf([excludeValidator], 'Cannot have permission2 or permission3')
+
+            // Test with permission1 only - should pass
+            expect(validator.safeValidate(['permission1']).valid).toBe(true)
+
+            // Test with permission1 and permission4 - should pass
+            expect(validator.safeValidate(['permission1', 'permission4']).valid).toBe(true)
+
+            // Test with permission1 and permission2 - should fail
+            expect(validator.safeValidate(['permission1', 'permission2']).valid).toBe(false)
+
+            // Test with permission1 and permission3 - should fail
+            expect(validator.safeValidate(['permission1', 'permission3']).valid).toBe(false)
+
+            // Test with permission1, permission2, and permission3 - should fail
+            expect(validator.safeValidate(['permission1', 'permission2', 'permission3']).valid).toBe(false)
+        })
+
+        it('should provide meaningful error messages for nested validators', () => {
+            const nestedValidator = PermissionValidator.create().allOf(
+                ['permission2', 'permission3'],
+                'Missing required permissions 2 and 3',
+            )
+            const validator = PermissionValidator.create().someOf(
+                ['permission1', nestedValidator],
+                'Need permission1 OR both permission2 and permission3',
+            )
+
+            const result = validator.safeValidate(['permission2'])
+
+            expect(result.valid).toBe(false)
+            expect(result.errorMessage).toBe('Need permission1 OR both permission2 and permission3')
+            expect(result.errors).toHaveLength(1)
+        })
+
+        it('should work with real-world permission patterns using nesting', () => {
+            // Create validator for: write:all OR (create:all AND update:all)
+            const createAndUpdate = PermissionValidator.create().allOf(['create:all', 'update:all'])
+            const validator = PermissionValidator.create().someOf(
+                ['write:all', createAndUpdate],
+                'Need write:all OR (create:all AND update:all)',
+            )
+
+            // Test with write:all - should pass
+            expect(validator.safeValidate(['write:all']).valid).toBe(true)
+
+            // Test with create:all and update:all - should pass
+            expect(validator.safeValidate(['create:all', 'update:all']).valid).toBe(true)
+
+            // Test with all permissions - should pass
+            expect(validator.safeValidate(['write:all', 'create:all', 'update:all']).valid).toBe(true)
+
+            // Test with create:all only - should fail
+            expect(validator.safeValidate(['create:all']).valid).toBe(false)
+
+            // Test with update:all only - should fail
+            expect(validator.safeValidate(['update:all']).valid).toBe(false)
+
+            // Test with read:all - should fail
+            expect(validator.safeValidate(['read:all']).valid).toBe(false)
+        })
+
+        it('should work with wildcards in nested validators', () => {
+            // Create validator: admin:* OR (books:read AND books:write)
+            const booksReadWrite = PermissionValidator.create().allOf(['books:read', 'books:write'])
+            const validator = PermissionValidator.create().someOf(
+                ['admin:*', booksReadWrite],
+                'Need admin access OR books read/write',
+            )
+
+            // Test with admin wildcard - should pass
+            expect(validator.safeValidate(['admin:read']).valid).toBe(true)
+            expect(validator.safeValidate(['admin:write']).valid).toBe(true)
+            expect(validator.safeValidate(['admin:delete']).valid).toBe(true)
+
+            // Test with books read and write - should pass
+            expect(validator.safeValidate(['books:read', 'books:write']).valid).toBe(true)
+
+            // Test with books read only - should fail
+            expect(validator.safeValidate(['books:read']).valid).toBe(false)
+
+            // Test with books write only - should fail
+            expect(validator.safeValidate(['books:write']).valid).toBe(false)
+
+            // Test with other permissions - should fail
+            expect(validator.safeValidate(['users:read']).valid).toBe(false)
+        })
+    })
 })

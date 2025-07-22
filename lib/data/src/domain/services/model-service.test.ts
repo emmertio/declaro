@@ -292,4 +292,340 @@ describe('ModelService', () => {
             expect(result2.title).toBe(input2.title)
         })
     })
+
+    describe('bulkUpsert functionality', () => {
+        it('should handle empty input array', async () => {
+            const results = await service.bulkUpsert([])
+            expect(results).toEqual([])
+        })
+
+        it('should create multiple new records with explicit IDs', async () => {
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date('2023-02-01') },
+                { id: 3, title: 'Book 3', author: 'Author 3', publishedDate: new Date('2023-03-01') },
+            ]
+
+            const results = await service.bulkUpsert(inputs)
+
+            expect(results).toEqual(inputs)
+            expect(results).toHaveLength(3)
+
+            // Verify all records were created
+            for (const input of inputs) {
+                const loaded = await repository.load({ id: input.id })
+                expect(loaded).toEqual(input)
+            }
+        })
+
+        it('should update multiple existing records', async () => {
+            // Create initial records
+            const initialRecords = [
+                { id: 1, title: 'Original Book 1', author: 'Original Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Original Book 2', author: 'Original Author 2', publishedDate: new Date('2023-02-01') },
+                { id: 3, title: 'Original Book 3', author: 'Original Author 3', publishedDate: new Date('2023-03-01') },
+            ]
+
+            for (const record of initialRecords) {
+                await repository.create(record)
+            }
+
+            // Clear spies from creation
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            // Update all records
+            const updateInputs = [
+                { id: 1, title: 'Updated Book 1', author: 'Updated Author 1', publishedDate: new Date('2023-06-01') },
+                { id: 2, title: 'Updated Book 2', author: 'Updated Author 2', publishedDate: new Date('2023-07-01') },
+                { id: 3, title: 'Updated Book 3', author: 'Updated Author 3', publishedDate: new Date('2023-08-01') },
+            ]
+
+            const results = await service.bulkUpsert(updateInputs)
+
+            expect(results).toEqual(updateInputs)
+            expect(results).toHaveLength(3)
+
+            // Verify all records were updated
+            for (const input of updateInputs) {
+                const loaded = await repository.load({ id: input.id })
+                expect(loaded).toEqual(input)
+            }
+        })
+
+        it('should handle mixed create and update operations', async () => {
+            // Create some initial records
+            const initialRecords = [
+                { id: 1, title: 'Existing Book 1', author: 'Existing Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 3, title: 'Existing Book 3', author: 'Existing Author 3', publishedDate: new Date('2023-03-01') },
+            ]
+
+            for (const record of initialRecords) {
+                await repository.create(record)
+            }
+
+            // Clear spies from creation
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            // Mix of updates and creates
+            const mixedInputs = [
+                { id: 1, title: 'Updated Book 1', author: 'Updated Author 1', publishedDate: new Date('2023-06-01') }, // Update
+                { id: 2, title: 'New Book 2', author: 'New Author 2', publishedDate: new Date('2023-07-01') }, // Create
+                { id: 3, title: 'Updated Book 3', author: 'Updated Author 3', publishedDate: new Date('2023-08-01') }, // Update
+                { id: 4, title: 'New Book 4', author: 'New Author 4', publishedDate: new Date('2023-09-01') }, // Create
+            ]
+
+            const results = await service.bulkUpsert(mixedInputs)
+
+            expect(results).toEqual(mixedInputs)
+            expect(results).toHaveLength(4)
+
+            // Verify all records exist with correct data
+            for (const input of mixedInputs) {
+                const loaded = await repository.load({ id: input.id })
+                expect(loaded).toEqual(input)
+            }
+        })
+
+        it('should handle records without primary keys (auto-generated IDs)', async () => {
+            const inputsWithoutIds = [
+                { title: 'Auto Book 1', author: 'Auto Author 1', publishedDate: new Date('2023-01-01') },
+                { title: 'Auto Book 2', author: 'Auto Author 2', publishedDate: new Date('2023-02-01') },
+            ]
+
+            const results = await service.bulkUpsert(inputsWithoutIds)
+
+            expect(results).toHaveLength(2)
+            expect(results[0].id).toBeDefined()
+            expect(results[1].id).toBeDefined()
+            expect(results[0].id).not.toBe(results[1].id)
+            expect(results[0].title).toBe(inputsWithoutIds[0].title)
+            expect(results[1].title).toBe(inputsWithoutIds[1].title)
+
+            // Verify records were created
+            for (const result of results) {
+                const loaded = await repository.load({ id: result.id })
+                expect(loaded).toEqual(result)
+            }
+        })
+
+        it('should handle mixed records with and without primary keys', async () => {
+            // Create an existing record with a higher ID to avoid conflicts with auto-generated IDs
+            const existingRecord = {
+                id: 100,
+                title: 'Existing Book',
+                author: 'Existing Author',
+                publishedDate: new Date('2023-01-01'),
+            }
+            await repository.create(existingRecord)
+
+            // Clear spies from creation
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            const mixedInputs = [
+                {
+                    id: 100,
+                    title: 'Updated Existing Book',
+                    author: 'Updated Author',
+                    publishedDate: new Date('2023-06-01'),
+                }, // Update
+                { id: 200, title: 'New Book with ID', author: 'New Author', publishedDate: new Date('2023-07-01') }, // Create with ID
+                { title: 'Auto Book 1', author: 'Auto Author 1', publishedDate: new Date('2023-08-01') }, // Create without ID
+                { title: 'Auto Book 2', author: 'Auto Author 2', publishedDate: new Date('2023-09-01') }, // Create without ID
+            ]
+
+            const results = await service.bulkUpsert(mixedInputs)
+
+            expect(results).toHaveLength(4)
+
+            // Results should be in the same order as inputs (repository preserves order)
+            expect(results[0].id).toBe(100)
+            expect(results[0].title).toBe('Updated Existing Book')
+
+            expect(results[1].id).toBe(200)
+            expect(results[1].title).toBe('New Book with ID')
+
+            expect(results[2].id).toBeDefined()
+            expect(results[2].title).toBe('Auto Book 1')
+
+            expect(results[3].id).toBeDefined()
+            expect(results[3].title).toBe('Auto Book 2')
+
+            // Verify all records exist in repository
+            const loadedRecord1 = await repository.load({ id: 100 })
+            expect(loadedRecord1?.title).toBe('Updated Existing Book')
+
+            const loadedRecord2 = await repository.load({ id: 200 })
+            expect(loadedRecord2?.title).toBe('New Book with ID')
+
+            const loadedRecord3 = await repository.load({ id: results[2].id })
+            expect(loadedRecord3?.title).toBe('Auto Book 1')
+
+            const loadedRecord4 = await repository.load({ id: results[3].id })
+            expect(loadedRecord4?.title).toBe('Auto Book 2')
+        })
+
+        it('should trigger correct before and after events for bulk create operations', async () => {
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date() },
+            ]
+
+            await service.bulkUpsert(inputs)
+
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(2)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(2)
+            expect(beforeUpdateSpy).not.toHaveBeenCalled()
+            expect(afterUpdateSpy).not.toHaveBeenCalled()
+
+            // Verify event details
+            expect(beforeCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeCreate' }))
+            expect(afterCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterCreate' }))
+        })
+
+        it('should trigger correct before and after events for bulk update operations', async () => {
+            // Create initial records
+            const initialRecords = [
+                { id: 1, title: 'Original Book 1', author: 'Original Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Original Book 2', author: 'Original Author 2', publishedDate: new Date() },
+            ]
+
+            for (const record of initialRecords) {
+                await repository.create(record)
+            }
+
+            // Clear spies from creation
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            // Update records
+            const updateInputs = [
+                { id: 1, title: 'Updated Book 1', author: 'Updated Author 1', publishedDate: new Date() },
+                { id: 2, title: 'Updated Book 2', author: 'Updated Author 2', publishedDate: new Date() },
+            ]
+
+            await service.bulkUpsert(updateInputs)
+
+            expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
+            expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+            expect(beforeCreateSpy).not.toHaveBeenCalled()
+            expect(afterCreateSpy).not.toHaveBeenCalled()
+
+            // Verify event details
+            expect(beforeUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeUpdate' }))
+            expect(afterUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterUpdate' }))
+        })
+
+        it('should trigger correct before and after events for mixed operations', async () => {
+            // Create one existing record
+            const existingRecord = {
+                id: 1,
+                title: 'Existing Book',
+                author: 'Existing Author',
+                publishedDate: new Date(),
+            }
+            await repository.create(existingRecord)
+
+            // Clear spies from creation
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            // Mix of update and create
+            const mixedInputs = [
+                { id: 1, title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }, // Update
+                { id: 2, title: 'New Book', author: 'New Author', publishedDate: new Date() }, // Create
+            ]
+
+            await service.bulkUpsert(mixedInputs)
+
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+            expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+            expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+        })
+
+        it('should trigger events for records without primary keys', async () => {
+            const inputsWithoutIds = [
+                { title: 'Auto Book 1', author: 'Auto Author 1', publishedDate: new Date() },
+                { title: 'Auto Book 2', author: 'Auto Author 2', publishedDate: new Date() },
+            ]
+
+            await service.bulkUpsert(inputsWithoutIds)
+
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(2)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(2)
+            expect(beforeUpdateSpy).not.toHaveBeenCalled()
+            expect(afterUpdateSpy).not.toHaveBeenCalled()
+        })
+
+        it('should handle large batches efficiently', async () => {
+            const batchSize = 100
+            const inputs = Array.from({ length: batchSize }, (_, index) => ({
+                id: index + 1,
+                title: `Book ${index + 1}`,
+                author: `Author ${index + 1}`,
+                publishedDate: new Date(`2023-${String((index % 12) + 1).padStart(2, '0')}-01`),
+            }))
+
+            const startTime = Date.now()
+            const results = await service.bulkUpsert(inputs)
+            const endTime = Date.now()
+
+            expect(results).toHaveLength(batchSize)
+            expect(results).toEqual(inputs)
+
+            // Verify events were triggered for all items
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(batchSize)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(batchSize)
+
+            // Basic performance check - should complete in reasonable time
+            expect(endTime - startTime).toBeLessThan(5000) // Less than 5 seconds
+
+            // Verify a few random records
+            const randomIndexes = [0, Math.floor(batchSize / 2), batchSize - 1]
+            for (const index of randomIndexes) {
+                const loaded = await repository.load({ id: inputs[index].id })
+                expect(loaded).toEqual(inputs[index])
+            }
+        })
+
+        it('should maintain data integrity when bulk upserting duplicate primary keys in input', async () => {
+            // Input with duplicate IDs - last one should win
+            const inputsWithDuplicates = [
+                { id: 1, title: 'First Book 1', author: 'First Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date('2023-02-01') },
+                { id: 1, title: 'Last Book 1', author: 'Last Author 1', publishedDate: new Date('2023-03-01') }, // Duplicate ID
+            ]
+
+            const results = await service.bulkUpsert(inputsWithDuplicates)
+
+            expect(results).toHaveLength(3)
+
+            // The repository should handle duplicates according to its implementation
+            // In our mock implementation, it processes them sequentially
+            const finalRecord1 = await repository.load({ id: 1 })
+            expect(finalRecord1?.title).toBe('Last Book 1') // Last write wins
+
+            const record2 = await repository.load({ id: 2 })
+            expect(record2?.title).toBe('Book 2')
+        })
+
+        it('should preserve order of results matching input order', async () => {
+            const inputs = [
+                { id: 3, title: 'Book 3', author: 'Author 3', publishedDate: new Date('2023-03-01') },
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date('2023-02-01') },
+            ]
+
+            const results = await service.bulkUpsert(inputs)
+
+            expect(results).toHaveLength(3)
+            expect(results[0].id).toBe(3)
+            expect(results[1].id).toBe(1)
+            expect(results[2].id).toBe(2)
+            expect(results).toEqual(inputs)
+        })
+    })
 })

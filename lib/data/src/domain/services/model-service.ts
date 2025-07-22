@@ -169,4 +169,154 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         // Return the results of the upsert operation
         return result
     }
+
+    /**
+     * Bulk upserts multiple records (creates if they don't exist, updates if they do).
+     * @param inputs Array of input data for the bulk upsert operation.
+     * @param options Optional create or update options.
+     * @returns Array of upserted records.
+     */
+    async bulkUpsert(
+        inputs: InferInput<TSchema>[],
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<InferDetail<TSchema>[]> {
+        if (inputs.length === 0) {
+            return []
+        }
+
+        // Build a map of primary key to input and lookup info
+        type EntityInfo = {
+            input: InferInput<TSchema>
+            lookup: InferLookup<TSchema>
+            primaryKeyValue: string | number
+            existingEntity?: InferDetail<TSchema>
+            operation?: ModelMutationAction
+        }
+
+        const entityInfoMap = new Map<string | number, EntityInfo>()
+        const inputsWithoutPrimaryKey: InferInput<TSchema>[] = []
+
+        // Process each input and organize by primary key
+        for (const input of inputs) {
+            const primaryKeyValue = this.getPrimaryKeyValue(input)
+
+            if (primaryKeyValue !== undefined) {
+                const entityInfo: EntityInfo = {
+                    input,
+                    primaryKeyValue,
+                    lookup: {
+                        [this.entityMetadata.primaryKey]: primaryKeyValue,
+                    } as InferLookup<TSchema>,
+                }
+                entityInfoMap.set(primaryKeyValue, entityInfo)
+            } else {
+                // Inputs without primary keys are always creates
+                inputsWithoutPrimaryKey.push(input)
+            }
+        }
+
+        // Extract lookups for existing entities
+        const lookups = Array.from(entityInfoMap.values()).map((info) => info.lookup)
+
+        // Load existing entities and update the map
+        if (lookups.length > 0) {
+            const existingEntities = await this.loadMany(lookups, options)
+            existingEntities.forEach((entity) => {
+                if (entity) {
+                    const pkValue = this.getPrimaryKeyValue(entity)
+                    if (pkValue !== undefined && entityInfoMap.has(pkValue)) {
+                        const entityInfo = entityInfoMap.get(pkValue)!
+                        entityInfo.existingEntity = entity
+                    }
+                }
+            })
+        }
+
+        // Determine operation types and prepare before events
+        const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+
+        // Handle entities with primary keys
+        for (const entityInfo of entityInfoMap.values()) {
+            const operation = entityInfo.existingEntity
+                ? ModelMutationAction.BeforeUpdate
+                : ModelMutationAction.BeforeCreate
+
+            entityInfo.operation = operation
+
+            beforeEvents.push(
+                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                    this.getDescriptor(operation),
+                    entityInfo.input,
+                ),
+            )
+        }
+
+        // Handle inputs without primary keys (always creates)
+        for (const input of inputsWithoutPrimaryKey) {
+            beforeEvents.push(
+                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                    this.getDescriptor(ModelMutationAction.BeforeCreate),
+                    input,
+                ),
+            )
+        }
+
+        // Emit all before events
+        await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
+
+        // Perform the bulk upsert operation
+        const results = await this.repository.bulkUpsert(inputs, options)
+
+        // Create a map of result primary keys to results for matching
+        const resultsByPrimaryKey = new Map<string | number, InferDetail<TSchema>>()
+        const resultsWithoutPrimaryKey: InferDetail<TSchema>[] = []
+
+        for (const result of results) {
+            const pkValue = this.getPrimaryKeyValue(result)
+            if (pkValue !== undefined) {
+                resultsByPrimaryKey.set(pkValue, result)
+            } else {
+                resultsWithoutPrimaryKey.push(result)
+            }
+        }
+
+        // Prepare after events by matching results back to original inputs
+        const afterEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+        let resultsWithoutPkIndex = 0
+
+        // Handle entities with primary keys
+        for (const entityInfo of entityInfoMap.values()) {
+            const matchedResult = resultsByPrimaryKey.get(entityInfo.primaryKeyValue)!
+
+            const afterOperation =
+                entityInfo.operation === ModelMutationAction.BeforeCreate
+                    ? ModelMutationAction.AfterCreate
+                    : ModelMutationAction.AfterUpdate
+
+            afterEvents.push(
+                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                    this.getDescriptor(afterOperation),
+                    entityInfo.input,
+                ).setResult(matchedResult),
+            )
+        }
+
+        // Handle inputs without primary keys (always creates)
+        for (const input of inputsWithoutPrimaryKey) {
+            const matchedResult = resultsWithoutPrimaryKey[resultsWithoutPkIndex++]
+
+            afterEvents.push(
+                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                    this.getDescriptor(ModelMutationAction.AfterCreate),
+                    input,
+                ).setResult(matchedResult),
+            )
+        }
+
+        // Emit all after events
+        await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
+
+        // Return the results
+        return results
+    }
 }

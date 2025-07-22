@@ -58,7 +58,10 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
         this.authValidator.validatePermissions((v) =>
             v.someOf([
-                this.service.getDescriptor('upsert', '*').toString(),
+                v.allOf([
+                    this.service.getDescriptor('create', '*').toString(),
+                    this.service.getDescriptor('update', '*').toString(),
+                ]),
                 this.service.getDescriptor('write', '*').toString(),
             ]),
         )
@@ -77,7 +80,10 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     ): Promise<InferDetail<TSchema>[]> {
         this.authValidator.validatePermissions((v) =>
             v.someOf([
-                this.service.getDescriptor('bulkUpsert', '*').toString(),
+                v.allOf([
+                    this.service.getDescriptor('create', '*').toString(),
+                    this.service.getDescriptor('update', '*').toString(),
+                ]),
                 this.service.getDescriptor('write', '*').toString(),
             ]),
         )

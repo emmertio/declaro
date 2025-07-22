@@ -73,6 +73,31 @@ export interface IRepository<TSchema extends AnyModelSchema> {
     ): Promise<InferDetail<TSchema>>
 
     /**
+     * Upserts an element based on the provided input.
+     * If the element exists, it will be updated; otherwise, a new element will be created.
+     *
+     * A load operation will be performed to check if the element exists. create/update related events will be dispatched accordingly.
+     *
+     * @param input - The input data for the new or existing element.
+     * @returns A promise resolving to the detailed created or updated element.
+     */
+    upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>>
+
+    /**
+     * Upserts multiple elements based on the provided inputs.
+     * If an element exists, it will be updated; otherwise, a new element will be created.
+     *
+     * A loadMany operation will be performed to check if the elements exist. create/update related events will be dispatched accordingly.
+     *
+     * @param inputs - The input data for the upsert operation.
+     * @returns A promise resolving to an array of detailed upserted elements.
+     */
+    bulkUpsert(
+        inputs: InferInput<TSchema>[],
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<InferDetail<TSchema>[]>
+
+    /**
      * Counts the number of elements matching the provided search criteria.
      *
      * @param search - The search criteria to apply.

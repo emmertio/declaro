@@ -14,6 +14,8 @@ export type InferSort<TSchema extends AnyModelSchema> = InferModelInput<TSchema[
 export type InferInput<TSchema extends AnyModelSchema> = InferModelInput<TSchema['definition']['input']>
 export type InferSearchResults<TSchema extends AnyModelSchema> = ISearchResults<InferSummary<TSchema>>
 export type InferEntityMetadata<TSchema extends AnyModelSchema> = ReturnType<TSchema['getEntityMetadata']>
+export type InferPrimaryKeyType<TSchema extends AnyModelSchema> =
+    InferLookup<TSchema>[InferEntityMetadata<TSchema>['primaryKey']]
 
 export type InferSummarySchema<TSchema extends AnyModelSchema> = TSchema['definition']['summary']['schema']
 export type InferDetailSchema<TSchema extends AnyModelSchema> = TSchema['definition']['detail']['schema']

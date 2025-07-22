@@ -11,6 +11,7 @@ import type {
 } from '../../../shared/utils/schema-inference'
 import { v4 as uuid } from 'uuid'
 import type { ISearchOptions } from '../../../domain/services/read-only-model-service'
+import type { ICreateOptions, IUpdateOptions } from '../../../domain/services/model-service'
 
 export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
     schema: TSchema
@@ -174,6 +175,31 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
     async count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema> | undefined): Promise<number> {
         const filteredItems = this.applyFilters(search)
         return filteredItems.length
+    }
+
+    async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
+        const primaryKeyValue = input[this.entityMetadata.primaryKey]
+        let existingItem: InferDetail<TSchema> | undefined = undefined
+
+        if (primaryKeyValue) {
+            existingItem = this.data.get(primaryKeyValue) ?? {}
+        }
+
+        const updatedItem = Object.assign({}, existingItem, input) as InferDetail<TSchema>
+        if (!updatedItem[this.entityMetadata.primaryKey!]) {
+            updatedItem[this.entityMetadata.primaryKey!] = await this.generatePrimaryKey()
+        }
+
+        this.data.set(updatedItem[this.entityMetadata.primaryKey!], updatedItem)
+
+        return updatedItem
+    }
+
+    async bulkUpsert(
+        inputs: InferInput<TSchema>[],
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<InferDetail<TSchema>[]> {
+        return await Promise.all(inputs.map((input) => this.upsert(input, options)))
     }
 
     /**

@@ -10,6 +10,7 @@ import { ModelQueryEvent } from '../events/event-types'
 import { QueryEvent } from '../events/query-event'
 import { BaseModelService, type IActionOptions } from './base-model-service'
 import type { IPaginationInput } from '../models/pagination'
+import type { IUpdateOptions } from './model-service'
 
 export interface ILoadOptions extends IActionOptions {}
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
@@ -101,5 +102,32 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
 
         // Return the search results
         return results
+    }
+
+    /**
+     * Count the number of records matching the given filters.
+     * @param filters The filters to apply to the count operation.
+     * @returns The count of matching records.
+     */
+    async count(filters: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number> {
+        // Emit the before count event
+        const beforeCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+            this.getDescriptor(ModelQueryEvent.BeforeCount, options?.scope),
+            filters,
+        )
+        await this.emitter.emitAsync(beforeCountEvent)
+
+        // Count the records in the repository
+        const count = await this.repository.count(filters, options)
+
+        // Emit the after count event
+        const afterCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+            this.getDescriptor(ModelQueryEvent.AfterCount, options?.scope),
+            filters,
+        ).setResult(count)
+        await this.emitter.emitAsync(afterCountEvent)
+
+        // Return the count
+        return count
     }
 }

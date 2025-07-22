@@ -5,6 +5,8 @@ export enum ModelQueryEvent {
     AfterLoadMany = 'afterLoadMany',
     BeforeSearch = 'beforeSearch',
     AfterSearch = 'afterSearch',
+    BeforeCount = 'beforeCount',
+    AfterCount = 'afterCount',
 }
 
 export enum ModelMutationAction {

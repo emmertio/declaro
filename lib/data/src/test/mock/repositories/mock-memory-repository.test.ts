@@ -467,4 +467,249 @@ describe('MockMemoryRepository', () => {
             expect(await repositoryWithFilter.count({ text: 'Test' })).toBe(1)
         })
     })
+
+    describe('upsert functionality', () => {
+        it('should create a new item when no existing item with primary key exists', async () => {
+            const input = { id: 42, title: 'New Book', author: 'Author Name', publishedDate: new Date() }
+
+            const upsertedItem = await repository.upsert(input)
+
+            expect(upsertedItem).toEqual(input)
+            expect(await repository.load({ id: 42 })).toEqual(input)
+        })
+
+        it('should update an existing item when primary key matches', async () => {
+            // Create initial item
+            const initial = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Original Author',
+                publishedDate: new Date('2023-01-01'),
+            }
+            await repository.create(initial)
+
+            // Upsert with same ID but different data
+            const update = {
+                id: 42,
+                title: 'Updated Book',
+                author: 'Updated Author',
+                publishedDate: new Date('2023-12-01'),
+            }
+            const upsertedItem = await repository.upsert(update)
+
+            expect(upsertedItem).toEqual(update)
+            expect(await repository.load({ id: 42 })).toEqual(update)
+        })
+
+        it('should generate primary key when upserting without one', async () => {
+            const input = { title: 'Book Without ID', author: 'Author Name', publishedDate: new Date() }
+
+            const upsertedItem = await repository.upsert(input)
+
+            expect(upsertedItem.id).toBeDefined()
+            expect(upsertedItem.title).toBe(input.title)
+            expect(upsertedItem.author).toBe(input.author)
+            expect(await repository.load({ id: upsertedItem.id })).toEqual(upsertedItem)
+        })
+
+        it('should merge with existing item properties when updating', async () => {
+            // Create initial item with multiple properties
+            const initial = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Original Author',
+                publishedDate: new Date('2023-01-01'),
+            }
+            await repository.create(initial)
+
+            // Upsert with partial update (only title) - need to provide required fields
+            const partialUpdate = {
+                id: 42,
+                title: 'Updated Title',
+                author: 'Original Author', // Keep original
+                publishedDate: new Date('2023-01-01'), // Keep original
+            }
+            const upsertedItem = await repository.upsert(partialUpdate)
+
+            // Should have updated title but kept other properties
+            expect(upsertedItem.id).toBe(42)
+            expect(upsertedItem.title).toBe('Updated Title')
+            expect(upsertedItem.author).toBe('Original Author')
+            expect(upsertedItem.publishedDate).toEqual(initial.publishedDate)
+        })
+
+        it('should handle upsert with null/undefined primary key', async () => {
+            const input = {
+                id: undefined,
+                title: 'Book With Undefined ID',
+                author: 'Author Name',
+                publishedDate: new Date(),
+            }
+
+            const upsertedItem = await repository.upsert(input)
+
+            expect(upsertedItem.id).toBeDefined()
+            expect(typeof upsertedItem.id).toBe('number')
+            expect(upsertedItem.title).toBe(input.title)
+        })
+
+        it('should increment auto-generated IDs correctly', async () => {
+            const input1 = { title: 'Book 1', author: 'Author 1', publishedDate: new Date() }
+            const input2 = { title: 'Book 2', author: 'Author 2', publishedDate: new Date() }
+
+            const item1 = await repository.upsert(input1)
+            const item2 = await repository.upsert(input2)
+
+            expect(item1.id).toBe(1)
+            expect(item2.id).toBe(2)
+        })
+    })
+
+    describe('bulkUpsert functionality', () => {
+        it('should upsert multiple new items', async () => {
+            const inputs = [
+                { id: 1, title: 'Book 1', author: 'Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Book 2', author: 'Author 2', publishedDate: new Date('2023-02-01') },
+                { id: 3, title: 'Book 3', author: 'Author 3', publishedDate: new Date('2023-03-01') },
+            ]
+
+            const upsertedItems = await repository.bulkUpsert(inputs)
+
+            expect(upsertedItems).toHaveLength(3)
+            expect(upsertedItems).toEqual(inputs)
+
+            // Verify all items were created
+            for (const input of inputs) {
+                expect(await repository.load({ id: input.id })).toEqual(input)
+            }
+        })
+
+        it('should update existing items and create new ones in same operation', async () => {
+            // Create some initial items
+            const existing1 = {
+                id: 1,
+                title: 'Original Book 1',
+                author: 'Original Author 1',
+                publishedDate: new Date('2023-01-01'),
+            }
+            const existing2 = {
+                id: 2,
+                title: 'Original Book 2',
+                author: 'Original Author 2',
+                publishedDate: new Date('2023-02-01'),
+            }
+            await repository.create(existing1)
+            await repository.create(existing2)
+
+            // Bulk upsert with mix of updates and new items
+            const upsertInputs = [
+                { id: 1, title: 'Updated Book 1', author: 'Updated Author 1', publishedDate: new Date('2023-06-01') }, // Update
+                { id: 2, title: 'Updated Book 2', author: 'Updated Author 2', publishedDate: new Date('2023-07-01') }, // Update
+                { id: 3, title: 'New Book 3', author: 'New Author 3', publishedDate: new Date('2023-08-01') }, // Create
+                { id: 4, title: 'New Book 4', author: 'New Author 4', publishedDate: new Date('2023-09-01') }, // Create
+            ]
+
+            const upsertedItems = await repository.bulkUpsert(upsertInputs)
+
+            expect(upsertedItems).toHaveLength(4)
+            expect(upsertedItems).toEqual(upsertInputs)
+
+            // Verify all items have the updated/new values
+            for (const input of upsertInputs) {
+                expect(await repository.load({ id: input.id })).toEqual(input)
+            }
+        })
+
+        it('should handle bulk upsert with items without primary keys', async () => {
+            const inputs = [
+                { title: 'Book Without ID 1', author: 'Author 1', publishedDate: new Date() },
+                { title: 'Book Without ID 2', author: 'Author 2', publishedDate: new Date() },
+                { title: 'Book Without ID 3', author: 'Author 3', publishedDate: new Date() },
+            ]
+
+            const upsertedItems = await repository.bulkUpsert(inputs)
+
+            expect(upsertedItems).toHaveLength(3)
+
+            // All items should have generated IDs
+            expect(upsertedItems[0].id).toBe(1)
+            expect(upsertedItems[1].id).toBe(2)
+            expect(upsertedItems[2].id).toBe(3)
+
+            // Verify content is preserved
+            for (let i = 0; i < inputs.length; i++) {
+                expect(upsertedItems[i].title).toBe(inputs[i].title)
+                expect(upsertedItems[i].author).toBe(inputs[i].author)
+                expect(await repository.load({ id: upsertedItems[i].id })).toEqual(upsertedItems[i])
+            }
+        })
+
+        it('should handle empty bulk upsert', async () => {
+            const upsertedItems = await repository.bulkUpsert([])
+
+            expect(upsertedItems).toEqual([])
+        })
+
+        it('should handle bulk upsert with partial updates', async () => {
+            // Create initial items
+            const initial1 = {
+                id: 1,
+                title: 'Original Book 1',
+                author: 'Original Author 1',
+                publishedDate: new Date('2023-01-01'),
+            }
+            const initial2 = {
+                id: 2,
+                title: 'Original Book 2',
+                author: 'Original Author 2',
+                publishedDate: new Date('2023-02-01'),
+            }
+            await repository.create(initial1)
+            await repository.create(initial2)
+
+            // Updates with all required fields but only changing title
+            const partialUpdates = [
+                { id: 1, title: 'Updated Title 1', author: 'Original Author 1', publishedDate: new Date('2023-01-01') },
+                { id: 2, title: 'Updated Title 2', author: 'Original Author 2', publishedDate: new Date('2023-02-01') },
+            ]
+
+            const upsertedItems = await repository.bulkUpsert(partialUpdates)
+
+            expect(upsertedItems).toHaveLength(2)
+
+            // Should have updated titles but kept other properties
+            expect(upsertedItems[0].title).toBe('Updated Title 1')
+            expect(upsertedItems[0].author).toBe('Original Author 1')
+            expect(upsertedItems[0].publishedDate).toEqual(initial1.publishedDate)
+
+            expect(upsertedItems[1].title).toBe('Updated Title 2')
+            expect(upsertedItems[1].author).toBe('Original Author 2')
+            expect(upsertedItems[1].publishedDate).toEqual(initial2.publishedDate)
+        })
+
+        it('should handle large bulk operations efficiently', async () => {
+            // Create a large number of items to test performance
+            const inputs: Array<{ id: number; title: string; author: string; publishedDate: Date }> = []
+            for (let i = 1; i <= 100; i++) {
+                inputs.push({
+                    id: i,
+                    title: `Book ${i}`,
+                    author: `Author ${i}`,
+                    publishedDate: new Date(`2023-${String((i % 12) + 1).padStart(2, '0')}-01`),
+                })
+            }
+
+            const startTime = Date.now()
+            const upsertedItems = await repository.bulkUpsert(inputs)
+            const endTime = Date.now()
+
+            expect(upsertedItems).toHaveLength(100)
+            expect(endTime - startTime).toBeLessThan(1000) // Should complete in under 1 second
+
+            // Verify a few random items
+            expect(await repository.load({ id: 1 })).toEqual(inputs[0])
+            expect(await repository.load({ id: 50 })).toEqual(inputs[49])
+            expect(await repository.load({ id: 100 })).toEqual(inputs[99])
+        })
+    })
 })

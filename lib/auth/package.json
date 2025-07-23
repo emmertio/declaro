@@ -27,28 +27,29 @@
         "@declaro/zod": "workspace:^",
         "@types/bun": "^1.2.12",
         "@types/jsonwebtoken": "^9.0.10",
+        "crypto-browserify": "^3.12.1",
+        "typescript": "^5.5.4"
+    },
+    "dependencies": {
         "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.2",
-        "typescript": "^5.5.4",
         "uuid": "^11.1.0",
         "zod": "^3.25.67"
     },
-    "dependencies": {
-        "crypto-browserify": "^3.12.1"
-    },
     "peerDependencies": {
         "@declaro/core": "^2.0.0-beta.50",
+        "@declaro/redis": "^2.0.0-beta.50",
         "@declaro/zod": "^2.0.0-beta.50",
         "ioredis": "^5.6.1",
+        "jsonwebtoken": "^9.0.2",
+        "uuid": "^11.1.0",
         "zod": "^3.25.67"
     },
-    "optionalDependencies": {
-        "@declaro/redis": "^2.0.0-beta.50"
-    },
+    "optionalDependencies": {},
     "exports": {
         "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
-        "import": "./dist/browser/index.js",
+        "import": "./dist/node/index.js",
         "require": "./dist/node/index.cjs"
     }
 }

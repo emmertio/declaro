@@ -48,7 +48,7 @@
     "exports": {
         "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
-        "import": "./dist/node/index.js",
-        "require": "./dist/node/index.js"
+        "import": "./dist/browser/index.js",
+        "require": "./dist/node/index.cjs"
     }
 }

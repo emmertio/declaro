@@ -1,6 +1,6 @@
 {
     "name": "@declaro-apps/framework",
-    "version": "2.0.0-beta.68",
+    "version": "2.0.0-beta.69",
     "main": "./nuxt.config.ts",
     "type": "module",
     "private": true,

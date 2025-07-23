@@ -21,7 +21,7 @@ export const MockBookSchema = ModelSchema.create('Book')
                     id: z.number().int().positive(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
-                    publishedDate: z.date(),
+                    publishedDate: z.coerce.date(),
                 }),
             ),
         lookup: (h) =>
@@ -47,7 +47,7 @@ export const MockBookSchema = ModelSchema.create('Book')
                     id: z.number().int().positive(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
-                    publishedDate: z.date(),
+                    publishedDate: z.coerce.date(),
                 }),
             ),
         sort: (h) => new ZodModel(h.name, sortArray(['title', 'author'])),
@@ -60,7 +60,7 @@ export const MockBookSchema = ModelSchema.create('Book')
                     id: z.number().int().positive().optional(),
                     title: z.string().min(2).max(100),
                     author: z.string().min(2).max(100),
-                    publishedDate: z.date(),
+                    publishedDate: z.coerce.date(),
                 }),
             ),
     })

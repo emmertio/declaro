@@ -743,6 +743,40 @@ describe('Context', () => {
         expect(context2AsyncFactory).toHaveBeenCalledTimes(1)
     })
 
+    it('should not override singletons when extending, without an explicit override', async () => {
+        type Scope = {
+            foo: {
+                message: string
+                _id?: number
+            }
+            bar: {
+                message: string
+                _id?: number
+            }
+        }
+
+        const context1 = new Context<Scope>()
+        context1.registerFactory('foo', () => ({ message: 'Hello' }), [], {
+            singleton: true,
+        })
+
+        const foo1 = context1.resolve('foo')
+        foo1._id = 1
+
+        const context2 = new Context<Scope>()
+        context2.extend(context1)
+
+        const context3 = new Context<Scope>()
+        context3.extend(context1)
+
+        const foo2 = context2.resolve('foo')
+
+        const foo3 = context3.resolve('foo')
+
+        expect(foo2).toBe(foo3)
+        expect(foo2._id).toBe(1)
+    })
+
     it('should dispatch event objects and event strings', async () => {
         interface CustomEvent extends IEvent {
             type: 'test'

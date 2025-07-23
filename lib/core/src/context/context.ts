@@ -137,13 +137,7 @@ export class Context<Scope extends object = any> {
      */
     register<K extends ScopeKey<Scope>>(key: K, dep: ContextAttribute<this, Scope[K]>) {
         const existingDep = this.state[key]
-        this.state[key] = dep
-
-        Object.defineProperty(this.scope, key, {
-            get: () => this.resolve(key),
-            enumerable: true,
-            configurable: true,
-        })
+        this.addDep(key, dep)
 
         // kill any cached values that were made by a previous instance of this attribute
         if (existingDep) {
@@ -153,6 +147,21 @@ export class Context<Scope extends object = any> {
                 dependent.cachedValue = undefined
             })
         }
+    }
+
+    /**
+     * Add a dependency to the context.
+     */
+    protected addDep<K extends ScopeKey<Scope>>(key: K, dep: ContextAttribute<this, Scope[K]>) {
+        this.state[key] = dep
+
+        Object.defineProperty(this.scope, key, {
+            get: () => this.resolve(key),
+            enumerable: true,
+            configurable: true,
+        })
+
+        return dep
     }
 
     /**
@@ -427,7 +436,7 @@ export class Context<Scope extends object = any> {
             Reflect.ownKeys(context.state).forEach((key) => {
                 // const dep = cloneDeep(context.state[key])
                 const dep = { ...context.state[key] }
-                this.register(key as any, dep)
+                this.addDep(key as any, dep)
             })
 
             this.emitter.extend(context.emitter)

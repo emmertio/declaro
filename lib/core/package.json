@@ -37,13 +37,11 @@
         "vite": "^5.4.1",
         "vite-plugin-dts": "^4.0.3",
         "vitest": "^2.0.5",
-        "whatwg-url": "^14.1.1"
-    },
-    "dependencies": {
-        "@types/json-schema": "^7.0.15",
+        "whatwg-url": "^14.1.1",
         "change-case": "^5.4.4",
         "pluralize": "^8.0.0"
     },
+    "dependencies": {},
     "repository": {
         "type": "git",
         "url": "git+https://github.com/emmertio/declaro.git#main"

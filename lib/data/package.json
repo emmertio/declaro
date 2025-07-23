@@ -20,16 +20,15 @@
         "@declaro/core": "^2.0.0-beta.50",
         "@declaro/zod": "^2.0.0-beta.51"
     },
-    "dependencies": {
-        "crypto-browserify": "^3.12.1"
-    },
+    "dependencies": {},
     "devDependencies": {
         "@declaro/auth": "workspace:^",
         "@declaro/core": "workspace:^",
         "@declaro/zod": "workspace:^",
         "typescript": "^5.8.3",
         "uuid": "^11.1.0",
-        "zod": "^3.25.67"
+        "zod": "^3.25.67",
+        "crypto-browserify": "^3.12.1"
     },
     "author": "Your Name",
     "license": "MIT",

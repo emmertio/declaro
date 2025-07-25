@@ -855,4 +855,21 @@ describe('Context', () => {
         expect(extractedScope.foo).toBe('Hello')
         expect(extractedScope.bar).toBe(42)
     })
+
+    it('should be able to use middleware that requires a subset of the context scope', async () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        type ModuleScope = {
+            bar: number
+        }
+
+        const middleware = (context: Context<ModuleScope>) => {}
+
+        const context = new Context<Scope>()
+
+        context.use(middleware)
+    })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context, type DeclaroScope } from './context'
+import { Context, type DeclaroScope, type ExtractScope } from './context'
 import type { IEvent } from '../events'
 
 describe('Context', () => {
@@ -833,5 +833,26 @@ describe('Context', () => {
 
         expect(callback).not.toHaveBeenCalled()
         await expect(context.emit('test')).rejects.toThrow('Test error')
+    })
+
+    it('should be able to define an extracted scope type', () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        const context = new Context<Scope>()
+
+        type ExtractedScope = ExtractScope<typeof context>
+
+        const extractedScope: ExtractedScope = {
+            foo: 'Hello',
+            bar: 42,
+        }
+
+        const _: Context<Scope> = new Context<ExtractedScope>()
+
+        expect(extractedScope.foo).toBe('Hello')
+        expect(extractedScope.bar).toBe(42)
     })
 })

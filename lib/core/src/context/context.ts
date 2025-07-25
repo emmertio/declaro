@@ -19,7 +19,9 @@ export interface DeclaroRequestScope extends DeclaroScope {
     header: <K extends keyof IncomingHttpHeaders>(header: K) => IncomingHttpHeaders[K] | undefined
 }
 
-export type ContextMiddleware<C extends Context = Context> = (context: C) => any | Promise<any>
+export type ExtractScope<T extends Context<any>> = T extends Context<infer S> ? S : never
+
+export type ContextMiddleware<C extends Context = Context> = (context: Context<ExtractScope<C>>) => any | Promise<any>
 export type ContextState<TContext extends Context> = Record<PropertyKey, ContextAttribute<TContext, StateValue<any>>>
 
 export type ContextResolver<T> = (context: Context) => StateValue<T>
@@ -455,7 +457,7 @@ export class Context<Scope extends object = any> {
     async use(...middleware: ContextMiddleware<this>[]) {
         return middleware.reduce(async (promise, middleware) => {
             await promise
-            await middleware(this)
+            await middleware(this as any)
 
             return undefined
         }, Promise.resolve(undefined))

@@ -3,7 +3,7 @@ import type { Context, DeclaroScope } from '../context/context'
 import { provideRequestMiddleware } from '../http/request-context'
 
 export function useDeclaro() {
-    return async (context: Context<DeclaroScope>) => {
+    return async <S extends DeclaroScope>(context: Context<S>) => {
         context.registerValue('requestMiddleware', [])
         context.registerValue('nodeMiddleware', [])
 

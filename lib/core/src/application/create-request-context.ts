@@ -16,8 +16,8 @@ declare module '#scope' {
     export interface RequestScope extends DeclaroRequestScope {}
 }
 
-export async function createRequestContext(
-    appContext: Context<DeclaroScope>,
+export async function createRequestContext<S extends DeclaroScope>(
+    appContext: Context<S>,
     request: Request,
 ): Promise<Context<DeclaroRequestScope>> {
     const context = new Context<DeclaroRequestScope>()

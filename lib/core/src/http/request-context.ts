@@ -9,7 +9,7 @@ import type { RequestScope, AppScope } from '#scope'
  * @returns An array of request middleware functions.
  * @deprecated Use `context.scope.requestMiddleware` instead.
  */
-export function useRequestMiddleware(context: Context<DeclaroScope>) {
+export function useRequestMiddleware<S extends DeclaroScope>(context: Context<S>) {
     const middleware = context.resolve('requestMiddleware', {
         strict: false,
     })
@@ -17,10 +17,10 @@ export function useRequestMiddleware(context: Context<DeclaroScope>) {
     return middleware ?? []
 }
 
-export function provideRequestMiddleware<
-    RC extends Context = Context<RequestScope>,
-    C extends Context = Context<AppScope>,
->(context: C, ...middleware: ContextMiddleware<RC>[]) {
+export function provideRequestMiddleware<S extends AppScope>(
+    context: Context<S>,
+    ...middleware: ContextMiddleware<Context<RequestScope>>[]
+) {
     const existingMiddleware = useRequestMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
@@ -35,7 +35,7 @@ export type NodePromisifiedHandler = (req: IncomingMessage, res: ServerResponse)
 export type NodeMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: Error) => any) => any
 export type AllNodeMiddleware = NodeListener | NodePromisifiedHandler | NodeMiddleware
 
-export function useNodeMiddleware(context: Context<AppScope>) {
+export function useNodeMiddleware<S extends AppScope>(context: Context<S>) {
     const middleware = context.resolve('nodeMiddleware', {
         strict: false,
     })
@@ -43,7 +43,7 @@ export function useNodeMiddleware(context: Context<AppScope>) {
     return middleware ?? []
 }
 
-export function provideNodeMiddleware(context: Context<AppScope>, ...middleware: AllNodeMiddleware[]) {
+export function provideNodeMiddleware<S extends AppScope>(context: Context<S>, ...middleware: AllNodeMiddleware[]) {
     const existingMiddleware = useNodeMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]

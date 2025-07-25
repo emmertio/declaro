@@ -2,7 +2,7 @@ import { Context } from '@declaro/core'
 import type { AuthRequestScope, AuthScope } from '../../types/auth-context'
 import { getMockAuthSession } from '../mock/auth-session'
 
-export async function createTestRequestContext(context: Context<AuthScope>) {
+export async function createTestRequestContext<S extends AuthScope>(context: Context<S>) {
     // Create a new request context
     const requestContext = new Context<AuthRequestScope>()
     requestContext.extend(context)

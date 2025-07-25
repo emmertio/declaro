@@ -856,7 +856,7 @@ describe('Context', () => {
         expect(extractedScope.bar).toBe(42)
     })
 
-    it('should be able to use middleware that requires a subset of the context scope', async () => {
+    it('should be able to use middleware that requires a subset of the context scope', () => {
         type Scope = {
             foo: string
             bar: number
@@ -866,10 +866,37 @@ describe('Context', () => {
             bar: number
         }
 
-        const middleware = (context: Context<ModuleScope>) => {}
+        const middleware = (context: Context<ModuleScope>) => {
+            // This middleware only needs 'bar', not 'foo'
+            expect(context.resolve('bar')).toBe(42)
+        }
+
+        const context = new Context<Scope>()
+        context.registerValue('foo', 'test')
+        context.registerValue('bar', 42)
+
+        // This should work - the context has more than what the middleware needs
+        return context.use(middleware)
+    })
+
+    it('should be able to apply a full context to a partial', () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        type ModuleScope = {
+            bar: number
+        }
 
         const context = new Context<Scope>()
 
-        context.use(middleware)
+        // Using the type-safe narrow method - this provides the proper covariance
+        const partialContext: Context<ModuleScope> = context.narrow<ModuleScope>()
+
+        expect(context).toBeInstanceOf(Context)
+        expect(partialContext).toBeInstanceOf(Context)
+        // Both references point to the same instance
+        expect(partialContext).toBe(context)
     })
 })

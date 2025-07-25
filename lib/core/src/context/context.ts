@@ -21,6 +21,18 @@ export interface DeclaroRequestScope extends DeclaroScope {
 
 export type ExtractScope<T extends Context<any>> = T extends Context<infer S> ? S : never
 
+/**
+ * Creates a context type that narrows the scope to a subset.
+ * This allows using a context with more dependencies where fewer are expected.
+ */
+export type NarrowContext<TContext extends Context<any>, TNarrowScope extends object> = TContext extends Context<
+    infer TFullScope
+>
+    ? TNarrowScope extends Partial<TFullScope>
+        ? Context<TNarrowScope>
+        : never
+    : never
+
 export type ContextMiddleware<C extends Context = Context> = (context: Context<ExtractScope<C>>) => any | Promise<any>
 export type ContextState<TContext extends Context> = Record<PropertyKey, ContextAttribute<TContext, StateValue<any>>>
 
@@ -454,10 +466,14 @@ export class Context<Scope extends object = any> {
      * @param middleware
      * @returns
      */
+    async use<TNarrowScope extends Partial<Scope>>(
+        ...middleware: ContextMiddleware<Context<TNarrowScope>>[]
+    ): Promise<void>
+    async use(...middleware: ContextMiddleware[]): Promise<void>
     async use(...middleware: ContextMiddleware[]) {
         return middleware.reduce(async (promise, middleware) => {
             await promise
-            await middleware(this as any)
+            await middleware(this)
 
             return undefined
         }, Promise.resolve(undefined))
@@ -506,5 +522,15 @@ export class Context<Scope extends object = any> {
         const eventObject = typeof event === 'string' ? { type: event } : event
 
         return await this.emitter.emitAsync(eventObject)
+    }
+
+    /**
+     * Narrow the context to a subset of its scope type.
+     * This is a type-only operation - it returns the same instance with a narrower type.
+     *
+     * @returns A context with a narrower scope type that shares the same underlying state
+     */
+    narrow<TNarrowScope extends Partial<Scope>>(): NarrowContext<this, TNarrowScope> {
+        return this as unknown as NarrowContext<this, TNarrowScope>
     }
 }

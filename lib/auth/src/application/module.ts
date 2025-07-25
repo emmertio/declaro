@@ -22,7 +22,7 @@ export function authModule(config: AuthConfig) {
 
         context.registerAsyncFactory('authSession', async () => null) // Initialize authSession as null
 
-        provideRequestMiddleware<Context<AuthRequestScope>>(context, async (context) => {
+        provideRequestMiddleware(context, async (context) => {
             context.registerAsyncFactory(
                 'authSession',
                 async (authService: AuthService) => {

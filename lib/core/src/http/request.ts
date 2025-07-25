@@ -3,7 +3,14 @@ import { Context, type DeclaroRequestScope } from '../context/context'
 
 export interface Request extends IncomingMessage {}
 
-export function provideRequest<C extends Context<DeclaroRequestScope>>(context: C, request: Request) {
+/**
+ * Provide a request to a context that supports request scope.
+ * The context must have all properties required by DeclaroRequestScope.
+ *
+ * @param context A context that includes DeclaroRequestScope properties
+ * @param request The request to provide
+ */
+export function provideRequest<S extends DeclaroRequestScope>(context: Context<S>, request: Request) {
     context.registerValue('request', request)
 }
 

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http'
-import { Context, type ContextMiddleware, type DeclaroScope } from '../context/context'
+import { Context, type ContextMiddleware, type DeclaroRequestScope, type DeclaroScope } from '../context/context'
 
 import type { RequestScope, AppScope } from '#scope'
 
@@ -17,15 +17,15 @@ export function useRequestMiddleware<S extends DeclaroScope>(context: Context<S>
     return middleware ?? []
 }
 
-export function provideRequestMiddleware<S extends AppScope>(
+export function provideRequestMiddleware<S extends DeclaroScope>(
     context: Context<S>,
-    ...middleware: ContextMiddleware<Context<RequestScope>>[]
+    ...middleware: ContextMiddleware<Context<DeclaroRequestScope>>[]
 ) {
-    const existingMiddleware = useRequestMiddleware(context)
+    const existingMiddleware = context.scope.requestMiddleware ?? []
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
 
-    context.registerValue('requestMiddleware', extendedMiddleware)
+    context.registerValue('requestMiddleware', extendedMiddleware as any)
 
     return extendedMiddleware
 }
@@ -35,7 +35,7 @@ export type NodePromisifiedHandler = (req: IncomingMessage, res: ServerResponse)
 export type NodeMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: Error) => any) => any
 export type AllNodeMiddleware = NodeListener | NodePromisifiedHandler | NodeMiddleware
 
-export function useNodeMiddleware<S extends AppScope>(context: Context<S>) {
+export function useNodeMiddleware<S extends DeclaroScope>(context: Context<S>) {
     const middleware = context.resolve('nodeMiddleware', {
         strict: false,
     })
@@ -43,7 +43,7 @@ export function useNodeMiddleware<S extends AppScope>(context: Context<S>) {
     return middleware ?? []
 }
 
-export function provideNodeMiddleware<S extends AppScope>(context: Context<S>, ...middleware: AllNodeMiddleware[]) {
+export function provideNodeMiddleware<S extends DeclaroScope>(context: Context<S>, ...middleware: AllNodeMiddleware[]) {
     const existingMiddleware = useNodeMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]

@@ -5,12 +5,11 @@ import type { AllNodeMiddleware } from '../http/request-context'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
-import type { RequestScope } from '#scope'
 
 export interface DeclaroDependencies {}
 
 export interface DeclaroScope {
-    requestMiddleware: ContextMiddleware<Context<RequestScope>>[]
+    requestMiddleware: ContextMiddleware<Context>[]
     nodeMiddleware: AllNodeMiddleware[]
 }
 export interface DeclaroRequestScope extends DeclaroScope {

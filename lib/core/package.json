@@ -1,6 +1,6 @@
 {
     "name": "@declaro/core",
-    "version": "2.0.0-beta.70",
+    "version": "2.0.0-beta.71",
     "description": "Declarative Business Module Definition",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
@@ -27,21 +27,20 @@
         "@types/json-schema": "^7.0.15",
         "@types/whatwg-url": "^13.0.0",
         "@vitest/coverage-v8": "^2.0.5",
+        "change-case": "^5.4.4",
         "json-schema-library": "^7.4.8",
         "lodash": "^4.17.21",
         "minimatch": "^10.0.1",
         "node-mocks-http": "^1.16.2",
         "openapi-types": "^12.1.3",
+        "pluralize": "^8.0.0",
         "typescript": "^5.5.4",
         "uuid": "^11.1.0",
         "vite": "^5.4.1",
         "vite-plugin-dts": "^4.0.3",
         "vitest": "^2.0.5",
-        "whatwg-url": "^14.1.1",
-        "change-case": "^5.4.4",
-        "pluralize": "^8.0.0"
+        "whatwg-url": "^14.1.1"
     },
-    "dependencies": {},
     "repository": {
         "type": "git",
         "url": "git+https://github.com/emmertio/declaro.git#main"

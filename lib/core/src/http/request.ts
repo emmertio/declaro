@@ -3,7 +3,7 @@ import { Context, type DeclaroRequestScope } from '../context/context'
 
 export interface Request extends IncomingMessage {}
 
-export function provideRequest(context: Context<DeclaroRequestScope>, request: Request) {
+export function provideRequest<C extends Context<DeclaroRequestScope>>(context: C, request: Request) {
     context.registerValue('request', request)
 }
 

@@ -452,7 +452,7 @@ export class Context<Scope extends object = any> {
      * @param middleware
      * @returns
      */
-    async use(...middleware: ContextMiddleware<Context<Scope>>[]) {
+    async use(...middleware: ContextMiddleware<this>[]) {
         return middleware.reduce(async (promise, middleware) => {
             await promise
             await middleware(this)

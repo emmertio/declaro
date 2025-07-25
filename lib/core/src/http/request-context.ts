@@ -19,7 +19,7 @@ export function useRequestMiddleware<S extends DeclaroScope>(context: Context<S>
 
 export function provideRequestMiddleware<S extends DeclaroScope>(
     context: Context<S>,
-    ...middleware: ContextMiddleware<Context<DeclaroRequestScope>>[]
+    ...middleware: ContextMiddleware<Context>[]
 ) {
     const existingMiddleware = context.scope.requestMiddleware ?? []
 

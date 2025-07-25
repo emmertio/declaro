@@ -5,12 +5,13 @@ import type { IAuthSession } from '../domain/models/auth-session'
 import type { AuthService } from '../domain/services/auth-service'
 import { RedisAuthService } from '../infrastructure/impl/redis-auth-service'
 import { AuthValidator } from '../shared/utils/auth-validator'
-import '../types/auth-context' // Ensure types are added to AppScope and RequestScope
 import type { AuthRequestScope, AuthScope } from '../types/auth-context'
 
 export function authModule(config: AuthConfig) {
     return (context: Context<AuthScope>) => {
         context.registerValue('authConfig', config)
+
+        context.scope.authSession
 
         context.registerAsyncFactory(
             'authService',
@@ -22,7 +23,7 @@ export function authModule(config: AuthConfig) {
 
         context.registerAsyncFactory('authSession', async () => null) // Initialize authSession as null
 
-        provideRequestMiddleware(context, async (context) => {
+        provideRequestMiddleware(context, async (context: Context<AuthRequestScope>) => {
             context.registerAsyncFactory(
                 'authSession',
                 async (authService: AuthService) => {

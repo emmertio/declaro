@@ -1,9 +1,9 @@
 import type { IncomingHttpHeaders } from 'http'
-import type { AppScope, Context } from '../context/context'
+import type { Context, DeclaroScope } from '../context/context'
 import { provideRequestMiddleware } from '../http/request-context'
 
 export function useDeclaro() {
-    return async (context: Context<AppScope>) => {
+    return async (context: Context<DeclaroScope>) => {
         context.registerValue('requestMiddleware', [])
         context.registerValue('nodeMiddleware', [])
 

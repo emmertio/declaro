@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context, type AppScope } from './context'
+import { Context, type DeclaroScope } from './context'
 import type { IEvent } from '../events'
 
 describe('Context', () => {
@@ -789,7 +789,7 @@ describe('Context', () => {
 
         const contextACallback = vi.fn()
 
-        const contextA = new Context<AppScope>()
+        const contextA = new Context<DeclaroScope>()
 
         contextA.on<CustomEvent>('test', contextACallback)
 
@@ -812,7 +812,7 @@ describe('Context', () => {
 
         const contextACallback = vi.fn()
 
-        const contextA = new Context<AppScope>()
+        const contextA = new Context<DeclaroScope>()
 
         contextA.events.on('test', contextACallback)
 
@@ -823,7 +823,7 @@ describe('Context', () => {
     })
 
     it('should not squash errors in event handlers', async () => {
-        const context = new Context<AppScope>()
+        const context = new Context<DeclaroScope>()
         const callback = vi.fn()
 
         context.on('test', () => {

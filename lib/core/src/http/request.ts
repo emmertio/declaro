@@ -1,9 +1,9 @@
-import { Context, type RequestScope } from '../context/context'
 import type { IncomingMessage } from 'http'
+import { Context, type DeclaroRequestScope } from '../context/context'
 
 export interface Request extends IncomingMessage {}
 
-export function provideRequest(context: Context<RequestScope>, request: Request) {
+export function provideRequest(context: Context<DeclaroRequestScope>, request: Request) {
     context.registerValue('request', request)
 }
 
@@ -15,7 +15,7 @@ export function provideRequest(context: Context<RequestScope>, request: Request)
  * @param context The context to use for the request.
  * @returns
  */
-export function useRequest(context: Context<RequestScope>) {
+export function useRequest(context: Context) {
     const request = context.resolve('request')
 
     return request
@@ -29,7 +29,7 @@ export function useRequest(context: Context<RequestScope>) {
  * @param context The context to use for the request.
  * @returns The HTTP method of the request, or undefined if not available.
  */
-export function useRequestMethod(context: Context<RequestScope>) {
+export function useRequestMethod(context: Context) {
     const request = useRequest(context)
 
     return request?.method

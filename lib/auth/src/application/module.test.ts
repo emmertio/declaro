@@ -1,20 +1,20 @@
-import { Context, type AppScope, type RequestScope } from '@declaro/core'
+import { Context } from '@declaro/core'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import type { AuthDependencies } from './auth-dependencies'
-import { authModule } from './module'
 import { AuthService } from '../domain/services/auth-service'
-import { createTestRequestContext } from '../test/utils/test-request'
-import { getMockJWT } from '../test/mock/auth-session'
 import { AuthValidator } from '../shared/utils/auth-validator'
+import { getMockJWT } from '../test/mock/auth-session'
+import { createTestRequestContext } from '../test/utils/test-request'
+import type { AuthRequestScope, AuthScope } from '../types/auth-context'
+import { authModule } from './module'
 
 describe('Module', () => {
-    let context: Context<AppScope & AuthDependencies>
-    let requestContext: Context<RequestScope & AuthDependencies>
+    let context: Context<AuthScope>
+    let requestContext: Context<AuthRequestScope>
 
     const mockJwt = getMockJWT()
 
     beforeAll(async () => {
-        context = new Context()
+        context = new Context<AuthScope>()
         await context.use(
             authModule({
                 authTimeout: 3600, // 1 hour

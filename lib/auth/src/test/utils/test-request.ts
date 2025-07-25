@@ -1,10 +1,10 @@
-import { type AppScope, Context, type RequestScope } from '@declaro/core'
-import type { AuthDependencies } from '../../application/auth-dependencies'
+import { Context } from '@declaro/core'
+import type { AuthRequestScope, AuthScope } from '../../types/auth-context'
 import { getMockAuthSession } from '../mock/auth-session'
 
-export async function createTestRequestContext(context: Context<AppScope & AuthDependencies>) {
+export async function createTestRequestContext(context: Context<AuthScope>) {
     // Create a new request context
-    const requestContext = new Context<RequestScope & AuthDependencies>()
+    const requestContext = new Context<AuthRequestScope>()
     requestContext.extend(context)
 
     const middleware = context.scope.requestMiddleware ?? []

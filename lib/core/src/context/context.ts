@@ -5,18 +5,19 @@ import type { AllNodeMiddleware } from '../http/request-context'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
+import type { RequestScope } from '#scope'
 
-export interface AppScope {
-    requestMiddleware: ContextMiddleware<RequestContext>[]
+export interface DeclaroDependencies {}
+
+export interface DeclaroScope {
+    requestMiddleware: ContextMiddleware<Context<RequestScope>>[]
     nodeMiddleware: AllNodeMiddleware[]
 }
-export interface RequestScope extends AppScope {
+export interface DeclaroRequestScope extends DeclaroScope {
     request: Request
     headers: IncomingHttpHeaders
     header: <K extends keyof IncomingHttpHeaders>(header: K) => IncomingHttpHeaders[K] | undefined
 }
-export type AppContext = Context<AppScope>
-export type RequestContext = Context<RequestScope>
 
 export type ContextMiddleware<C extends Context = Context> = (context: C) => any | Promise<any>
 export type ContextState<TContext extends Context> = Record<PropertyKey, ContextAttribute<TContext, StateValue<any>>>

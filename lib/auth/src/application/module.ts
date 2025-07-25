@@ -1,15 +1,15 @@
-import { provideRequestMiddleware, useHeader, type AppScope, type Context, type RequestScope } from '@declaro/core'
+import { provideRequestMiddleware, type Context } from '@declaro/core'
 import type Redis from 'ioredis'
 import type { AuthConfig } from '../domain/interfaces/auth-config'
-import { RedisAuthService } from '../infrastructure/impl/redis-auth-service'
-import type { AuthDependencies } from './auth-dependencies'
-import type { AuthService } from '../domain/services/auth-service'
-import '../types/auth-context' // Ensure types are added to AppScope and RequestScope
-import { AuthValidator } from '../shared/utils/auth-validator'
 import type { IAuthSession } from '../domain/models/auth-session'
+import type { AuthService } from '../domain/services/auth-service'
+import { RedisAuthService } from '../infrastructure/impl/redis-auth-service'
+import { AuthValidator } from '../shared/utils/auth-validator'
+import '../types/auth-context' // Ensure types are added to AppScope and RequestScope
+import type { AuthRequestScope, AuthScope } from '../types/auth-context'
 
 export function authModule(config: AuthConfig) {
-    return (context: Context<AppScope & AuthDependencies>) => {
+    return (context: Context<AuthScope>) => {
         context.registerValue('authConfig', config)
 
         context.registerAsyncFactory(
@@ -22,7 +22,7 @@ export function authModule(config: AuthConfig) {
 
         context.registerAsyncFactory('authSession', async () => null) // Initialize authSession as null
 
-        provideRequestMiddleware(context, async (context: Context<RequestScope>) => {
+        provideRequestMiddleware<Context<AuthRequestScope>>(context, async (context) => {
             context.registerAsyncFactory(
                 'authSession',
                 async (authService: AuthService) => {

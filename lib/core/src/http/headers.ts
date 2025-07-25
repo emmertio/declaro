@@ -1,4 +1,4 @@
-import { Context, type RequestScope } from '../context/context'
+import { Context } from '../context/context'
 import { useRequest } from './request'
 
 /**
@@ -9,7 +9,7 @@ import { useRequest } from './request'
  * @param context The context to use for the request.
  * @returns The headers of the request, or an empty object if not available.
  */
-export function useHeaders(context: Context<RequestScope>) {
+export function useHeaders(context: Context) {
     const request = useRequest(context)
 
     return request?.headers ?? {}
@@ -24,7 +24,7 @@ export function useHeaders(context: Context<RequestScope>) {
  * @param header The name of the header to retrieve.
  * @returns The value of the specified header, or undefined if not available.
  */
-export function useHeader(context: Context<RequestScope>, header: string) {
+export function useHeader(context: Context, header: string) {
     const headers = useHeaders(context)
 
     return headers[header]

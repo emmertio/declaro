@@ -5,7 +5,11 @@
         "allowSyntheticDefaultImports": true,
         "declaration": true,
         "declarationMap": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "baseUrl": ".",
+        "paths": {
+            "#scope": ["./src/@types/context.d.ts"]
+        }
     },
     "include": ["src/*.ts", "src/**/*.ts", "src/**/*.d.ts"],
     "buildOptions": {

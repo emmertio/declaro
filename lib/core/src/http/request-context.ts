@@ -1,7 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'http'
-import { Context, type AppScope, type ContextMiddleware, type RequestScope } from '../context/context'
+import { Context, type ContextMiddleware, type DeclaroScope } from '../context/context'
 
-export function useRequestMiddleware(context: Context<AppScope>) {
+import type { RequestScope, AppScope } from '#scope'
+
+/**
+ * Get the request middleware for the current context.
+ * @param context The context to retrieve middleware from.
+ * @returns An array of request middleware functions.
+ * @deprecated Use `context.scope.requestMiddleware` instead.
+ */
+export function useRequestMiddleware(context: Context<DeclaroScope>) {
     const middleware = context.resolve('requestMiddleware', {
         strict: false,
     })
@@ -9,10 +17,10 @@ export function useRequestMiddleware(context: Context<AppScope>) {
     return middleware ?? []
 }
 
-export function provideRequestMiddleware<C extends Context>(
-    context: C,
-    ...middleware: ContextMiddleware<Context<RequestScope>>[]
-) {
+export function provideRequestMiddleware<
+    RC extends Context = Context<RequestScope>,
+    C extends Context = Context<AppScope>,
+>(context: C, ...middleware: ContextMiddleware<RC>[]) {
     const existingMiddleware = useRequestMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]

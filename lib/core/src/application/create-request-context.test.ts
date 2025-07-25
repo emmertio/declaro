@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { Context, type AppScope, type RequestScope } from '../context/context'
 import { createRequest } from 'node-mocks-http'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { Context, type DeclaroRequestScope, type DeclaroScope } from '../context/context'
 import type { Request } from '../http/request'
 import { createRequestContext } from './create-request-context'
 import { useDeclaro } from './use-declaro'
 
 // Extended scopes for testing
-interface TestAppScope extends AppScope {
+interface TestAppScope extends DeclaroScope {
     testAppValue?: string
     sharedKey?: string
     appValue?: string
@@ -15,7 +15,7 @@ interface TestAppScope extends AppScope {
     eagerDep?: string
 }
 
-interface TestRequestScope extends RequestScope {
+interface TestRequestScope extends DeclaroRequestScope {
     middlewareTest?: string
     asyncTest?: string
     middleware1?: string

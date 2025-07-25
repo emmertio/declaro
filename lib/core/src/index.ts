@@ -1,3 +1,5 @@
+import type { AppScope as UserAppScope, RequestScope as UserRequestScope } from '#scope'
+
 export * from '@standard-schema/spec'
 
 export * from './typescript'
@@ -26,3 +28,13 @@ export * from './schema/schema-mixin'
 export * from './schema/test/mock-model'
 
 export * from './shared/utils/action-descriptor'
+
+/**
+ * @deprecated Import AppScope from `#scope` instead.
+ */
+export type AppScope = UserAppScope
+
+/**
+ * @deprecated Import RequestScope from `#scope` instead.
+ */
+export type RequestScope = UserRequestScope

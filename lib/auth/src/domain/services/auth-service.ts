@@ -56,7 +56,7 @@ export abstract class AuthService {
     }
 
     getSecret(): string {
-        if (!process.env.APP_SECRET) {
+        if (!process.env.APP_SECRET && process.env.NODE_ENV !== 'test') {
             console.warn('APP_SECRET is not set, using a default secret for development purposes.')
         }
         if (!process.env.APP_SECRET && process.env.NODE_ENV !== 'production') {

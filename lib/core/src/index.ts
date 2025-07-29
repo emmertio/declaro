@@ -1,4 +1,21 @@
-import type { AppScope as UserAppScope, RequestScope as UserRequestScope } from '#scope'
+export type {
+    /**
+     * @deprecated Import AppScope from '#scope' instead.
+     *
+     * Migration: Change `import { AppScope } from '@declaro/core'` to `import { AppScope } from '#scope'`
+     *
+     * The #scope import allows for better type augmentation and module resolution.
+     */
+    AppScope,
+    /**
+     * @deprecated Import RequestScope from '#scope' instead.
+     *
+     * Migration: Change `import { RequestScope } from '@declaro/core'` to `import { RequestScope } from '#scope'`
+     *
+     * The #scope import allows for better type augmentation and module resolution.
+     */
+    RequestScope,
+} from '#scope'
 
 export * from '@standard-schema/spec'
 
@@ -29,21 +46,3 @@ export * from './schema/schema-mixin'
 export * from './schema/test/mock-model'
 
 export * from './shared/utils/action-descriptor'
-
-/**
- * @deprecated Import AppScope from '#scope' instead.
- *
- * Migration: Change `import { AppScope } from '@declaro/core'` to `import { AppScope } from '#scope'`
- *
- * The #scope import allows for better type augmentation and module resolution.
- */
-export type AppScope = UserAppScope
-
-/**
- * @deprecated Import RequestScope from '#scope' instead.
- *
- * Migration: Change `import { RequestScope } from '@declaro/core'` to `import { RequestScope } from '#scope'`
- *
- * The #scope import allows for better type augmentation and module resolution.
- */
-export type RequestScope = UserRequestScope

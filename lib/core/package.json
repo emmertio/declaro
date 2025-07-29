@@ -57,15 +57,16 @@
     "exports": {
         "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
-        "import": "./dist/browser/index.js",
-        "require": "./dist/node/index.cjs"
+        "import": "./dist/node/index.js",
+        "require": "./dist/node/index.cjs",
+        "browser": "./dist/browser/index.js"
     },
     "imports": {
         "#scope": {
             "types": "./dist/ts/scope/index.d.ts",
-            "browser": "./dist/browser/scope/index.js",
             "import": "./dist/node/scope/index.js",
-            "require": "./dist/node/scope/index.cjs"
+            "require": "./dist/node/scope/index.cjs",
+            "browser": "./dist/browser/scope/index.js"
         }
     }
 }

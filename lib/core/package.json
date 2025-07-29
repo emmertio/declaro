@@ -59,5 +59,13 @@
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/browser/index.js",
         "require": "./dist/node/index.cjs"
+    },
+    "imports": {
+        "#scope": {
+            "types": "./dist/ts/scope/index.d.ts",
+            "browser": "./dist/browser/scope/index.js",
+            "import": "./dist/node/scope/index.js",
+            "require": "./dist/node/scope/index.cjs"
+        }
     }
 }

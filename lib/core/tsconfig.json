@@ -8,7 +8,7 @@
         "sourceMap": true,
         "baseUrl": ".",
         "paths": {
-            "#scope": ["./src/@types/context.d.ts"]
+            "#scope": ["./src/scope/index.ts"]
         }
     },
     "include": ["src/*.ts", "src/**/*.ts", "src/**/*.d.ts"],

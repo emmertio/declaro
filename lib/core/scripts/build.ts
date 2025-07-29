@@ -32,7 +32,7 @@ const getExternalPackages = (): string[] => {
 const externalPackages = getExternalPackages()
 
 const defaults = {
-    entrypoints: [resolve(__dirname, '../src/index.ts')],
+    entrypoints: [resolve(__dirname, '../src/index.ts'), resolve(__dirname, '../src/scope/index.ts')],
 }
 
 await Promise.all([

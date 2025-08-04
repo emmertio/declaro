@@ -13,6 +13,13 @@ export enum AuthSubject {
 export const AuthPayloadModel = new ZodModel(
     'AuthPayload' as const,
     z.object({
+        /**
+         * Unique session ID, can be generated or provided
+         */
+        sid: z.string(),
+        /**
+         * Unique user ID
+         */
         id: z.string(),
         email: z.email(),
         nickname: z.string(),
@@ -35,6 +42,9 @@ export type IAuthPayload = InferModelOutput<typeof AuthPayloadModel>
 const AuthSessionInputModel = new ZodModel(
     'AuthSessionInput' as const,
     z.object({
+        /**
+         * Unique session ID, can be generated or provided
+         */
         id: z.string().optional(),
         jwt: z.jwt(),
         claims: z.array(z.string()).optional(),
@@ -46,6 +56,9 @@ export type IAuthSessionInput = InferModelOutput<typeof AuthSessionInputModel>
 export const AuthSessionModel = new ZodModel(
     'AuthSession' as const,
     z.object({
+        /**
+         * Unique session ID, can be generated or provided
+         */
         id: z.string(),
         jwt: z.jwt(),
         jwtPayload: AuthPayloadModel.schema,

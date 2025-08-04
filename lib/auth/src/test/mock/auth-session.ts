@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken'
 
 export function getMockAuthPayload(overrides: Partial<IAuthPayload> = {}): IAuthPayload {
     const mockAuthPayload: IAuthPayload = {
-        id: '884ca673-6468-418d-a281-979dff45f4ea',
+        id: '42',
+        sid: '884ca673-6468-418d-a281-979dff45f4ea',
         email: 'test@emmert.io',
         nickname: 'Test User',
         given_name: 'Test',

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'bun:test'
 import type { AuthService } from './auth-service'
 import { MockAuthService } from '../../test/mock/auth-service'
 import { mockAuthConfig } from '../../test/mock/auth-config'
-import { getMockJWT } from '../../test/mock/auth-session'
+import { getMockAuthPayload, getMockJWT } from '../../test/mock/auth-session'
 
 describe('AuthService', () => {
     let authService: AuthService
@@ -32,15 +32,18 @@ describe('AuthService', () => {
             roles: ['role1', 'role2'],
         })
 
+        const mockPayload = getMockAuthPayload()
+
         expect(session.id).toBeDefined()
         expect(session.jwt).toBe(mockJwt)
         expect(session.jwtPayload).toBeDefined()
-        expect(session.jwtPayload.id).toBeDefined()
-        expect(session.jwtPayload.email).toBe('test@emmert.io')
-        expect(session.jwtPayload.nickname).toBe('Test User')
-        expect(session.jwtPayload.given_name).toBe('Test')
-        expect(session.jwtPayload.family_name).toBe('User')
-        expect(session.jwtPayload.name).toBe('Test User')
+        expect(session.jwtPayload.sid).toBe(mockPayload.sid)
+        expect(session.jwtPayload.id).toBe(mockPayload.id)
+        expect(session.jwtPayload.email).toBe(mockPayload.email)
+        expect(session.jwtPayload.nickname).toBe(mockPayload.nickname)
+        expect(session.jwtPayload.given_name).toBe(mockPayload.given_name!)
+        expect(session.jwtPayload.family_name).toBe(mockPayload.family_name!)
+        expect(session.jwtPayload.name).toBe(mockPayload.name)
         expect(session.expires).toBeInstanceOf(Date)
         expect(session.issued).toBeInstanceOf(Date)
         expect(session.roles).toEqual(['role1', 'role2'])
@@ -57,15 +60,19 @@ describe('AuthService', () => {
             roles: ['role1', 'role2'],
         })
 
+        const mockPayload = getMockAuthPayload()
+
         const session = await authService.getSession(sessionId)
         expect(session).toBeDefined()
         expect(session?.id).toBe(sessionId)
         expect(session?.jwt).toBe(mockJwt)
-        expect(session?.jwtPayload.email).toBe('test@emmert.io')
-        expect(session?.jwtPayload.nickname).toBe('Test User')
-        expect(session?.jwtPayload.given_name).toBe('Test')
-        expect(session?.jwtPayload.family_name).toBe('User')
-        expect(session?.jwtPayload.name).toBe('Test User')
+        expect(session?.jwtPayload).toBeDefined()
+        expect(session?.jwtPayload.sid).toBe(mockPayload.sid)
+        expect(session?.jwtPayload.email).toBe(mockPayload.email)
+        expect(session?.jwtPayload.nickname).toBe(mockPayload.nickname)
+        expect(session?.jwtPayload.given_name).toBe(mockPayload.given_name!)
+        expect(session?.jwtPayload.family_name).toBe(mockPayload.family_name!)
+        expect(session?.jwtPayload.name).toBe(mockPayload.name)
         expect(session?.expires).toBeInstanceOf(Date)
         expect(session?.issued).toBeInstanceOf(Date)
         expect(session?.roles).toEqual(['role1', 'role2'])

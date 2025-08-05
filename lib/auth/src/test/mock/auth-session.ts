@@ -35,7 +35,7 @@ export function getMockAuthSession(overrides: Partial<IAuthSession> = {}): IAuth
     const mockJwt = getMockJWT({ ...mockAuthPayload })
 
     const mockAuthSession: IAuthSession = {
-        id: mockAuthPayload.id,
+        id: mockAuthPayload.sid,
         jwt: mockJwt,
         jwtPayload: mockAuthPayload,
         expires: new Date(mockAuthPayload.exp),

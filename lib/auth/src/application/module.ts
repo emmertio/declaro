@@ -32,7 +32,7 @@ export function authModule(config: AuthConfig) {
 
                     if (token) {
                         const authPayload = authService.validateJWT(token)
-                        const session = await authService.getSession(authPayload.id)
+                        const session = await authService.getSession(authPayload.sid)
 
                         return session ?? null
                     }

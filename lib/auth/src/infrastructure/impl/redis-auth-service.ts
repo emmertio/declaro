@@ -33,6 +33,11 @@ export class RedisAuthService extends AuthService {
 
         const session = unserialize<IAuthSession>(result)
 
+        if (session) {
+            session.expires = new Date(session.expires)
+            session.issued = new Date(session.issued)
+        }
+
         return session ?? null
     }
 

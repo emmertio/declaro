@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import type { IAuthPayload, IAuthSession, IAuthSessionInput } from '../models/auth-session'
 import { ForbiddenError } from '@declaro/core'
 import type { AuthConfig } from '../interfaces/auth-config'
+import { DateTime } from 'luxon'
 
 export abstract class AuthService {
     protected readonly sessionPrefix: string = 'auth-session'
@@ -14,7 +15,7 @@ export abstract class AuthService {
             id: this.getSessionId(payload),
             jwt: payload.jwt,
             jwtPayload: this.decodeJWT(payload.jwt),
-            expires: new Date(new Date().getTime() + (this.authConfig.authTimeout ?? 60 * 60 * 24)), // Default to 24 hours
+            expires: DateTime.now().plus({ seconds: this.authConfig.authTimeout }).toJSDate(),
             issued: new Date(),
             roles: payload.roles ?? [],
             claims: payload.claims ?? [],

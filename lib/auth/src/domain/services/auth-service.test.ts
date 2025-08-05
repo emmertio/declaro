@@ -78,4 +78,26 @@ describe('AuthService', () => {
         expect(session?.roles).toEqual(['role1', 'role2'])
         expect(session?.claims).toEqual(['claim1', 'claim2'])
     })
+
+    it('should create a session with an expiration date in the future according to authConfig', async () => {
+        const before = new Date()
+        const session = await authService.createSession({
+            jwt: mockJwt,
+            claims: ['claim1', 'claim2'],
+            roles: ['role1', 'role2'],
+        })
+        const after = new Date()
+
+        expect(session.issued).toBeInstanceOf(Date)
+        expect(session.issued.getTime()).toBeGreaterThanOrEqual(before.getTime())
+        expect(session.issued.getTime()).toBeLessThanOrEqual(after.getTime())
+
+        expect(session.expires).toBeInstanceOf(Date)
+        expect(session.expires.getTime()).toBeGreaterThanOrEqual(
+            session.issued.getTime() + mockAuthConfig.authTimeout * 1000,
+        )
+        expect(session.expires.getTime()).toBeLessThanOrEqual(
+            new Date(before.getTime() + mockAuthConfig.authTimeout * 1000).getTime(),
+        )
+    })
 })

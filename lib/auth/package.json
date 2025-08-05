@@ -22,6 +22,8 @@
         "typecheck": "bun tsc --noEmit"
     },
     "devDependencies": {
+        "luxon": "^3.7.1",
+        "@types/luxon": "^3.7.1",
         "@declaro/core": "workspace:^",
         "@declaro/redis": "workspace:^",
         "@declaro/zod": "workspace:^",

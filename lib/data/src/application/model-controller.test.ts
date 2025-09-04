@@ -23,18 +23,21 @@ describe('ModelController', () => {
             getMockAuthSession({
                 claims: ['books::book.write:all'],
             }),
+            null,
             authService,
         )
         invalidAuthValidator = new AuthValidator(
             getMockAuthSession({
                 claims: ['authors::author.write:all'],
             }),
+            null,
             authService,
         )
         readAuthValidator = new AuthValidator(
             getMockAuthSession({
                 claims: ['books::book.read:all'],
             }),
+            null,
             authService,
         )
         service = new ModelService({
@@ -274,6 +277,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.create:all', 'books::book.update:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, createUpdateValidator)
@@ -289,6 +293,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.create:all', 'books::book.update:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, createUpdateValidator)
@@ -308,6 +313,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.create:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, createOnlyValidator)
@@ -322,6 +328,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.update:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, updateOnlyValidator)
@@ -336,6 +343,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.create:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, createOnlyValidator)
@@ -353,6 +361,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.update:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, updateOnlyValidator)
@@ -390,6 +399,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.create:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, createOnlyValidator)
@@ -405,6 +415,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.update:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, updateOnlyValidator)
@@ -423,6 +434,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.remove:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, removeOnlyValidator)
@@ -440,6 +452,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.restore:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, restoreOnlyValidator)
@@ -458,6 +471,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['users::user.write:all'], // Wrong namespace
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, wrongNamespaceValidator)
@@ -474,6 +488,7 @@ describe('ModelController', () => {
                 getMockAuthSession({
                     claims: ['books::author.write:all'], // Wrong resource
                 }),
+                null,
                 authService,
             )
             const controller = new ModelController(service, wrongResourceValidator)

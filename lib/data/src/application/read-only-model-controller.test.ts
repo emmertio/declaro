@@ -22,12 +22,14 @@ describe('ReadOnlyModelController', () => {
             getMockAuthSession({
                 claims: ['books::book.read:all'],
             }),
+            null,
             authService,
         )
         invalidAuthValidator = new AuthValidator(
             getMockAuthSession({
                 claims: ['authors::author.read:all'],
             }),
+            null,
             authService,
         )
         service = new ReadOnlyModelService({
@@ -203,6 +205,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.load:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, loadOnlyValidator)
@@ -220,6 +223,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.loadMany:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, loadManyOnlyValidator)
@@ -239,6 +243,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.search:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, searchOnlyValidator)
@@ -259,6 +264,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['books::book.count:all'],
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, countOnlyValidator)
@@ -278,6 +284,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['users::user.read:all'], // Wrong namespace
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, wrongNamespaceValidator)
@@ -293,6 +300,7 @@ describe('ReadOnlyModelController', () => {
                 getMockAuthSession({
                     claims: ['books::author.read:all'], // Wrong resource
                 }),
+                null,
                 authService,
             )
             const controller = new ReadOnlyModelController(service, wrongResourceValidator)

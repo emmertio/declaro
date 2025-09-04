@@ -52,6 +52,7 @@ export type IAuthTeamSummary = InferModelOutput<typeof AuthTeamSummarySchema>
 const AuthMembershipSummaryModel = new ZodModel(
     'AuthMembershipSummary',
     z.object({
+        id: z.string(),
         claims: z.array(z.string()).optional(),
         roles: z.array(z.string()).optional(),
         team: AuthTeamSummarySchema.schema,

@@ -33,6 +33,7 @@ describe('ValidatePermissions Decorator', () => {
                 getMockAuthSession({
                     claims: validPermissions,
                 }),
+                null,
                 authService,
             ),
         )
@@ -43,7 +44,7 @@ describe('ValidatePermissions Decorator', () => {
 
     it('should throw UnauthorizedError if required permissions are missing', () => {
         const controller = new MyController(
-            new AuthValidator(getMockAuthSession({ claims: missingRequiredPermissions }), authService),
+            new AuthValidator(getMockAuthSession({ claims: missingRequiredPermissions }), null, authService),
         )
 
         expect(() => controller.foo()).toThrow(PermissionError)
@@ -52,7 +53,7 @@ describe('ValidatePermissions Decorator', () => {
 
     it('should throw UnauthorizedError if all optional permissions are all missing', () => {
         const controller = new MyController(
-            new AuthValidator(getMockAuthSession({ claims: missingAllOptionalPermissions }), authService),
+            new AuthValidator(getMockAuthSession({ claims: missingAllOptionalPermissions }), null, authService),
         )
 
         expect(() => controller.foo()).toThrow(PermissionError)

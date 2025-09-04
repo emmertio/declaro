@@ -1,4 +1,4 @@
-import { Context } from '@declaro/core'
+import { Context, provideRequest, useDeclaro, type Request } from '@declaro/core'
 import type { AuthRequestScope, AuthScope } from '../../types/auth-context'
 import { getMockAuthSession } from '../mock/auth-session'
 import { authModule } from '../../application/module'
@@ -6,6 +6,12 @@ import Redis from 'ioredis-mock' // Import to ensure types are available
 
 export async function createTestContext() {
     const context = new Context<AuthScope>()
+    await context.use(
+        useDeclaro(),
+        authModule({
+            authTimeout: 3600, // 1 hour
+        }),
+    )
 
     context.registerValue('authConfig', {
         authTimeout: 3600, // 1 hour
@@ -24,11 +30,15 @@ export async function createTestContext() {
     return context
 }
 
-export async function createTestRequestContext<S extends AuthScope>(context?: Context<S>) {
+export async function createTestRequestContext<S extends AuthScope>(context?: Context<S>, request?: Request) {
     const baseContext = context ?? (await createTestContext())
     // Create a new request context
     const requestContext = new Context<AuthRequestScope>()
     requestContext.extend(baseContext)
+
+    if (request) {
+        provideRequest(requestContext, request)
+    }
 
     const middleware = baseContext.scope.requestMiddleware ?? []
 

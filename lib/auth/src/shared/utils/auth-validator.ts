@@ -1,5 +1,5 @@
 import { PermissionValidator, UnauthorizedError } from '@declaro/core'
-import type { IAuthSession } from '../../domain/models/auth-session'
+import type { IAuthMembershipSummary, IAuthSession, IAuthTeamSummary } from '../../domain/models/auth-session'
 import type { AuthService } from '../../domain/services/auth-service'
 
 export type Permission = string | PermissionValidator
@@ -11,7 +11,11 @@ export interface IInstanceWithAuthValidator {
 }
 
 export class AuthValidator {
-    constructor(protected readonly authSession: IAuthSession | null, protected readonly authService: AuthService) {}
+    constructor(
+        protected readonly authSession: IAuthSession | null,
+        protected readonly authMembership: IAuthTeamSummary | null,
+        protected readonly authService: AuthService,
+    ) {}
 
     static createFromClass(classInstance: IInstanceWithAuthValidator) {
         if (!(classInstance?.authValidator instanceof AuthValidator)) {
@@ -50,6 +54,22 @@ export class AuthValidator {
         }
     }
 
+    getActiveClaims() {
+        const membership = this.authSession?.memberships.find((m) => m.team.id === this.authMembership?.id)
+
+        if (this.authMembership && !membership) {
+            throw new UnauthorizedError('You do not have permission to perform this action.')
+        }
+
+        const claims: string[] = [...(this.authSession?.claims ?? [])]
+
+        if (membership) {
+            claims.push(...(membership.claims ?? []))
+        }
+
+        return claims
+    }
+
     validatePermissions(validate: PermissionValidationFn, strict: boolean = true) {
         const isSessionValid = this.validateSession(strict)
 
@@ -57,12 +77,14 @@ export class AuthValidator {
             return false
         }
 
+        const claims = this.getActiveClaims()
+
         const validator = PermissionValidator.create()
         validate(validator)
         if (strict) {
-            validator.validate(this.authSession?.claims ?? [])
+            validator.validate(claims)
         } else {
-            const results = validator.safeValidate(this.authSession?.claims ?? [])
+            const results = validator.safeValidate(claims)
             return results.valid
         }
 

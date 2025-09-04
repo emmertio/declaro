@@ -41,12 +41,6 @@ describe('createRequestContext', () => {
         appContext = new Context<TestAppScope>()
         await appContext.use(useDeclaro())
 
-        // Add middleware to provide headers (this is typically done by the framework)
-        appContext.scope.requestMiddleware.push((context) => {
-            const request = context.resolve('request')
-            context.registerValue('headers', request?.headers ?? {})
-        })
-
         // Create mock request
         mockRequest = createRequest({
             method: 'POST',

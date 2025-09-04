@@ -1,22 +1,34 @@
-import { Context } from '@declaro/core'
+import { Context, type Request } from '@declaro/core'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { AuthService } from '../domain/services/auth-service'
 import { AuthValidator } from '../shared/utils/auth-validator'
-import { getMockJWT } from '../test/mock/auth-session'
+import { getMockAuthSession, getMockJWT } from '../test/mock/auth-session'
 import { createTestContext, createTestRequestContext } from '../test/utils/test-request'
 import type { AuthRequestScope, AuthScope } from '../types/auth-context'
 import { authModule } from './module'
+import { createRequest } from 'node-mocks-http'
+import type { IAuthSession } from '../domain/models/auth-session'
 
 describe('Module', () => {
     let context: Context<AuthScope>
     let requestContext: Context<AuthRequestScope>
+    let mockRequest: Request
 
     const mockJwt = getMockJWT()
+    const mockAuthSession = getMockAuthSession()
 
     beforeAll(async () => {
         context = await createTestContext()
 
-        requestContext = await createTestRequestContext(context)
+        mockRequest = createRequest({
+            method: 'GET',
+            headers: {
+                'x-team': mockAuthSession.memberships![0].team.id,
+                authorization: `Bearer ${mockJwt}`,
+            },
+        })
+
+        requestContext = await createTestRequestContext(context, mockRequest)
     })
 
     it('should register authConfig', () => {
@@ -56,6 +68,52 @@ describe('Module', () => {
         expect(fetchedSession?.issued).toBeInstanceOf(Date)
         expect(fetchedSession?.roles).toEqual(['role1', 'role2'])
         expect(fetchedSession?.claims).toEqual(['claim1', 'claim2'])
+    })
+
+    it('should have an authMembership if an x-team header matching the team id is present', async () => {
+        const authSession = await requestContext.scope.authSession
+        const authMembership = await requestContext.scope.authMembership
+        const membershipHeader = requestContext.scope.header('x-team') as string
+        expect(authSession).toBeDefined()
+
+        expect(membershipHeader).toBeDefined()
+        expect(authMembership).not.toBeNull()
+        expect(authMembership?.team.id).toBe(membershipHeader)
+    })
+
+    it('should have a null membership if an x-team header isn not present', async () => {
+        const context = await createTestContext()
+
+        const mockRequest = createRequest({
+            method: 'GET',
+            headers: {
+                authorization: `Bearer ${mockJwt}`,
+            },
+        })
+
+        const requestContext = await createTestRequestContext(context, mockRequest)
+
+        const authMembership = await requestContext.scope.authMembership
+
+        expect(authMembership).toBeNull()
+    })
+
+    it('should throw an error if an x-team header is provided with a team that is not present in the auth session', async () => {
+        const context = await createTestContext()
+
+        const mockRequest = createRequest({
+            method: 'GET',
+            headers: {
+                'x-team': 'non-existent-team-id',
+                authorization: `Bearer ${mockJwt}`,
+            },
+        })
+
+        const requestContext = await createTestRequestContext(context, mockRequest)
+
+        const authMembership = requestContext.scope.authMembership
+
+        await expect(authMembership).rejects.toThrow('User is not a member of the specified team')
     })
 
     it('should provide authSession in request context', async () => {

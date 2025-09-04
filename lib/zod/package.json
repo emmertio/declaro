@@ -1,6 +1,6 @@
 {
     "name": "@declaro/zod",
-    "version": "2.0.0-beta.94",
+    "version": "2.0.0-beta.95",
     "description": "A library for Zod-based models in the Declaro ecosystem.",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",

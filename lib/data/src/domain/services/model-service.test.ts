@@ -628,4 +628,249 @@ describe('ModelService', () => {
             expect(results).toEqual(inputs)
         })
     })
+
+    describe('normalizeInput functionality', () => {
+        class TestModelService extends ModelService<typeof mockSchema> {
+            public testNormalizeInput(input: any) {
+                return this.normalizeInput(input)
+            }
+
+            protected async normalizeInput(input: any) {
+                return {
+                    ...input,
+                    title: input.title?.trim(),
+                    author: input.author?.trim(),
+                    normalizedAt: new Date('2023-01-01'),
+                }
+            }
+        }
+
+        let testService: TestModelService
+
+        beforeEach(() => {
+            testService = new TestModelService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        it('should use default normalizeInput method (no changes) when not overridden', async () => {
+            const input = { title: '  Test Book  ', author: '  Author Name  ', publishedDate: new Date() }
+            const normalized = await service['normalizeInput'](input)
+
+            expect(normalized).toEqual(input)
+            expect(normalized).toBe(input) // Should be the exact same reference
+        })
+
+        it('should use custom normalizeInput method for create operation', async () => {
+            const input = { title: '  Test Book  ', author: '  Author Name  ', publishedDate: new Date() }
+            const createdItem = await testService.create(input)
+
+            expect(createdItem.title).toBe('Test Book')
+            expect(createdItem.author).toBe('Author Name')
+            expect((createdItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+        })
+
+        it('should use custom normalizeInput method for update operation', async () => {
+            const input = { id: 42, title: 'Original Book', author: 'Original Author', publishedDate: new Date() }
+            const createdItem = await testService.create(input)
+
+            const updateInput = { title: '  Updated Book  ', author: '  Updated Author  ', publishedDate: new Date() }
+            const updatedItem = await testService.update({ id: createdItem.id }, updateInput)
+
+            expect(updatedItem.title).toBe('Updated Book')
+            expect(updatedItem.author).toBe('Updated Author')
+            expect((updatedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+        })
+
+        it('should use custom normalizeInput method for upsert operation', async () => {
+            const input = { id: 42, title: '  Test Book  ', author: '  Author Name  ', publishedDate: new Date() }
+            const upsertedItem = await testService.upsert(input)
+
+            expect(upsertedItem.title).toBe('Test Book')
+            expect(upsertedItem.author).toBe('Author Name')
+            expect((upsertedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+
+            // Upsert again with different data
+            const updateInput = {
+                id: 42,
+                title: '  Updated Book  ',
+                author: '  Updated Author  ',
+                publishedDate: new Date(),
+            }
+            const updatedItem = await testService.upsert(updateInput)
+
+            expect(updatedItem.title).toBe('Updated Book')
+            expect(updatedItem.author).toBe('Updated Author')
+            expect((updatedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+        })
+
+        it('should use custom normalizeInput method for bulkUpsert operation', async () => {
+            const inputs = [
+                { id: 1, title: '  Book One  ', author: '  Author One  ', publishedDate: new Date() },
+                { id: 2, title: '  Book Two  ', author: '  Author Two  ', publishedDate: new Date() },
+                { title: '  Book Three  ', author: '  Author Three  ', publishedDate: new Date() }, // No ID - will be created
+            ]
+
+            const results = await testService.bulkUpsert(inputs)
+
+            expect(results).toHaveLength(3)
+            expect(results[0].title).toBe('Book One')
+            expect(results[0].author).toBe('Author One')
+            expect((results[0] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+
+            expect(results[1].title).toBe('Book Two')
+            expect(results[1].author).toBe('Author Two')
+            expect((results[1] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+
+            expect(results[2].title).toBe('Book Three')
+            expect(results[2].author).toBe('Author Three')
+            expect((results[2] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+        })
+
+        it('should preserve events order with normalized input in create operation', async () => {
+            const input = { title: '  Test Book  ', author: '  Author Name  ', publishedDate: new Date() }
+            await testService.create(input)
+
+            // Debug: Let's see what was actually called
+            const beforeCreateCall = beforeCreateSpy.mock.calls[0][0]
+            const afterCreateCall = afterCreateSpy.mock.calls[0][0]
+
+            expect(beforeCreateCall.meta.input.title).toBe('Test Book')
+            expect(beforeCreateCall.meta.input.author).toBe('Author Name')
+            expect(beforeCreateCall.meta.input.normalizedAt).toEqual(new Date('2023-01-01'))
+
+            expect(afterCreateCall.meta.input.title).toBe('Test Book')
+            expect(afterCreateCall.meta.input.author).toBe('Author Name')
+            expect(afterCreateCall.meta.input.normalizedAt).toEqual(new Date('2023-01-01'))
+        })
+
+        it('should handle complex async normalization logic', async () => {
+            class ComplexNormalizationService extends ModelService<typeof mockSchema> {
+                protected async normalizeInput(input: any) {
+                    // Simulate async operations like database lookups, API calls, etc.
+                    await new Promise((resolve) => setTimeout(resolve, 10))
+
+                    const normalized = { ...input }
+
+                    // Complex normalization logic
+                    if (normalized.title) {
+                        normalized.title = normalized.title
+                            .trim()
+                            .replace(/\s+/g, ' ')
+                            .toLowerCase()
+                            .replace(/\b\w/g, (l: string) => l.toUpperCase()) // Title case
+                    }
+
+                    if (normalized.author) {
+                        normalized.author = normalized.author.trim()
+                    }
+
+                    // Add metadata
+                    normalized.processedAt = new Date('2023-01-01')
+                    normalized.version = (normalized.version || 0) + 1
+
+                    return normalized
+                }
+            }
+
+            const complexService = new ComplexNormalizationService({
+                repository,
+                emitter,
+                schema: mockSchema,
+                namespace,
+            })
+
+            const input = {
+                title: '  the  great   book  ',
+                author: '  John Doe  ',
+                publishedDate: new Date(),
+            }
+
+            const result = await complexService.create(input)
+
+            expect(result.title).toBe('The Great Book')
+            expect(result.author).toBe('John Doe')
+            expect((result as any).processedAt).toEqual(new Date('2023-01-01'))
+            expect((result as any).version).toBe(1)
+        })
+
+        it('should call normalizeInput method exactly once per input during bulkUpsert with Promise.all', async () => {
+            const normalizeInputSpy = mock(async (input: any) => ({ ...input, normalized: true }))
+
+            class SpyService extends ModelService<typeof mockSchema> {
+                protected async normalizeInput(input: any) {
+                    return normalizeInputSpy(input)
+                }
+            }
+
+            const spyService = new SpyService({ repository, emitter, schema: mockSchema, namespace })
+
+            const inputs = [
+                { id: 1, title: 'Book One', author: 'Author One', publishedDate: new Date() },
+                { id: 2, title: 'Book Two', author: 'Author Two', publishedDate: new Date() },
+            ]
+
+            await spyService.bulkUpsert(inputs)
+
+            expect(normalizeInputSpy).toHaveBeenCalledTimes(2)
+            expect(normalizeInputSpy).toHaveBeenNthCalledWith(1, inputs[0])
+            expect(normalizeInputSpy).toHaveBeenNthCalledWith(2, inputs[1])
+        })
+
+        it('should handle async normalization errors gracefully', async () => {
+            class ErrorNormalizationService extends ModelService<typeof mockSchema> {
+                protected async normalizeInput(input: any) {
+                    if (input.title === 'ERROR') {
+                        throw new Error('Normalization failed')
+                    }
+                    return input
+                }
+            }
+
+            const errorService = new ErrorNormalizationService({
+                repository,
+                emitter,
+                schema: mockSchema,
+                namespace,
+            })
+
+            const input = { title: 'ERROR', author: 'Author Name', publishedDate: new Date() }
+
+            await expect(errorService.create(input)).rejects.toThrow('Normalization failed')
+        })
+
+        it('should process bulk normalization in parallel for performance', async () => {
+            const processingTimes: number[] = []
+
+            class TimingNormalizationService extends ModelService<typeof mockSchema> {
+                protected async normalizeInput(input: any) {
+                    const start = Date.now()
+                    // Simulate some async work
+                    await new Promise((resolve) => setTimeout(resolve, 50))
+                    processingTimes.push(Date.now() - start)
+                    return input
+                }
+            }
+
+            const timingService = new TimingNormalizationService({
+                repository,
+                emitter,
+                schema: mockSchema,
+                namespace,
+            })
+
+            const inputs = [
+                { id: 1, title: 'Book One', author: 'Author One', publishedDate: new Date() },
+                { id: 2, title: 'Book Two', author: 'Author Two', publishedDate: new Date() },
+                { id: 3, title: 'Book Three', author: 'Author Three', publishedDate: new Date() },
+            ]
+
+            const start = Date.now()
+            await timingService.bulkUpsert(inputs)
+            const totalTime = Date.now() - start
+
+            // With Promise.all, total time should be closer to single operation time rather than sum of all
+            // Allow some variance for test stability
+            expect(totalTime).toBeLessThan(150) // Much less than 3 * 50ms = 150ms
+            expect(processingTimes).toHaveLength(3)
+        })
+    })
 })

@@ -15,6 +15,17 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
     }
 
     /**
+     * Normalizes input data before processing. This method can be overridden by subclasses
+     * to implement custom input normalization logic (e.g., trimming strings, setting defaults, etc.).
+     * By default, this method returns the input unchanged.
+     * @param input The input data to normalize.
+     * @returns The normalized input data.
+     */
+    protected async normalizeInput(input: InferInput<TSchema>): Promise<InferInput<TSchema>> {
+        return input
+    }
+
+    /**
      * Removes a record by its lookup criteria.
      * @param lookup The lookup criteria to find the record.
      * @returns The removed record.
@@ -70,20 +81,23 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
     }
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
+        // Normalize the input data
+        const normalizedInput = await this.normalizeInput(input)
+
         // Emit the before create event
         const beforeCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(ModelMutationAction.BeforeCreate),
-            input,
+            normalizedInput,
         )
         await this.emitter.emitAsync(beforeCreateEvent)
 
         // Perform the creation
-        const result = await this.repository.create(input, options)
+        const result = await this.repository.create(normalizedInput, options)
 
         // Emit the after create event
         const afterCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(ModelMutationAction.AfterCreate),
-            input,
+            normalizedInput,
         ).setResult(result)
         await this.emitter.emitAsync(afterCreateEvent)
 
@@ -96,20 +110,23 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         input: InferInput<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>> {
+        // Normalize the input data
+        const normalizedInput = await this.normalizeInput(input)
+
         // Emit the before update event
         const beforeUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(ModelMutationAction.BeforeUpdate),
-            input,
+            normalizedInput,
         )
         await this.emitter.emitAsync(beforeUpdateEvent)
 
         // Perform the update
-        const result = await this.repository.update(lookup, input, options)
+        const result = await this.repository.update(lookup, normalizedInput, options)
 
         // Emit the after update event
         const afterUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(ModelMutationAction.AfterUpdate),
-            input,
+            normalizedInput,
         ).setResult(result)
         await this.emitter.emitAsync(afterUpdateEvent)
 
@@ -124,7 +141,10 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns The upserted record.
      */
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
-        const primaryKeyValue = this.getPrimaryKeyValue(input)
+        // Normalize the input data
+        const normalizedInput = await this.normalizeInput(input)
+
+        const primaryKeyValue = this.getPrimaryKeyValue(normalizedInput)
 
         let beforeOperation: ModelMutationAction
         let afterOperation: ModelMutationAction
@@ -152,17 +172,17 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         // Emit the before upsert event
         const beforeUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(beforeOperation),
-            input,
+            normalizedInput,
         )
         await this.emitter.emitAsync(beforeUpsertEvent)
 
         // Perform the upsert operation
-        const result = await this.repository.upsert(input, options)
+        const result = await this.repository.upsert(normalizedInput, options)
 
         // Emit the after upsert event
         const afterUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
             this.getDescriptor(afterOperation),
-            input,
+            normalizedInput,
         ).setResult(result)
         await this.emitter.emitAsync(afterUpsertEvent)
 
@@ -184,6 +204,9 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             return []
         }
 
+        // Normalize all input data in parallel using Promise.all
+        const normalizedInputs = await Promise.all(inputs.map((input) => this.normalizeInput(input)))
+
         // Build a map of primary key to input and lookup info
         type EntityInfo = {
             input: InferInput<TSchema>
@@ -196,8 +219,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         const entityInfoMap = new Map<string | number, EntityInfo>()
         const inputsWithoutPrimaryKey: InferInput<TSchema>[] = []
 
-        // Process each input and organize by primary key
-        for (const input of inputs) {
+        // Process each normalized input and organize by primary key
+        for (const input of normalizedInputs) {
             const primaryKeyValue = this.getPrimaryKeyValue(input)
 
             if (primaryKeyValue !== undefined) {
@@ -264,8 +287,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         // Emit all before events
         await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
 
-        // Perform the bulk upsert operation
-        const results = await this.repository.bulkUpsert(inputs, options)
+        // Perform the bulk upsert operation with normalized inputs
+        const results = await this.repository.bulkUpsert(normalizedInputs, options)
 
         // Create a map of result primary keys to results for matching
         const resultsByPrimaryKey = new Map<string | number, InferDetail<TSchema>>()

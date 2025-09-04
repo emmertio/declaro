@@ -17,6 +17,7 @@ export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
     schema: TSchema
     lookup?: (data: InferDetail<TSchema>, lookup: InferLookup<TSchema>) => boolean
     filter?: (data: InferSummary<TSchema>, filters: InferFilters<TSchema>) => boolean
+    assign?: (data: InferDetail<TSchema>, input: InferInput<TSchema>) => InferDetail<TSchema>
 }
 
 export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRepository<TSchema> {
@@ -140,17 +141,16 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Item with the same primary key already exists')
         }
 
-        const payload = {
-            ...(input as any),
-        }
+        const baseData = {} as InferDetail<TSchema>
+        const payload = this.assignInput(baseData, input)
 
         if (!payload[this.entityMetadata.primaryKey]) {
             // Generate a new primary key if not provided
             payload[this.entityMetadata.primaryKey!] = await this.generatePrimaryKey()
         }
 
-        this.data.set(payload[this.entityMetadata.primaryKey!], payload as InferDetail<TSchema>)
-        return payload as InferDetail<TSchema>
+        this.data.set(payload[this.entityMetadata.primaryKey!], payload)
+        return payload
     }
 
     async update(lookup: InferLookup<TSchema>, input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
@@ -167,7 +167,7 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Item not found')
         }
 
-        const updatedItem = Object.assign({}, existingItem, input) as InferDetail<TSchema>
+        const updatedItem = this.assignInput(existingItem, input)
         this.data.set(primaryKeyValue, updatedItem)
         return updatedItem
     }
@@ -179,13 +179,13 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
 
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
         const primaryKeyValue = input[this.entityMetadata.primaryKey]
-        let existingItem: InferDetail<TSchema> | undefined = undefined
+        let existingItem: InferDetail<TSchema> = {} as InferDetail<TSchema>
 
         if (primaryKeyValue) {
-            existingItem = this.data.get(primaryKeyValue) ?? {}
+            existingItem = this.data.get(primaryKeyValue) ?? ({} as InferDetail<TSchema>)
         }
 
-        const updatedItem = Object.assign({}, existingItem, input) as InferDetail<TSchema>
+        const updatedItem = this.assignInput(existingItem, input)
         if (!updatedItem[this.entityMetadata.primaryKey!]) {
             updatedItem[this.entityMetadata.primaryKey!] = await this.generatePrimaryKey()
         }
@@ -216,6 +216,21 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
                 return true
             }
         })
+    }
+
+    /**
+     * Assign input data to existing data using the provided assign function or default Object.assign
+     * @param existingData - The existing data to merge with
+     * @param input - The input data to assign
+     * @returns The merged data
+     */
+    protected assignInput(existingData: InferDetail<TSchema>, input: InferInput<TSchema>): InferDetail<TSchema> {
+        if (typeof this.args.assign === 'function') {
+            return this.args.assign(existingData, input)
+        } else {
+            // Default implementation using Object.assign
+            return Object.assign({}, existingData, input) as InferDetail<TSchema>
+        }
     }
 
     protected async generatePrimaryKey() {

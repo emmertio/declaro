@@ -59,6 +59,10 @@ describe('AuthValidator', () => {
         expect(session.memberships[0].team).toBeDefined()
         expect(session.memberships[0].team.id).toBeDefined()
         expect(session.memberships[0].team.name).toBeDefined()
+        expect(session.memberships[0].roles).toBeDefined()
+        expect(session.memberships[0].roles?.length).toBeGreaterThan(0)
+        expect(session.memberships[0].claims).toBeDefined()
+        expect(session.memberships[0].claims?.length).toBeGreaterThan(0)
     })
 
     it('should validate team permissions', async () => {

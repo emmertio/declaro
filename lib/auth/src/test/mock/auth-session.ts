@@ -42,6 +42,16 @@ export function getMockAuthSession(overrides: Partial<IAuthSession> = {}): IAuth
         issued: new Date(mockAuthPayload.iat),
         roles: ['role1', 'role2'],
         claims: ['claim1', 'claim2'],
+        memberships: [
+            {
+                team: {
+                    id: '752fe6a0-829f-4c5a-b90f-491bed13d333',
+                    name: 'Team One',
+                },
+                claims: ['team-claim-1', 'team-claim-2'],
+                roles: ['team-role-1', 'team-role-2'],
+            },
+        ],
     }
     return {
         ...mockAuthSession,

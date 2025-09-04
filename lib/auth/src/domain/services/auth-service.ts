@@ -19,6 +19,7 @@ export abstract class AuthService {
             issued: new Date(),
             roles: payload.roles ?? [],
             claims: payload.claims ?? [],
+            memberships: payload.memberships ?? [],
         }
 
         await this.saveSession(session)

@@ -97,7 +97,7 @@ describe('AuthService', () => {
             session.issued.getTime() + mockAuthConfig.authTimeout * 1000,
         )
         expect(session.expires.getTime()).toBeLessThanOrEqual(
-            new Date(before.getTime() + mockAuthConfig.authTimeout * 1000).getTime(),
+            new Date(after.getTime() + mockAuthConfig.authTimeout * 1000).getTime(),
         )
     })
 })

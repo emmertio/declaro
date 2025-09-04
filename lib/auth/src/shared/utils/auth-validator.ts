@@ -68,4 +68,29 @@ export class AuthValidator {
 
         return true
     }
+
+    validateTeamPermissions(teamId: string, validate: PermissionValidationFn, strict: boolean = true) {
+        const isSessionValid = this.validateSession(strict)
+
+        if (!isSessionValid) {
+            return false
+        }
+
+        const membership = this.authSession?.memberships.find((m) => m.team.id === teamId)
+        const membershipClaims = membership?.claims ?? []
+
+        const validator = PermissionValidator.create()
+        validate(validator)
+        if (strict) {
+            if (!membership) {
+                throw new UnauthorizedError('You do not have permission to perform this action.')
+            }
+            validator.validate(membershipClaims)
+        } else {
+            const results = validator.safeValidate(membershipClaims)
+            return results.valid
+        }
+
+        return true
+    }
 }

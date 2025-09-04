@@ -45,4 +45,40 @@ describe('AuthValidator', () => {
 
         expect(() => authValidator.validateSession(true)).toThrow('You must be logged in to perform this action.')
     })
+
+    it('should validate a session with memberships', () => {
+        const session = getMockAuthSession()
+        authService.saveSession(session)
+
+        const authValidator = new AuthValidator(session, authService)
+        const sessionValid = authValidator.validateSession(false)
+
+        expect(sessionValid).toBe(true)
+        expect(session.memberships).toBeDefined()
+        expect(session.memberships.length).toBeGreaterThan(0)
+        expect(session.memberships[0].team).toBeDefined()
+        expect(session.memberships[0].team.id).toBeDefined()
+        expect(session.memberships[0].team.name).toBeDefined()
+    })
+
+    it('should validate team permissions', async () => {
+        const session = getMockAuthSession()
+        authService.saveSession(session)
+
+        const authValidator = new AuthValidator(session, authService)
+        const sessionValid = authValidator.validateTeamPermissions(session.memberships[0].team.id, (v) =>
+            v.someOf(['team-claim-1']),
+        )
+        const sessionInvalid = authValidator.validateTeamPermissions(
+            session.memberships[0].team.id,
+            (v) => v.someOf(['missing-claim']),
+            false,
+        )
+
+        expect(sessionValid).toBe(true)
+        expect(sessionInvalid).toBe(false)
+        expect(() => {
+            authValidator.validateTeamPermissions(session.memberships[0].team.id, (v) => v.someOf(['missing-claim']))
+        }).toThrow('You do not have any of the required permissions')
+    })
 })

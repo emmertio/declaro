@@ -39,6 +39,27 @@ export const AuthPayloadModel = new ZodModel(
 )
 export type IAuthPayload = InferModelOutput<typeof AuthPayloadModel>
 
+const AuthTeamSummarySchema = new ZodModel(
+    'AuthTeamSummary',
+    z.object({
+        id: z.string(),
+        name: z.string(),
+    }),
+)
+
+export type IAuthTeamSummary = InferModelOutput<typeof AuthTeamSummarySchema>
+
+const AuthMembershipSummaryModel = new ZodModel(
+    'AuthMembershipSummary',
+    z.object({
+        claims: z.array(z.string()).optional(),
+        roles: z.array(z.string()).optional(),
+        team: AuthTeamSummarySchema.schema,
+    }),
+)
+
+export type IAuthMembershipSummary = InferModelOutput<typeof AuthMembershipSummaryModel>
+
 const AuthSessionInputModel = new ZodModel(
     'AuthSessionInput' as const,
     z.object({
@@ -49,6 +70,7 @@ const AuthSessionInputModel = new ZodModel(
         jwt: z.jwt(),
         claims: z.array(z.string()).optional(),
         roles: z.array(z.string()).optional(),
+        memberships: z.array(AuthMembershipSummaryModel.schema).optional(),
     }),
 )
 export type IAuthSessionInput = InferModelOutput<typeof AuthSessionInputModel>
@@ -64,8 +86,9 @@ export const AuthSessionModel = new ZodModel(
         jwtPayload: AuthPayloadModel.schema,
         expires: z.date(),
         issued: z.date(),
-        roles: z.array(z.string()).optional(),
-        claims: z.array(z.string()).optional(),
+        roles: z.array(z.string()),
+        claims: z.array(z.string()),
+        memberships: z.array(AuthMembershipSummaryModel.schema),
     }),
 )
 export type IAuthSession = InferModelOutput<typeof AuthSessionModel>
@@ -74,4 +97,6 @@ export const AuthSessionSchema = ModelSchema.create('AuthSession' as const).cust
     authPayload: () => AuthPayloadModel,
     authSessionInput: () => AuthSessionInputModel,
     authSession: () => AuthSessionModel,
+    authMembership: () => AuthMembershipSummaryModel,
+    authTeamSummary: () => AuthTeamSummarySchema,
 })

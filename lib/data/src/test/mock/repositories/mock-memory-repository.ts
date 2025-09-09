@@ -53,8 +53,20 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        const items = await Promise.all(inputs.map((input) => this.data.get(input[this.entityMetadata.primaryKey!])))
-        return items
+        const results: InferDetail<TSchema>[] = []
+        for (const input of inputs) {
+            let item: InferDetail<TSchema> | undefined
+            if (typeof this.args.lookup === 'function') {
+                item = Array.from(this.data.values()).find((data) => this.args.lookup!(data, input))
+            } else {
+                // Default lookup by primary key
+                item = this.data.get(input[this.entityMetadata.primaryKey!])
+            }
+            if (item) {
+                results.push(item)
+            }
+        }
+        return results
     }
     async search(
         input: InferFilters<TSchema>,
@@ -107,14 +119,27 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        const item = await this.data.get(lookup[this.entityMetadata.primaryKey])
+        let item: InferDetail<TSchema> | undefined
+        let itemKey: string
+
+        if (typeof this.args.lookup === 'function') {
+            item = Array.from(this.data.values()).find((data) => this.args.lookup!(data, lookup))
+            if (item) {
+                itemKey = item[this.entityMetadata.primaryKey!]
+            }
+        } else {
+            // Default lookup by primary key
+            itemKey = lookup[this.entityMetadata.primaryKey]
+            item = this.data.get(itemKey)
+        }
+
         if (!item) {
             throw new Error('Item not found')
         }
         // Move the item to trash
-        this.trash.set(lookup[this.entityMetadata.primaryKey], item)
+        this.trash.set(itemKey!, item)
         // Remove the item from data
-        this.data.delete(lookup[this.entityMetadata.primaryKey])
+        this.data.delete(itemKey!)
         return item
     }
     async restore(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
@@ -122,12 +147,25 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        const item = await this.trash.get(lookup[this.entityMetadata.primaryKey])
+        let item: InferDetail<TSchema> | undefined
+        let itemKey: string
+
+        if (typeof this.args.lookup === 'function') {
+            item = Array.from(this.trash.values()).find((data) => this.args.lookup!(data, lookup))
+            if (item) {
+                itemKey = item[this.entityMetadata.primaryKey!]
+            }
+        } else {
+            // Default lookup by primary key
+            itemKey = lookup[this.entityMetadata.primaryKey]
+            item = this.trash.get(itemKey)
+        }
+
         if (!item) {
             throw new Error('Item not found in trash')
         }
-        this.trash.delete(lookup[this.entityMetadata.primaryKey])
-        this.data.set(lookup[this.entityMetadata.primaryKey], item)
+        this.trash.delete(itemKey!)
+        this.data.set(itemKey!, item)
         return item
     }
 
@@ -157,18 +195,31 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key is not defined in the schema metadata')
         }
-        const primaryKeyValue = lookup[this.entityMetadata.primaryKey]
-        if (!primaryKeyValue) {
-            throw new Error('Primary key value must be provided')
-        }
 
-        const existingItem = this.data.get(primaryKeyValue)
-        if (!existingItem) {
-            throw new Error('Item not found')
+        let existingItem: InferDetail<TSchema> | undefined
+        let itemKey: string
+
+        if (typeof this.args.lookup === 'function') {
+            existingItem = Array.from(this.data.values()).find((data) => this.args.lookup!(data, lookup))
+            if (existingItem) {
+                itemKey = existingItem[this.entityMetadata.primaryKey!]
+            } else {
+                throw new Error('Item not found')
+            }
+        } else {
+            // Default lookup by primary key
+            itemKey = lookup[this.entityMetadata.primaryKey]
+            if (!itemKey) {
+                throw new Error('Primary key value must be provided')
+            }
+            existingItem = this.data.get(itemKey)
+            if (!existingItem) {
+                throw new Error('Item not found')
+            }
         }
 
         const updatedItem = this.assignInput(existingItem, input)
-        this.data.set(primaryKeyValue, updatedItem)
+        this.data.set(itemKey!, updatedItem)
         return updatedItem
     }
 

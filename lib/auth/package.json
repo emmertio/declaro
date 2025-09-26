@@ -30,10 +30,10 @@
         "@types/luxon": "^3.7.1",
         "crypto-browserify": "^3.12.1",
         "luxon": "^3.7.1",
-        "typescript": "^5.5.4"
+        "typescript": "^5.5.4",
+        "ioredis": "^5.6.1"
     },
     "dependencies": {
-        "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.2",
         "uuid": "^11.1.0",
         "zod": "^3.25.67"

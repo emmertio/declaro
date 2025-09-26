@@ -1,6 +1,6 @@
 {
     "name": "@declaro/auth",
-    "version": "2.0.0-beta.99",
+    "version": "2.0.0-beta.100",
     "description": "A simple authentication library for Declaro projects.",
     "main": "dist/node/index.js",
     "module": "dist/node/index.js",
@@ -29,9 +29,9 @@
         "@types/jsonwebtoken": "^9.0.10",
         "@types/luxon": "^3.7.1",
         "crypto-browserify": "^3.12.1",
+        "ioredis": "^5.6.1",
         "luxon": "^3.7.1",
-        "typescript": "^5.5.4",
-        "ioredis": "^5.6.1"
+        "typescript": "^5.5.4"
     },
     "dependencies": {
         "jsonwebtoken": "^9.0.2",

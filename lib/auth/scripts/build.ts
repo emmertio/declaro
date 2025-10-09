@@ -31,14 +31,18 @@ const getExternalPackages = (): string[] => {
 
 const externalPackages = getExternalPackages()
 
-const defaults = {
+const nodeDefaults = {
     entrypoints: [resolve(__dirname, '../src/index.ts')],
+}
+
+const browserDefaults = {
+    entrypoints: [resolve(__dirname, '../src/index.browser.ts')],
 }
 
 await Promise.all([
     // CommonJS build for Node.js - externalize all dependencies and peerDependencies
     build({
-        ...defaults,
+        ...nodeDefaults,
         target: 'node',
         format: 'cjs',
         outdir: 'dist/node',
@@ -48,7 +52,7 @@ await Promise.all([
     }),
     // ES modules build for Node.js - same externals as CommonJS
     build({
-        ...defaults,
+        ...nodeDefaults,
         target: 'node',
         format: 'esm',
         outdir: 'dist/node',
@@ -56,9 +60,9 @@ await Promise.all([
         naming: '[dir]/[name].js',
         external: externalPackages,
     }),
-    // Browser build - same external behavior for consistency
+    // Browser build - uses browser-specific entry point
     build({
-        ...defaults,
+        ...browserDefaults,
         target: 'browser',
         outdir: 'dist/browser',
         sourcemap: 'linked',

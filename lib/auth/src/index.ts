@@ -1,11 +1,5 @@
-export * from './domain/models/auth-session'
-export * from './domain/interfaces/auth-config'
-export * from './domain/services/auth-service'
+// Re-export all browser-compatible exports
+export * from './index.browser'
+
+// Add Node.js-specific exports
 export * from './infrastructure/impl/redis-auth-service'
-export * from './application/module'
-export * from './shared/utils/auth-validator'
-export * from './shared/decorators/validate-permissions'
-export * from './types/auth-context'
-export * from './test/mock/auth-service'
-export * from './test/mock/auth-session'
-export * from './test/mock/auth-config'

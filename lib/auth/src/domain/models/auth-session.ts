@@ -39,7 +39,7 @@ export const AuthPayloadModel = new ZodModel(
 )
 export type IAuthPayload = InferModelOutput<typeof AuthPayloadModel>
 
-const AuthTeamSummarySchema = new ZodModel(
+export const AuthTeamSummarySchema = new ZodModel(
     'AuthTeamSummary',
     z.object({
         id: z.string(),
@@ -49,7 +49,7 @@ const AuthTeamSummarySchema = new ZodModel(
 
 export type IAuthTeamSummary = InferModelOutput<typeof AuthTeamSummarySchema>
 
-const AuthMembershipSummaryModel = new ZodModel(
+export const AuthMembershipSummaryModel = new ZodModel(
     'AuthMembershipSummary',
     z.object({
         id: z.string(),
@@ -61,7 +61,7 @@ const AuthMembershipSummaryModel = new ZodModel(
 
 export type IAuthMembershipSummary = InferModelOutput<typeof AuthMembershipSummaryModel>
 
-const AuthSessionInputModel = new ZodModel(
+export const AuthSessionInputModel = new ZodModel(
     'AuthSessionInput' as const,
     z.object({
         /**

@@ -12,7 +12,7 @@
     },
     "apps/framework": {
       "name": "@declaro-apps/framework",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "dependencies": {
         "@declaro/di": "^2.0.0-beta.40",
         "@nuxt/icon": "^1.5.0",
@@ -46,9 +46,8 @@
     },
     "lib/auth": {
       "name": "@declaro/auth",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "dependencies": {
-        "jsonwebtoken": "^9.0.2",
         "uuid": "^11.1.0",
         "zod": "^4.1.11",
       },
@@ -64,19 +63,21 @@
         "luxon": "^3.7.1",
         "typescript": "^5.5.4",
       },
-      "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.50",
+      "optionalDependencies": {
         "@declaro/redis": "^2.0.0-beta.50",
-        "@declaro/zod": "^2.0.0-beta.50",
         "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.2",
+      },
+      "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.50",
+        "@declaro/zod": "^2.0.0-beta.50",
         "uuid": "^11.1.0",
         "zod": "^4.1.11",
       },
     },
     "lib/core": {
       "name": "@declaro/core",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "devDependencies": {
         "@standard-schema/spec": "^1.0.0",
         "@types/bun": "^1.2.12",
@@ -100,7 +101,7 @@
     },
     "lib/data": {
       "name": "@declaro/data",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "devDependencies": {
         "@declaro/auth": "workspace:^",
         "@declaro/core": "workspace:^",
@@ -118,7 +119,7 @@
     },
     "lib/redis": {
       "name": "@declaro/redis",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "devDependencies": {
         "@declaro/core": "workspace:^",
         "@types/ioredis-mock": "^8.2.5",
@@ -138,7 +139,7 @@
     },
     "lib/zod": {
       "name": "@declaro/zod",
-      "version": "2.0.0-beta.99",
+      "version": "2.0.0-beta.104",
       "devDependencies": {
         "@declaro/core": "workspace:^",
         "@types/bun": "^1.2.12",

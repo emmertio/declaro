@@ -1,5 +1,5 @@
 import { serialize, unserialize } from '@declaro/redis'
-import { Redis } from 'ioredis'
+import type { Redis } from 'ioredis'
 import type { IAuthSession } from '../../domain/models/auth-session'
 import { AuthService } from '../../domain/services/auth-service'
 import { SystemError } from '@declaro/core'

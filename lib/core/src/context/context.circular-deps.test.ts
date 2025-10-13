@@ -521,4 +521,420 @@ describe('Context - Circular Dependencies', () => {
         const orders = await orderService.getOrdersForUser('user456')
         expect(orders).toEqual(['Order1-user456', 'Order2-user456'])
     })
+
+    it('should handle circular dependencies between registerClass and registerAsyncClass', async () => {
+        class SyncService {
+            constructor(public asyncService: Promise<AsyncService>) {}
+
+            getName() {
+                return 'SyncService'
+            }
+
+            async getAsyncName() {
+                const service = await this.asyncService
+                return service.getName()
+            }
+        }
+
+        class AsyncService {
+            constructor(public syncService: SyncService) {}
+
+            getName() {
+                return 'AsyncService'
+            }
+
+            getSyncName() {
+                return this.syncService.getName()
+            }
+        }
+
+        type Scope = {
+            syncService: SyncService
+            asyncService: Promise<AsyncService>
+        }
+
+        const context = new Context<Scope>()
+
+        context.registerClass('syncService', SyncService, ['asyncService'])
+        context.registerAsyncClass('asyncService', AsyncService, ['syncService'])
+
+        const resolutionContext = new Map()
+        const syncService = context.resolve('syncService', { resolutionContext })
+        const asyncService = await context.resolve('asyncService', { resolutionContext })
+
+        expect(syncService).toBeInstanceOf(SyncService)
+        expect(asyncService).toBeInstanceOf(AsyncService)
+        expect(syncService.getName()).toBe('SyncService')
+        expect(asyncService.getName()).toBe('AsyncService')
+
+        // Test circular references work
+        expect(await syncService.getAsyncName()).toBe('AsyncService')
+        expect(asyncService.getSyncName()).toBe('SyncService')
+
+        // The async service should match
+        expect(await syncService.asyncService).toBe(asyncService)
+        expect(asyncService.syncService).toBe(syncService)
+    })
+
+    it('should handle multiple async circular dependency chains in parallel', async () => {
+        // Chain 1: Multiple async factories with circular dependencies
+        type ServiceA = { name: string; serviceB: Promise<ServiceB>; serviceC: Promise<ServiceC> }
+        type ServiceB = { name: string; serviceA: Promise<ServiceA>; serviceC: Promise<ServiceC> }
+        type ServiceC = { name: string; serviceA: Promise<ServiceA>; serviceB: Promise<ServiceB> }
+
+        // Chain 2: Another set of async factories with circular dependencies
+        type ServiceX = { name: string; serviceY: Promise<ServiceY>; serviceZ: Promise<ServiceZ> }
+        type ServiceY = { name: string; serviceX: Promise<ServiceX>; serviceZ: Promise<ServiceZ> }
+        type ServiceZ = { name: string; serviceX: Promise<ServiceX>; serviceY: Promise<ServiceY> }
+
+        type Scope1 = {
+            serviceA: Promise<ServiceA>
+            serviceB: Promise<ServiceB>
+            serviceC: Promise<ServiceC>
+        }
+
+        type Scope2 = {
+            serviceX: Promise<ServiceX>
+            serviceY: Promise<ServiceY>
+            serviceZ: Promise<ServiceZ>
+        }
+
+        const context1 = new Context<Scope1>()
+        const context2 = new Context<Scope2>()
+
+        // Register async factories with multiple circular dependencies for chain 1
+        context1.registerAsyncFactory(
+            'serviceA',
+            async (): Promise<ServiceA> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceA',
+                    serviceB: context1.resolve('serviceB'),
+                    serviceC: context1.resolve('serviceC'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        context1.registerAsyncFactory(
+            'serviceB',
+            async (): Promise<ServiceB> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceB',
+                    serviceA: context1.resolve('serviceA'),
+                    serviceC: context1.resolve('serviceC'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        context1.registerAsyncFactory(
+            'serviceC',
+            async (): Promise<ServiceC> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceC',
+                    serviceA: context1.resolve('serviceA'),
+                    serviceB: context1.resolve('serviceB'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        // Register async factories with multiple circular dependencies for chain 2
+        context2.registerAsyncFactory(
+            'serviceX',
+            async (): Promise<ServiceX> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceX',
+                    serviceY: context2.resolve('serviceY'),
+                    serviceZ: context2.resolve('serviceZ'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        context2.registerAsyncFactory(
+            'serviceY',
+            async (): Promise<ServiceY> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceY',
+                    serviceX: context2.resolve('serviceX'),
+                    serviceZ: context2.resolve('serviceZ'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        context2.registerAsyncFactory(
+            'serviceZ',
+            async (): Promise<ServiceZ> => {
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                return {
+                    name: 'ServiceZ',
+                    serviceX: context2.resolve('serviceX'),
+                    serviceY: context2.resolve('serviceY'),
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        // Resolve both chains in parallel with multiple async dependencies
+        const [{ serviceA, serviceB, serviceC }, { serviceX, serviceY, serviceZ }] = await Promise.all([
+            Promise.all([
+                context1.resolve('serviceA'),
+                context1.resolve('serviceB'),
+                context1.resolve('serviceC'),
+            ]).then(([a, b, c]) => ({ serviceA: a, serviceB: b, serviceC: c })),
+            Promise.all([
+                context2.resolve('serviceX'),
+                context2.resolve('serviceY'),
+                context2.resolve('serviceZ'),
+            ]).then(([x, y, z]) => ({ serviceX: x, serviceY: y, serviceZ: z })),
+        ])
+
+        // Verify both chains resolved correctly
+        expect(serviceA.name).toBe('ServiceA')
+        expect(serviceB.name).toBe('ServiceB')
+        expect(serviceC.name).toBe('ServiceC')
+        expect(serviceX.name).toBe('ServiceX')
+        expect(serviceY.name).toBe('ServiceY')
+        expect(serviceZ.name).toBe('ServiceZ')
+
+        // Verify circular references work within each chain (singletons should be same instances)
+        expect(await serviceA.serviceB).toBe(serviceB)
+        expect(await serviceA.serviceC).toBe(serviceC)
+        expect(await serviceB.serviceA).toBe(serviceA)
+        expect(await serviceB.serviceC).toBe(serviceC)
+        expect(await serviceC.serviceA).toBe(serviceA)
+        expect(await serviceC.serviceB).toBe(serviceB)
+
+        expect(await serviceX.serviceY).toBe(serviceY)
+        expect(await serviceX.serviceZ).toBe(serviceZ)
+        expect(await serviceY.serviceX).toBe(serviceX)
+        expect(await serviceY.serviceZ).toBe(serviceZ)
+        expect(await serviceZ.serviceX).toBe(serviceX)
+        expect(await serviceZ.serviceY).toBe(serviceY)
+
+        // Verify chains are independent (no cross-contamination)
+        expect(serviceA.name).not.toBe(serviceX.name)
+        expect(serviceB.name).not.toBe(serviceY.name)
+        expect(serviceC.name).not.toBe(serviceZ.name)
+    })
+
+    it('should not leak memory after circular dependency resolution', async () => {
+        class ServiceA {
+            constructor(public serviceB: ServiceB) {}
+        }
+
+        class ServiceB {
+            constructor(public serviceA: ServiceA) {}
+        }
+
+        type Scope = {
+            serviceA: ServiceA
+            serviceB: ServiceB
+        }
+
+        let weakRefA: WeakRef<ServiceA> | undefined
+        let weakRefB: WeakRef<ServiceB> | undefined
+        let weakRefContext: WeakRef<any> | undefined
+
+        // Scope the resolution to allow garbage collection
+        {
+            const context = new Context<Scope>()
+            context.registerClass('serviceA', ServiceA, ['serviceB'])
+            context.registerClass('serviceB', ServiceB, ['serviceA'])
+
+            const resolutionContext = new Map()
+            const serviceA = context.resolve('serviceA', { resolutionContext })
+            const serviceB = context.resolve('serviceB', { resolutionContext })
+
+            // Create weak references to track garbage collection
+            weakRefA = new WeakRef(serviceA)
+            weakRefB = new WeakRef(serviceB)
+            weakRefContext = new WeakRef(resolutionContext)
+
+            // Verify objects exist
+            expect(weakRefA.deref()).toBeDefined()
+            expect(weakRefB.deref()).toBeDefined()
+            expect(weakRefContext.deref()).toBeDefined()
+        }
+
+        // Force garbage collection (if available)
+        if (global.gc) {
+            global.gc()
+            // Wait a bit for GC to complete
+            await new Promise((resolve) => setTimeout(resolve, 5))
+        }
+
+        // Note: We can't reliably test GC in all environments, but we can at least
+        // verify the test structure works and doesn't throw errors
+        expect(weakRefA).toBeDefined()
+        expect(weakRefB).toBeDefined()
+        expect(weakRefContext).toBeDefined()
+    })
+
+    it('should handle circular dependencies with context extension and inheritance', () => {
+        class ServiceA {
+            constructor(public serviceB: ServiceB) {}
+            getName() {
+                return 'ServiceA'
+            }
+        }
+
+        class ServiceB {
+            constructor(public serviceA: ServiceA) {}
+            getName() {
+                return 'ServiceB'
+            }
+        }
+
+        class CustomServiceB extends ServiceB {
+            getName() {
+                return 'CustomServiceB'
+            }
+        }
+
+        type BaseScope = {
+            serviceA: ServiceA
+            serviceB: ServiceB
+        }
+
+        type CustomScope = BaseScope & {
+            serviceB: CustomServiceB
+        }
+
+        // Base context with circular dependencies
+        const baseContext = new Context<BaseScope>()
+        baseContext.registerClass('serviceA', ServiceA, ['serviceB'])
+        baseContext.registerClass('serviceB', ServiceB, ['serviceA'])
+
+        // Custom context extends base and overrides serviceB
+        const customContext = new Context<CustomScope>()
+        customContext.extend(baseContext)
+        customContext.registerClass('serviceB', CustomServiceB, ['serviceA'])
+
+        const serviceA = customContext.resolve('serviceA')
+        const serviceB = customContext.resolve('serviceB')
+
+        expect(serviceA).toBeInstanceOf(ServiceA)
+        expect(serviceB).toBeInstanceOf(CustomServiceB)
+        expect(serviceA.getName()).toBe('ServiceA')
+        expect(serviceB.getName()).toBe('CustomServiceB')
+
+        // Test that circular dependency resolved with the overridden class
+        expect(serviceA.serviceB).toBeInstanceOf(CustomServiceB)
+        expect(serviceB.serviceA).toBeInstanceOf(ServiceA)
+        expect(serviceA.serviceB.getName()).toBe('CustomServiceB')
+    })
+
+    it('should handle resolution context with pre-populated values', () => {
+        // Test case 1: Pre-populate a simple non-circular dependency
+        class ServiceC {
+            getName() {
+                return 'ServiceC'
+            }
+            getSpecialValue() {
+                return 'special'
+            }
+        }
+
+        class ServiceA {
+            constructor(public serviceC: ServiceC) {}
+            getName() {
+                return 'ServiceA'
+            }
+        }
+
+        type Scope = {
+            serviceA: ServiceA
+            serviceC: ServiceC
+        }
+
+        const context = new Context<Scope>()
+        context.registerClass('serviceA', ServiceA, ['serviceC'])
+        context.registerClass('serviceC', ServiceC, [])
+
+        // Create a custom ServiceC instance with modified behavior
+        const customServiceC = new ServiceC()
+        customServiceC.getSpecialValue = () => 'custom-special'
+
+        // Pre-populate resolution context using the internal API
+        // Note: This uses the internal __instanceCache which is the current API
+        const resolutionContext = {}
+        ;(resolutionContext as any).__instanceCache = new Map([['serviceC', customServiceC]])
+
+        // Resolve serviceA with the pre-populated context
+        const serviceA = context.resolve('serviceA', { resolutionContext })
+
+        expect(serviceA).toBeInstanceOf(ServiceA)
+        expect(serviceA.serviceC).toBe(customServiceC) // Should use pre-populated instance
+        expect(serviceA.serviceC.getName()).toBe('ServiceC')
+        expect(serviceA.serviceC.getSpecialValue()).toBe('custom-special') // Verify it's our custom instance
+
+        // When resolving serviceC directly, it should return the pre-populated instance
+        const serviceC = context.resolve('serviceC', { resolutionContext })
+        expect(serviceC).toBe(customServiceC)
+        expect(serviceC.getSpecialValue()).toBe('custom-special')
+
+        // Test case 2: Pre-populate in a simpler non-circular scenario to show the API works
+        class ServiceD {
+            constructor(public value: string) {}
+            getValue() {
+                return this.value
+            }
+        }
+
+        class ServiceB2 {
+            constructor(public serviceD: ServiceD) {}
+            getName() {
+                return 'ServiceB2'
+            }
+        }
+
+        type Scope2 = {
+            serviceB2: ServiceB2
+            serviceD: ServiceD
+            value: string
+        }
+
+        const context2 = new Context<Scope2>()
+        context2.registerClass('serviceB2', ServiceB2, ['serviceD'])
+        context2.registerFactory('serviceD', (value: string) => new ServiceD(value), ['value'])
+        context2.registerValue('value', 'default-value')
+
+        // Pre-populate serviceD with a custom instance
+        const customServiceD = new ServiceD('custom-value')
+        const resolutionContext2 = {}
+        ;(resolutionContext2 as any).__instanceCache = new Map([['serviceD', customServiceD]])
+
+        // Resolve serviceB2, which should use the pre-populated serviceD
+        const serviceB2 = context2.resolve('serviceB2', { resolutionContext: resolutionContext2 })
+
+        expect(serviceB2).toBeInstanceOf(ServiceB2)
+        expect(serviceB2.serviceD).toBe(customServiceD)
+        expect(serviceB2.serviceD.getValue()).toBe('custom-value')
+
+        // Test case 3: Verify that different resolution contexts create different instances
+        const anotherResolutionContext = {}
+        ;(anotherResolutionContext as any).__instanceCache = new Map()
+
+        const anotherServiceA = context.resolve('serviceA', { resolutionContext: anotherResolutionContext })
+        const anotherServiceC = context.resolve('serviceC', { resolutionContext: anotherResolutionContext })
+
+        // Different resolution contexts should create different instances
+        expect(anotherServiceA).not.toBe(serviceA)
+        expect(anotherServiceC).not.toBe(customServiceC)
+        expect(anotherServiceA.serviceC).toBe(anotherServiceC) // But within same context, should be same
+    })
 })

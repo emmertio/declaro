@@ -361,13 +361,19 @@ export class Context<Scope extends object = any> {
         return dependencies
     }
 
-    getAllDependents<K extends ScopeKey<Scope>>(key: K): ContextAttribute<this, any>[] {
+    getAllDependents<K extends ScopeKey<Scope>>(key: K, visited = new Set<any>()): ContextAttribute<this, any>[] {
+        if (visited.has(key)) {
+            return []
+        }
+
+        visited.add(key)
+
         const dependents = Object.entries(this.state)
             .filter(([_, attribute]) => attribute.inject?.includes(key))
             .map(([key, attribute]) => attribute)
 
         dependents.forEach((dependent) => {
-            const nestedDependents = this.getAllDependents(dependent.key as any)
+            const nestedDependents = this.getAllDependents(dependent.key as any, visited)
             dependents.push(...nestedDependents)
         })
 

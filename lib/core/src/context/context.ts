@@ -74,9 +74,47 @@ export type ScopeKey<S extends object> = keyof S
 export type ContextListener<C extends Context, E extends IEvent> = (context: C, event: E) => any
 
 export type ResolveOptions = {
+    /**
+     * If true, an error will be thrown if the dependency is not found. If false, undefined will be returned if the dependency is not found.
+     * @default false
+     */
     strict?: boolean
+
+    /**
+     * If true, the dependency will be resolved immediately when the context is initialized. This is useful for dependencies that need to perform setup work.
+     * @default false
+     */
     eager?: boolean
+
+    /**
+     * If true, the dependency will be a singleton, and the same instance will be returned for every request. If false, a new instance will be created each time the dependency is resolved.
+     * @default false
+     */
     singleton?: boolean
+
+    /**
+     * An optional resolution context that can be used to track resolution state across multiple `resolve` calls. This is primarily used internally to track circular dependencies, but can be useful for advanced use cases.
+     */
+    resolutionContext?: object
+
+    /**
+     * An internal stack used to track resolution state. This is primarily used internally to track circular dependencies, but can be useful for advanced use cases.
+     * @internal
+     */
+    _resolutionStack?: Set<PropertyKey>
+
+    /**
+     * An internal map used to track circular proxies. This is primarily used internally to track circular dependencies. Use `resolutionContext` for custom resolution contexts.
+     * @internal
+     */
+    _circularProxies?: Map<PropertyKey, any>
+
+    /**
+     * A cache of instances for singleton dependencies. This is used internally to store the instances of singleton dependencies. Use `resolutionContext` for custom resolution contexts.
+     *
+     * @internal
+     * */
+    _instanceCache?: Map<PropertyKey, any>
 }
 
 export function defaultResolveOptions(): ResolveOptions {
@@ -342,7 +380,12 @@ export class Context<Scope extends object = any> {
         return attribute
     }
 
-    protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K): boolean {
+    protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K, visited = new Set<PropertyKey>()): boolean {
+        // Prevent infinite recursion in circular dependencies
+        if (visited.has(key)) {
+            return true
+        }
+
         const attribute = this.state[key]
 
         const needsCache = attribute?.resolveOptions?.singleton || attribute?.resolveOptions?.eager
@@ -357,17 +400,139 @@ export class Context<Scope extends object = any> {
             return false
         }
 
-        return hasCachedValue && attribute.inject?.every((key) => this._cacheIsValid(key as any))
+        visited.add(key)
+        const result = hasCachedValue && attribute.inject?.every((depKey) => this._cacheIsValid(depKey as any, visited))
+        visited.delete(key)
+
+        return result
+    }
+
+    /**
+     * Handle circular dependency resolution by creating and using a proxy
+     */
+    protected _handleCircularDependency<K extends ScopeKey<Scope>>(
+        key: K,
+        circularProxies: Map<PropertyKey, any>,
+    ): Scope[K] {
+        // If we already have a proxy for this key, return it
+        if (circularProxies.has(key)) {
+            return circularProxies.get(key)
+        }
+
+        // Create a proxy that will defer to the real object once resolved
+        const proxy = this._createCircularProxy(key)
+        circularProxies.set(key, proxy)
+
+        return proxy
+    }
+
+    /**
+     * Create a proxy that will be populated with the real target later
+     */
+    protected _createCircularProxy<K extends ScopeKey<Scope>>(key: K): Scope[K] {
+        let realTarget: any = null
+        let isResolved = false
+
+        const proxy = new Proxy({} as any, {
+            get: (target, prop, receiver) => {
+                if (prop === '__isCircularProxy') {
+                    return true
+                }
+                if (prop === '__setRealTarget') {
+                    return (newTarget: any) => {
+                        realTarget = newTarget
+                        isResolved = true
+                        // Copy any properties that were set on the proxy to the real target
+                        Object.keys(target).forEach((key) => {
+                            if (!(key in newTarget)) {
+                                newTarget[key] = target[key]
+                            }
+                        })
+                    }
+                }
+
+                if (isResolved && realTarget) {
+                    return Reflect.get(realTarget, prop, realTarget)
+                }
+
+                return Reflect.get(target, prop, receiver)
+            },
+
+            set: (target, prop, value, receiver) => {
+                if (isResolved && realTarget) {
+                    return Reflect.set(realTarget, prop, value, realTarget)
+                }
+                return Reflect.set(target, prop, value, receiver)
+            },
+
+            has: (target, prop) => {
+                if (isResolved && realTarget) {
+                    return Reflect.has(realTarget, prop)
+                }
+                return Reflect.has(target, prop)
+            },
+
+            ownKeys: (target) => {
+                if (isResolved && realTarget) {
+                    return Reflect.ownKeys(realTarget)
+                }
+                return Reflect.ownKeys(target)
+            },
+
+            getOwnPropertyDescriptor: (target, prop) => {
+                if (isResolved && realTarget) {
+                    return Reflect.getOwnPropertyDescriptor(realTarget, prop)
+                }
+                return Reflect.getOwnPropertyDescriptor(target, prop)
+            },
+
+            getPrototypeOf: (target) => {
+                if (isResolved && realTarget) {
+                    return Reflect.getPrototypeOf(realTarget)
+                }
+                return Reflect.getPrototypeOf(target)
+            },
+        })
+
+        return proxy as Scope[K]
     }
 
     protected _resolveValue<K extends ScopeKey<Scope>>(key: K, resolveOptions?: ResolveOptions): Scope[K] {
-        const attribute = this.state[key]
-
         const attributeResolveOptions = {
             ...this.defaultResolveOptions,
-            ...attribute?.resolveOptions,
+            ...this.state[key]?.resolveOptions,
             ...resolveOptions,
         }
+
+        // Initialize or reuse tracking from resolution context
+        let resolutionStack: Set<PropertyKey>
+        let circularProxies: Map<PropertyKey, any>
+        let instanceCache: Map<PropertyKey, any>
+
+        if (attributeResolveOptions._resolutionStack) {
+            // Nested call - use provided tracking
+            resolutionStack = attributeResolveOptions._resolutionStack
+            circularProxies = attributeResolveOptions._circularProxies!
+            instanceCache = attributeResolveOptions._instanceCache!
+        } else if (attributeResolveOptions.resolutionContext) {
+            // Top-level call with shared context - use context-scoped tracking
+            const ctx = attributeResolveOptions.resolutionContext as any
+            resolutionStack = new Set<PropertyKey>()
+            circularProxies = ctx.__circularProxies ??= new Map<PropertyKey, any>()
+            instanceCache = ctx.__instanceCache ??= new Map<PropertyKey, any>()
+        } else {
+            // Top-level call without shared context - use fresh tracking
+            resolutionStack = new Set<PropertyKey>()
+            circularProxies = new Map<PropertyKey, any>()
+            instanceCache = new Map<PropertyKey, any>()
+        }
+
+        // Check for circular dependency
+        if (resolutionStack.has(key)) {
+            return this._handleCircularDependency(key, circularProxies)
+        }
+
+        const attribute = this.state[key]
 
         if (!attribute && attributeResolveOptions.strict) {
             throw new Error(`Dependency ${key?.toString()} not found.`)
@@ -378,10 +543,53 @@ export class Context<Scope extends object = any> {
         const serveFromCache = attributeResolveOptions.singleton || attributeResolveOptions.eager
         const dependenciesValid = attribute?.inject?.every((key) => this._cacheIsValid(key as any))
 
-        if (serveFromCache && attribute?.cachedValue && dependenciesValid) {
+        // Check instance cache for resolution context (including non-singletons)
+        if (instanceCache.has(key)) {
+            value = instanceCache.get(key)
+        } else if (serveFromCache && attribute?.cachedValue && dependenciesValid) {
             value = attribute.cachedValue
         } else {
-            value = typeof attribute?.value === 'function' ? attribute.value(this) : undefined
+            // Add to resolution stack to track circular dependencies
+            resolutionStack.add(key)
+
+            // Pass down all tracking to nested calls
+            const nestedResolveOptions = {
+                ...attributeResolveOptions,
+                _resolutionStack: resolutionStack,
+                _circularProxies: circularProxies,
+                _instanceCache: instanceCache,
+            }
+
+            // Temporarily store the original resolve method and override it
+            const originalResolve = this.resolve.bind(this)
+
+            try {
+                ;(this.resolve as any) = <NK extends ScopeKey<Scope>>(
+                    nestedKey: NK,
+                    nestedOptions?: ResolveOptions,
+                ) => {
+                    return this._resolveValue(nestedKey, { ...nestedResolveOptions, ...nestedOptions })
+                }
+
+                value = typeof attribute?.value === 'function' ? attribute.value(this) : undefined
+
+                // If we created a proxy for this dependency, populate it now
+                const proxy = circularProxies.get(key)
+                if (proxy && value && typeof value === 'object') {
+                    ;(proxy as any).__setRealTarget(value)
+                    // Return the proxy instead of the raw value for consistency
+                    value = proxy
+                }
+
+                // Cache the resolved instance in the resolution context
+                instanceCache.set(key, value)
+            } finally {
+                // Restore the original resolve method
+                ;(this.resolve as any) = originalResolve
+
+                // Always remove from resolution stack
+                resolutionStack.delete(key)
+            }
         }
 
         if (serveFromCache) {
@@ -407,7 +615,11 @@ export class Context<Scope extends object = any> {
     }
 
     resolve<K extends ScopeKey<Scope>>(key: K, resolveOptions?: ResolveOptions): Scope[K] {
-        return this._resolveValue(key, resolveOptions)
+        // Create a default resolution context for top-level calls if none provided
+        const options = resolveOptions?.resolutionContext
+            ? resolveOptions
+            : { ...resolveOptions, resolutionContext: {} }
+        return this._resolveValue(key, options)
     }
 
     /**

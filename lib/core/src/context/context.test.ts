@@ -899,4 +899,154 @@ describe('Context', () => {
         // Both references point to the same instance
         expect(partialContext).toBe(context)
     })
+
+    it('should cache singleton dependencies of dependencies correctly', async () => {
+        interface ServiceA {
+            id: string
+            message: string
+        }
+
+        interface ServiceB {
+            id: string
+            serviceA: ServiceA
+        }
+
+        interface ServiceC {
+            id: string
+            serviceA: ServiceA
+            serviceB: ServiceB
+        }
+
+        interface ServiceD {
+            id: string
+            serviceA: ServiceA
+            serviceB: ServiceB
+            serviceC: ServiceC
+        }
+
+        type Scope = {
+            serviceA: Promise<ServiceA>
+            serviceB: Promise<ServiceB>
+            serviceC: Promise<ServiceC>
+            serviceD: Promise<ServiceD>
+        }
+
+        const context = new Context<Scope>()
+
+        let serviceAInstances = 0
+        let serviceBInstances = 0
+        let serviceCInstances = 0
+        let serviceDInstances = 0
+
+        // ServiceA - async factory - singleton
+        context.registerAsyncFactory(
+            'serviceA',
+            async (): Promise<ServiceA> => {
+                serviceAInstances++
+                return {
+                    id: `serviceA-${serviceAInstances}`,
+                    message: 'I am Service A',
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        // ServiceB - async factory depends on ServiceA - singleton
+        context.registerAsyncFactory(
+            'serviceB',
+            async (serviceA: ServiceA): Promise<ServiceB> => {
+                serviceBInstances++
+                return {
+                    id: `serviceB-${serviceBInstances}`,
+                    serviceA,
+                }
+            },
+            ['serviceA'],
+            { singleton: true },
+        )
+
+        // ServiceC - async factory depends on ServiceB and ServiceA - singleton
+        context.registerAsyncFactory(
+            'serviceC',
+            async (serviceA: ServiceA, serviceB: ServiceB): Promise<ServiceC> => {
+                serviceCInstances++
+                return {
+                    id: `serviceC-${serviceCInstances}`,
+                    serviceA,
+                    serviceB,
+                }
+            },
+            ['serviceA', 'serviceB'],
+            { singleton: true },
+        )
+
+        // ServiceD - async factory depends on ServiceA, ServiceB, and ServiceC - NOT a singleton
+        context.registerAsyncFactory(
+            'serviceD',
+            async (serviceA: ServiceA, serviceB: ServiceB, serviceC: ServiceC): Promise<ServiceD> => {
+                serviceDInstances++
+                return {
+                    id: `serviceD-${serviceDInstances}`,
+                    serviceA,
+                    serviceB,
+                    serviceC,
+                }
+            },
+            ['serviceA', 'serviceB', 'serviceC'],
+        )
+
+        // First resolution - all should be created
+        const serviceD1 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should only be created once
+        expect(serviceBInstances).toBe(1) // ServiceB should only be created once
+        expect(serviceCInstances).toBe(1) // ServiceC should only be created once
+        expect(serviceDInstances).toBe(1) // ServiceD should be created
+
+        // Second resolution - only ServiceD should be recreated
+        const serviceD2 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should still be only created once
+        expect(serviceBInstances).toBe(1) // ServiceB should still be only created once
+        expect(serviceCInstances).toBe(1) // ServiceC should still be only created once
+        expect(serviceDInstances).toBe(2) // ServiceD should be created again
+
+        // Third resolution - again only ServiceD should be recreated
+        const serviceD3 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should still be only created once
+        expect(serviceBInstances).toBe(1) // ServiceB should still be only created once
+        expect(serviceCInstances).toBe(1) // ServiceC should still be only created once
+        expect(serviceDInstances).toBe(3) // ServiceD should be created again
+
+        // Verify that singleton dependencies are the same instances (use toEqual since we have proxy objects)
+        expect(serviceD1.serviceA).toEqual(serviceD2.serviceA)
+        expect(serviceD1.serviceA).toEqual(serviceD3.serviceA)
+        expect(serviceD1.serviceB).toEqual(serviceD2.serviceB)
+        expect(serviceD1.serviceB).toEqual(serviceD3.serviceB)
+        expect(serviceD1.serviceC).toEqual(serviceD2.serviceC)
+        expect(serviceD1.serviceC).toEqual(serviceD3.serviceC)
+
+        // Verify nested dependencies are also the same
+        expect(serviceD1.serviceB.serviceA).toEqual(serviceD2.serviceB.serviceA)
+        expect(serviceD1.serviceC.serviceA).toEqual(serviceD2.serviceC.serviceA)
+        expect(serviceD1.serviceC.serviceB).toEqual(serviceD2.serviceC.serviceB)
+
+        // Verify the IDs to confirm singletons were reused
+        expect(serviceD1.serviceA.id).toBe('serviceA-1')
+        expect(serviceD1.serviceB.id).toBe('serviceB-1')
+        expect(serviceD1.serviceC.id).toBe('serviceC-1')
+        expect(serviceD1.id).toBe('serviceD-1')
+
+        expect(serviceD2.serviceA.id).toBe('serviceA-1') // Same instance
+        expect(serviceD2.serviceB.id).toBe('serviceB-1') // Same instance
+        expect(serviceD2.serviceC.id).toBe('serviceC-1') // Same instance
+        expect(serviceD2.id).toBe('serviceD-2') // New instance
+
+        expect(serviceD3.serviceA.id).toBe('serviceA-1') // Same instance
+        expect(serviceD3.serviceB.id).toBe('serviceB-1') // Same instance
+        expect(serviceD3.serviceC.id).toBe('serviceC-1') // Same instance
+        expect(serviceD3.id).toBe('serviceD-3') // New instance
+    })
 })

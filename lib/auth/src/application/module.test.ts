@@ -1,13 +1,11 @@
 import { Context, type Request } from '@declaro/core'
 import { beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { createRequest } from 'node-mocks-http'
 import { AuthService } from '../domain/services/auth-service'
 import { AuthValidator } from '../shared/utils/auth-validator'
 import { getMockAuthSession, getMockJWT } from '../test/mock/auth-session'
 import { createTestContext, createTestRequestContext } from '../test/utils/test-request'
 import type { AuthRequestScope, AuthScope } from '../types/auth-context'
-import { authModule } from './module'
-import { createRequest } from 'node-mocks-http'
-import type { IAuthSession } from '../domain/models/auth-session'
 
 describe('Module', () => {
     let context: Context<AuthScope>

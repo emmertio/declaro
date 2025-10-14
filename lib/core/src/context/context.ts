@@ -131,6 +131,13 @@ export interface ResolveOptions {
     resolutionContext?: Map<PropertyKey, any>
 }
 
+export function getNestedResolveOptions(options?: ResolveOptions | InternalResolveOptions): InternalResolveOptions {
+    return {
+        resolutionStack: (options as InternalResolveOptions)?.resolutionStack,
+        resolutionContext: options?.resolutionContext,
+    }
+}
+
 export interface InternalResolveOptions extends ResolveOptions {
     resolutionStack: Set<PropertyKey>
 }
@@ -270,7 +277,9 @@ export class Context<Scope extends object = any> {
     ) {
         const attribute: ContextAttribute<this, Scope[K]> = {
             value: (context, resolveOptions) => {
-                const args = (inject?.map((key) => context.resolve(key, resolveOptions)) ?? []) as A
+                const args = (inject?.map((key) =>
+                    context._resolveValue(key, getNestedResolveOptions(resolveOptions)),
+                ) ?? []) as A
 
                 return factory(...args)
             },
@@ -294,7 +303,7 @@ export class Context<Scope extends object = any> {
         const attribute: ContextAttribute<this, Scope[K]> = {
             value: (async (context, resolveOptions) => {
                 const args = (await Promise.all(
-                    (inject?.map((key) => context.resolve(key, resolveOptions)) as A) ?? [],
+                    (inject?.map((key) => context.resolve(key, getNestedResolveOptions(resolveOptions))) as A) ?? [],
                 )) as A
 
                 return await factory(...args)
@@ -321,7 +330,7 @@ export class Context<Scope extends object = any> {
     ) {
         const attribute: ContextAttribute<this, Scope[K]> = {
             value: (context, resolveOptions) => {
-                const args = inject?.map((key) => context.resolve(key, resolveOptions)) ?? []
+                const args = inject?.map((key) => context.resolve(key, getNestedResolveOptions(resolveOptions))) ?? []
 
                 return new (Class as any)(...(args as any))
             },
@@ -348,7 +357,8 @@ export class Context<Scope extends object = any> {
         const attribute: ContextAttribute<this, Scope[K]> = {
             value: (async (context, resolveOptions) => {
                 const args = (await Promise.all(
-                    (inject?.map((key) => context.resolve(key, resolveOptions)) ?? []) as ConstructorParameters<T>,
+                    (inject?.map((key) => context.resolve(key, getNestedResolveOptions(resolveOptions))) ??
+                        []) as ConstructorParameters<T>,
                 )) as ConstructorParameters<T>
 
                 return new (Class as any)(...(args as any))

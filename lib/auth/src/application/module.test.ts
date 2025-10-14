@@ -1,5 +1,5 @@
 import { Context, type Request } from '@declaro/core'
-import { beforeAll, describe, expect, it } from 'bun:test'
+import { beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { AuthService } from '../domain/services/auth-service'
 import { AuthValidator } from '../shared/utils/auth-validator'
 import { getMockAuthSession, getMockJWT } from '../test/mock/auth-session'
@@ -19,7 +19,9 @@ describe('Module', () => {
 
     beforeAll(async () => {
         context = await createTestContext()
+    })
 
+    beforeEach(async () => {
         mockRequest = createRequest({
             method: 'GET',
             headers: {

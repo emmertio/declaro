@@ -49,7 +49,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterRemoveEvent)
 
         // Return the results of the removal
-        return result
+        return await this.normalizeSummary(result)
     }
 
     /**
@@ -77,7 +77,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterRestoreEvent)
 
         // Return the results of the restore operation
-        return result
+        return await this.normalizeSummary(result)
     }
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
@@ -102,7 +102,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterCreateEvent)
 
         // Return the results of the creation
-        return result
+        return await this.normalizeDetail(result)
     }
 
     async update(
@@ -131,7 +131,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterUpdateEvent)
 
         // Return the results of the update
-        return result
+        return await this.normalizeDetail(result)
     }
 
     /**
@@ -187,7 +187,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterUpsertEvent)
 
         // Return the results of the upsert operation
-        return result
+        return await this.normalizeDetail(result)
     }
 
     /**
@@ -340,6 +340,6 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
 
         // Return the results
-        return results
+        return await Promise.all(results.map((result) => this.normalizeDetail(result)))
     }
 }

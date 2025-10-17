@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { ModelService } from './model-service'
 import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
-import { MockBookSchema } from '../../test/mock/models/mock-book-models'
+import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import { mock } from 'bun:test'
 
@@ -635,12 +635,12 @@ describe('ModelService', () => {
                 return this.normalizeInput(input)
             }
 
-            protected async normalizeInput(input: any) {
+            protected async normalizeInput(input: MockBookInput): Promise<MockBookInput> {
                 return {
                     ...input,
                     title: input.title?.trim(),
                     author: input.author?.trim(),
-                    normalizedAt: new Date('2023-01-01'),
+                    publishedDate: new Date('2023-01-01'),
                 }
             }
         }
@@ -665,7 +665,7 @@ describe('ModelService', () => {
 
             expect(createdItem.title).toBe('Test Book')
             expect(createdItem.author).toBe('Author Name')
-            expect((createdItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(createdItem.publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should use custom normalizeInput method for update operation', async () => {
@@ -677,7 +677,7 @@ describe('ModelService', () => {
 
             expect(updatedItem.title).toBe('Updated Book')
             expect(updatedItem.author).toBe('Updated Author')
-            expect((updatedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(updatedItem.publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should use custom normalizeInput method for upsert operation', async () => {
@@ -686,7 +686,7 @@ describe('ModelService', () => {
 
             expect(upsertedItem.title).toBe('Test Book')
             expect(upsertedItem.author).toBe('Author Name')
-            expect((upsertedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(upsertedItem.publishedDate).toEqual(new Date('2023-01-01'))
 
             // Upsert again with different data
             const updateInput = {
@@ -699,7 +699,7 @@ describe('ModelService', () => {
 
             expect(updatedItem.title).toBe('Updated Book')
             expect(updatedItem.author).toBe('Updated Author')
-            expect((updatedItem as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(updatedItem.publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should use custom normalizeInput method for bulkUpsert operation', async () => {
@@ -714,15 +714,15 @@ describe('ModelService', () => {
             expect(results).toHaveLength(3)
             expect(results[0].title).toBe('Book One')
             expect(results[0].author).toBe('Author One')
-            expect((results[0] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(results[0].publishedDate).toEqual(new Date('2023-01-01'))
 
             expect(results[1].title).toBe('Book Two')
             expect(results[1].author).toBe('Author Two')
-            expect((results[1] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(results[1].publishedDate).toEqual(new Date('2023-01-01'))
 
             expect(results[2].title).toBe('Book Three')
             expect(results[2].author).toBe('Author Three')
-            expect((results[2] as any).normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(results[2].publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should preserve events order with normalized input in create operation', async () => {
@@ -735,61 +735,11 @@ describe('ModelService', () => {
 
             expect(beforeCreateCall.meta.input.title).toBe('Test Book')
             expect(beforeCreateCall.meta.input.author).toBe('Author Name')
-            expect(beforeCreateCall.meta.input.normalizedAt).toEqual(new Date('2023-01-01'))
+            expect(beforeCreateCall.meta.input.publishedDate).toEqual(new Date('2023-01-01'))
 
             expect(afterCreateCall.meta.input.title).toBe('Test Book')
             expect(afterCreateCall.meta.input.author).toBe('Author Name')
-            expect(afterCreateCall.meta.input.normalizedAt).toEqual(new Date('2023-01-01'))
-        })
-
-        it('should handle complex async normalization logic', async () => {
-            class ComplexNormalizationService extends ModelService<typeof mockSchema> {
-                protected async normalizeInput(input: any) {
-                    // Simulate async operations like database lookups, API calls, etc.
-                    await new Promise((resolve) => setTimeout(resolve, 10))
-
-                    const normalized = { ...input }
-
-                    // Complex normalization logic
-                    if (normalized.title) {
-                        normalized.title = normalized.title
-                            .trim()
-                            .replace(/\s+/g, ' ')
-                            .toLowerCase()
-                            .replace(/\b\w/g, (l: string) => l.toUpperCase()) // Title case
-                    }
-
-                    if (normalized.author) {
-                        normalized.author = normalized.author.trim()
-                    }
-
-                    // Add metadata
-                    normalized.processedAt = new Date('2023-01-01')
-                    normalized.version = (normalized.version || 0) + 1
-
-                    return normalized
-                }
-            }
-
-            const complexService = new ComplexNormalizationService({
-                repository,
-                emitter,
-                schema: mockSchema,
-                namespace,
-            })
-
-            const input = {
-                title: '  the  great   book  ',
-                author: '  John Doe  ',
-                publishedDate: new Date(),
-            }
-
-            const result = await complexService.create(input)
-
-            expect(result.title).toBe('The Great Book')
-            expect(result.author).toBe('John Doe')
-            expect((result as any).processedAt).toEqual(new Date('2023-01-01'))
-            expect((result as any).version).toBe(1)
+            expect(afterCreateCall.meta.input.publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should call normalizeInput method exactly once per input during bulkUpsert with Promise.all', async () => {
@@ -871,6 +821,201 @@ describe('ModelService', () => {
             // Allow some variance for test stability
             expect(totalTime).toBeLessThan(150) // Much less than 3 * 50ms = 150ms
             expect(processingTimes).toHaveLength(3)
+        })
+    })
+
+    describe('Response Normalization', () => {
+        class TestRepository extends MockMemoryRepository<typeof mockSchema> {
+            constructor() {
+                super({
+                    schema: mockSchema,
+                })
+            }
+
+            async create(input: MockBookInput): Promise<any> {
+                const record = await super.create(input)
+                // Return with publishedDate as string to test normalization
+                record.publishedDate = '2024-01-01' as any
+                return record
+            }
+
+            async update(lookup: any, input: MockBookInput): Promise<any> {
+                const record = await super.update(lookup, input)
+                // Return with publishedDate as string to test normalization
+                record.publishedDate = '2024-01-01' as any
+                return record
+            }
+
+            async upsert(input: MockBookInput): Promise<any> {
+                const record = await super.upsert(input)
+                // Return with publishedDate as string to test normalization
+                record.publishedDate = '2024-01-01' as any
+                return record
+            }
+
+            async bulkUpsert(inputs: MockBookInput[]): Promise<any[]> {
+                const records = await super.bulkUpsert(inputs)
+                // Return with publishedDate as string to test normalization
+                for (const record of records) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+                return records
+            }
+
+            async remove(lookup: any): Promise<any> {
+                const record = await super.remove(lookup)
+                // Return with publishedDate as string to test normalization
+                if (record) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+                return record
+            }
+
+            async restore(lookup: any): Promise<any> {
+                const record = await super.restore(lookup)
+                // Return with publishedDate as string to test normalization
+                if (record) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+                return record
+            }
+        }
+
+        class TestService extends ModelService<typeof mockSchema> {}
+
+        let testRepository: TestRepository
+        let testService: TestService
+
+        beforeEach(() => {
+            testRepository = new TestRepository()
+            emitter = new EventManager()
+
+            testService = new TestService({
+                repository: testRepository,
+                emitter,
+                schema: mockSchema,
+                namespace,
+            })
+        })
+
+        it('should normalize details in the create response', async () => {
+            const input = { id: 200, title: 'Create Test', author: 'Creator', publishedDate: new Date() }
+            const record = await testService.create(input)
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize details in the update response', async () => {
+            const input = { id: 201, title: 'Update Test', author: 'Updater', publishedDate: new Date() }
+            await testRepository.create(input)
+
+            const updatedInput = { title: 'Updated Test', author: 'Updated Author', publishedDate: new Date() }
+            const record = await testService.update({ id: 201 }, updatedInput)
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize details in the upsert response when creating', async () => {
+            const input = { id: 202, title: 'Upsert Create Test', author: 'Upserter', publishedDate: new Date() }
+            const record = await testService.upsert(input)
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize details in the upsert response when updating', async () => {
+            const input = { id: 203, title: 'Upsert Update Test', author: 'Upserter', publishedDate: new Date() }
+            await testRepository.create(input)
+
+            const updatedInput = {
+                id: 203,
+                title: 'Updated Upsert Test',
+                author: 'Updated Upserter',
+                publishedDate: new Date(),
+            }
+            const record = await testService.upsert(updatedInput)
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize details in the bulkUpsert response', async () => {
+            const input1 = { id: 204, title: 'Bulk Test 1', author: 'Bulk Author 1', publishedDate: new Date() }
+            const input2 = { id: 205, title: 'Bulk Test 2', author: 'Bulk Author 2', publishedDate: new Date() }
+
+            const records = await testService.bulkUpsert([input1, input2])
+
+            const expectedDate = new Date('2024-01-01')
+
+            for (const record of records) {
+                const actualDate = record.publishedDate
+                expect(actualDate).toEqual(expectedDate)
+                expect(actualDate).toBeInstanceOf(Date)
+            }
+        })
+
+        it('should normalize details in the bulkUpsert response with mixed create and update', async () => {
+            const existingInput = { id: 206, title: 'Existing', author: 'Existing Author', publishedDate: new Date() }
+            await testRepository.create(existingInput)
+
+            const updateInput = {
+                id: 206,
+                title: 'Updated Existing',
+                author: 'Updated Author',
+                publishedDate: new Date(),
+            }
+            const createInput = { id: 207, title: 'New Record', author: 'New Author', publishedDate: new Date() }
+
+            const records = await testService.bulkUpsert([updateInput, createInput])
+
+            const expectedDate = new Date('2024-01-01')
+
+            for (const record of records) {
+                const actualDate = record.publishedDate
+                expect(actualDate).toEqual(expectedDate)
+                expect(actualDate).toBeInstanceOf(Date)
+            }
+        })
+
+        it('should normalize summaries in the remove response', async () => {
+            const input = { id: 208, title: 'Remove Test', author: 'Remover', publishedDate: new Date() }
+            await testRepository.create(input)
+
+            const record = await testService.remove({ id: 208 })
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize summaries in the restore response', async () => {
+            const input = { id: 209, title: 'Restore Test', author: 'Restorer', publishedDate: new Date() }
+            await testRepository.create(input)
+            await testRepository.remove({ id: 209 })
+
+            const record = await testService.restore({ id: 209 })
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
         })
     })
 })

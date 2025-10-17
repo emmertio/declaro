@@ -1,4 +1,4 @@
-import type { AnyModelSchema } from '@declaro/core'
+import type { AnyModelSchema, Model } from '@declaro/core'
 import type {
     InferDetail,
     InferFilters,
@@ -19,6 +19,47 @@ export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionO
 }
 
 export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
+    /**
+     * Normalize the detail data to match the expected schema.
+     * WARNING: This method is called once per detail in load operations.
+     * Any intensive operations or queries should be avoided here, and done via bulk operations in the respective methods such as `loadMany` instead.
+     * @param detail The detail data to normalize.
+     * @returns The normalized detail data.
+     */
+    async normalizeDetail(detail: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
+        const detailModel = this.schema.definition.detail as Model<any, any>
+        if (detailModel) {
+            const validation = await detailModel.validate(detail, { strict: false })
+            if (validation.issues) {
+                console.warn(`${detailModel.labels.singularLabel} shape did not match the expected schema`)
+            } else {
+                return validation.value
+            }
+        }
+        return detail
+    }
+
+    /**
+     * Normalize the summary data to match the expected schema.
+     * WARNING: This method is called once per summary in search results, often in parallel.
+     * Any intensive operations or queries should be avoided here, and done via bulk operations in the respective methods such as `search` instead.
+     *
+     * @param summary The summary data to normalize.
+     * @returns The normalized summary data.
+     */
+    async normalizeSummary(summary: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
+        const summaryModel = this.schema.definition.summary as Model<any, any>
+        if (summaryModel) {
+            const validation = await summaryModel.validate(summary, { strict: false })
+            if (validation.issues) {
+                console.warn(`${summaryModel.labels.singularLabel} shape did not match the expected schema`)
+            } else {
+                return validation.value
+            }
+        }
+        return summary
+    }
+
     /**
      * Load a single record by its lookup criteria.
      * @param lookup The lookup criteria to find the record.
@@ -43,7 +84,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         ).setResult(details)
         await this.emitter.emitAsync(afterLoadEvent)
 
-        return details
+        return await this.normalizeDetail(details)
     }
 
     /**
@@ -70,7 +111,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         ).setResult(details)
         await this.emitter.emitAsync(afterLoadManyEvent)
 
-        return details
+        return await Promise.all(details.map((detail) => this.normalizeDetail(detail)))
     }
 
     /**
@@ -101,7 +142,10 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         await this.emitter.emitAsync(afterSearchEvent)
 
         // Return the search results
-        return results
+        return {
+            ...results,
+            results: await Promise.all(results.results.map((detail) => this.normalizeSummary(detail))),
+        }
     }
 
     /**

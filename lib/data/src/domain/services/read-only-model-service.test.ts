@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, spyOn, mock } from 'bun:test'
-import { ReadOnlyModelService } from './read-only-model-service'
+import { describe, it, expect, beforeEach, spyOn, mock, beforeAll } from 'bun:test'
+import { ReadOnlyModelService, type ILoadOptions } from './read-only-model-service'
 import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
-import { MockBookSchema } from '../../test/mock/models/mock-book-models'
+import { MockBookSchema, type MockBookDetail, type MockBookLookup } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import type { QueryEvent } from '../events/query-event'
 import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../../shared/utils/schema-inference'
@@ -292,5 +292,105 @@ describe('ReadOnlyModelService', () => {
         expect(beforeSearchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeSearch' }))
         expect(afterSearchSpy).toHaveBeenCalledTimes(1)
         expect(afterSearchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterSearch' }))
+    })
+
+    describe('Response Normalization', () => {
+        class TestRepository extends MockMemoryRepository<typeof mockSchema> {
+            constructor() {
+                super({
+                    schema: mockSchema,
+                })
+            }
+
+            async load(input: MockBookLookup): Promise<MockBookDetail | null> {
+                const record = await super.load(input)
+
+                if (record) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+
+                return record
+            }
+
+            async loadMany(inputs: MockBookLookup[]): Promise<MockBookDetail[]> {
+                const records = await super.loadMany(inputs)
+
+                for (const record of records) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+
+                return records
+            }
+
+            async search(
+                filters: InferFilters<typeof mockSchema>,
+                options?: ILoadOptions,
+            ): Promise<InferSearchResults<typeof mockSchema>> {
+                const results = await super.search(filters, options)
+
+                for (const record of results.results) {
+                    record.publishedDate = '2024-01-01' as any
+                }
+
+                return results
+            }
+        }
+        class TestService extends ReadOnlyModelService<typeof mockSchema> {}
+
+        let testService: TestService
+
+        beforeEach(() => {
+            repository = new TestRepository()
+            emitter = new EventManager()
+
+            testService = new TestService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        it('should normalize details in the load response', async () => {
+            const input = { id: 100, title: 'Normalization Test', author: 'Normalizer', publishedDate: new Date() }
+            await repository.create(input)
+
+            const record = await testService.load({ id: 100 })
+
+            const expectedDate = new Date('2024-01-01')
+            const actualDate = record.publishedDate
+
+            expect(actualDate).toEqual(expectedDate)
+            expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should normalize details in the loadMany response', async () => {
+            const input1 = { id: 101, title: 'Normalization Test 1', author: 'Normalizer 1', publishedDate: new Date() }
+            const input2 = { id: 102, title: 'Normalization Test 2', author: 'Normalizer 2', publishedDate: new Date() }
+            await repository.create(input1)
+            await repository.create(input2)
+
+            const records = await testService.loadMany([{ id: 101 }, { id: 102 }])
+
+            const expectedDate = new Date('2024-01-01')
+
+            for (const record of records) {
+                const actualDate = record.publishedDate
+                expect(actualDate).toEqual(expectedDate)
+                expect(actualDate).toBeInstanceOf(Date)
+            }
+        })
+
+        it('should normalize details in the search response', async () => {
+            const input1 = { id: 103, title: 'Normalization Test 3', author: 'Normalizer 3', publishedDate: new Date() }
+            const input2 = { id: 104, title: 'Normalization Test 4', author: 'Normalizer 4', publishedDate: new Date() }
+            await repository.create(input1)
+            await repository.create(input2)
+
+            const results = await testService.search({ text: 'Normalization' })
+
+            const expectedDate = new Date('2024-01-01')
+
+            for (const record of results.results) {
+                const actualDate = record.publishedDate
+                expect(actualDate).toEqual(expectedDate)
+                expect(actualDate).toBeInstanceOf(Date)
+            }
+        })
     })
 })

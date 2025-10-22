@@ -55,11 +55,14 @@
         "src/**/*"
     ],
     "exports": {
-        "types": "./dist/ts/index.d.ts",
-        "import": "./dist/node/index.js",
+        "import": {
+            "browser": "./dist/browser/index.js",
+            "types": "./dist/ts/index.d.ts",
+            "default": "./dist/node/index.js"
+        },
         "require": "./dist/node/index.cjs",
-        "bun": "./src/index.ts",
-        "browser": "./dist/browser/index.js"
+        "types": "./dist/ts/index.d.ts",
+        "bun": "./src/index.ts"
     },
     "imports": {
         "#scope": {

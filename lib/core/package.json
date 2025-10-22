@@ -55,10 +55,10 @@
         "src/**/*"
     ],
     "exports": {
-        "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.cjs",
+        "bun": "./src/index.ts",
         "browser": "./dist/browser/index.js"
     },
     "imports": {

@@ -47,4 +47,8 @@ export class BaseModelService<TSchema extends AnyModelSchema> {
         }
         return input[this.entityMetadata.primaryKey]
     }
+
+    public getSchema() {
+        return this.schema
+    }
 }

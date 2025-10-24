@@ -31,7 +31,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         if (detailModel) {
             const validation = await detailModel.validate(detail, { strict: false })
             if (validation.issues) {
-                console.warn(`${detailModel.labels.singularLabel} shape did not match the expected schema`)
+                console.warn(`${detailModel.labels.singularLabel} shape did not match the expected schema`, validation)
             } else {
                 return validation.value
             }

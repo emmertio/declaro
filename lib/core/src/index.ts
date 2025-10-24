@@ -46,3 +46,4 @@ export * from './schema/schema-mixin'
 export * from './schema/test/mock-model'
 
 export * from './shared/utils/action-descriptor'
+export * from './shared/utils/schema-utils'

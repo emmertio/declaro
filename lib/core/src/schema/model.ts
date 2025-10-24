@@ -7,6 +7,16 @@ export interface ModelValidationOptions {
     strict?: boolean
 }
 
+export interface ModelSchemaOptions {
+    includePrivateFields?: boolean
+}
+
+export function getDefaultModelSchemaOptions(): ModelSchemaOptions {
+    return {
+        includePrivateFields: false,
+    }
+}
+
 export abstract class Model<TName extends Readonly<string>, TSchema extends StandardSchemaV1>
     implements StandardSchemaV1<StandardSchemaV1.InferInput<TSchema>, StandardSchemaV1.InferOutput<TSchema>>
 {
@@ -27,15 +37,36 @@ export abstract class Model<TName extends Readonly<string>, TSchema extends Stan
         this.schema = schema
     }
 
+    stripExcludedFields(value: StandardSchemaV1.InferInput<TSchema>): StandardSchemaV1.InferInput<TSchema> {
+        const meta = this.toJSONSchema({
+            includePrivateFields: true,
+        })
+
+        const excludedKeys = Object.keys(meta.properties ?? {}).filter((key) => {
+            const property = meta.properties?.[key]
+            return !!property && typeof property === 'object' && property.private === true
+        })
+
+        if (value && excludedKeys.length > 0) {
+            excludedKeys.forEach((key) => {
+                delete value[key]
+            })
+        }
+
+        return value
+    }
+
     async validate(
         value: StandardSchemaV1.InferInput<TSchema>,
         options?: ModelValidationOptions,
     ): Promise<StandardSchemaV1.Result<StandardSchemaV1.InferOutput<TSchema>>> {
+        const meta = this.toJSONSchema()
+
+        value = this.stripExcludedFields(value)
+
         const result = await this.schema['~standard'].validate(value)
 
         if (result.issues) {
-            const meta = this.toJSONSchema()
-
             const issues = result.issues.map((issue) => {
                 let schema: JSONSchema | undefined = meta
                 let field: string | undefined = undefined
@@ -82,7 +113,7 @@ export abstract class Model<TName extends Readonly<string>, TSchema extends Stan
         return getLabels(this.name)
     }
 
-    abstract toJSONSchema(): JSONSchema
+    abstract toJSONSchema(options?: ModelSchemaOptions): JSONSchema
 
     // Implementing StandardSchemaV1 interface
     get version(): number {

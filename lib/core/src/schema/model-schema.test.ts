@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod/v4'
 import { ModelSchema, type MergeMixins } from './model-schema'
 import { MockModel } from './test/mock-model'
-import type { InferModelOutput } from './model'
+import type { InferModelInput, InferModelOutput } from './model'
 import type { ShallowMerge, UniqueKeys } from '../typescript'
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 describe('ModelSchema', () => {
     it('should create a ModelSchema instance', () => {
@@ -124,5 +125,134 @@ describe('ModelSchema', () => {
             })
 
         expect(schema.getEntityMetadata().primaryKey).toBe('id')
+    })
+
+    it('should be able to manually strip private and hidden keys from input', () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const payload: InferModelInput<typeof testModel> = {
+            id: '1',
+            name: 'Test',
+            secret: 'top-secret',
+            internalNote: 'for-internal-use-only',
+        }
+
+        const stripped = testModel.stripExcludedFields(payload)
+
+        expect(stripped).toEqual({
+            id: '1',
+            name: 'Test',
+            internalNote: 'for-internal-use-only',
+        })
+    })
+
+    it('should strip private fields from validation input', async () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const payload: InferModelInput<typeof testModel> = {
+            id: '1',
+            name: 'Test',
+            secret: 'top-secret',
+            internalNote: 'for-internal-use-only',
+        }
+
+        const validation = await testModel.validate(payload, { strict: false })
+
+        expect(validation.issues).toBeUndefined()
+
+        const output = (validation as StandardSchemaV1.SuccessResult<InferModelOutput<typeof testModel>>).value
+
+        expect(output.secret).toBeUndefined()
+    })
+
+    it('should not strip hidden fields from validation input', async () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const payload: InferModelInput<typeof testModel> = {
+            id: '1',
+            name: 'Test',
+            secret: 'top-secret',
+            internalNote: 'for-internal-use-only',
+        }
+
+        const validation = await testModel.validate(payload, { strict: false })
+
+        expect(validation.issues).toBeUndefined()
+
+        const output = (validation as StandardSchemaV1.SuccessResult<InferModelOutput<typeof testModel>>).value
+
+        expect(output.internalNote).toBe('for-internal-use-only')
+    })
+
+    it('should strip private fields from model schema by default', () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const jsonSchema = testModel.toJSONSchema()
+
+        expect(Object.keys(jsonSchema.properties!)).toEqual(['id', 'name', 'internalNote'])
+    })
+
+    it('should not strip hidden fields from model schema', () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const jsonSchema = testModel.toJSONSchema({ includePrivateFields: false })
+
+        expect(Object.keys(jsonSchema.properties!)).toEqual(['id', 'name', 'internalNote'])
+    })
+
+    it('should not strip private fields from model schema when specified', () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const jsonSchema = testModel.toJSONSchema({ includePrivateFields: true })
+
+        expect(Object.keys(jsonSchema.properties!)).toEqual(['id', 'name', 'secret', 'internalNote'])
     })
 })

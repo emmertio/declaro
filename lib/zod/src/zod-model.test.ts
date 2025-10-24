@@ -108,13 +108,15 @@ describe('ZodModel', () => {
         const model = new ZodModel('User', schema)
 
         const jsonSchema = await model.toJSONSchema({
-            unrepresentable: 'any',
-            override: (ctx) => {
-                const def = ctx.zodSchema._zod.def
-                if (def.type === 'date') {
-                    ctx.jsonSchema.type = 'number'
-                    ctx.jsonSchema.format = 'date-time'
-                }
+            zodOptions: {
+                unrepresentable: 'any',
+                override: (ctx) => {
+                    const def = ctx.zodSchema._zod.def
+                    if (def.type === 'date') {
+                        ctx.jsonSchema.type = 'number'
+                        ctx.jsonSchema.format = 'date-time'
+                    }
+                },
             },
         })
 
@@ -169,6 +171,48 @@ describe('ZodModel', () => {
             },
             required: ['name', 'age', 'bigNumber'],
             $schema: 'https://json-schema.org/draft/2020-12/schema',
+        })
+    })
+
+    it('should not include private fields in JSON Schema by default', async () => {
+        const schema = z.object({
+            id: z.string(),
+            name: z.string(),
+            secret: z.string().optional().meta({ private: true }),
+            internalNote: z.string().optional().meta({ hidden: true }),
+        })
+        const model = new ZodModel('User', schema)
+
+        const jsonSchema = await model.toJSONSchema()
+        expect(jsonSchema).toMatchObject({
+            type: 'object',
+            properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+            },
+            required: ['id', 'name'],
+        })
+    })
+
+    it('should include private fields in JSON Schema when specified', async () => {
+        const schema = z.object({
+            id: z.string(),
+            name: z.string(),
+            secret: z.string().optional().meta({ private: true }),
+            internalNote: z.string().optional().meta({ hidden: true }),
+        })
+        const model = new ZodModel('User', schema)
+
+        const jsonSchema = await model.toJSONSchema({ includePrivateFields: true })
+        expect(jsonSchema).toMatchObject({
+            type: 'object',
+            properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                secret: { type: 'string' },
+                internalNote: { type: 'string' },
+            },
+            required: ['id', 'name'],
         })
     })
 })

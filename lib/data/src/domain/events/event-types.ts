@@ -10,12 +10,16 @@ export enum ModelQueryEvent {
 }
 
 export enum ModelMutationAction {
+    Create = 'create',
     BeforeCreate = 'beforeCreate',
     AfterCreate = 'afterCreate',
+    Update = 'update',
     BeforeUpdate = 'beforeUpdate',
     AfterUpdate = 'afterUpdate',
+    Remove = 'remove',
     BeforeRemove = 'beforeRemove',
     AfterRemove = 'afterRemove',
+    Restore = 'restore',
     BeforeRestore = 'beforeRestore',
     AfterRestore = 'afterRestore',
 }

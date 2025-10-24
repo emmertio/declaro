@@ -5,6 +5,7 @@ import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-
 import { EventManager } from '@declaro/core'
 import { mock } from 'bun:test'
 import type { InferDetail } from '../../shared/utils/schema-inference'
+import { ModelMutationAction } from '../events/event-types'
 
 describe('ModelService', () => {
     const namespace = 'books'
@@ -654,7 +655,9 @@ describe('ModelService', () => {
 
         it('should use default normalizeInput method (no changes) when not overridden', async () => {
             const input = { title: '  Test Book  ', author: '  Author Name  ', publishedDate: new Date() }
-            const normalized = await service['normalizeInput'](input)
+            const normalized = await service['normalizeInput'](input, {
+                descriptor: service['getDescriptor'](ModelMutationAction.Create),
+            })
 
             expect(normalized).toEqual(input)
             expect(normalized).toBe(input) // Should be the exact same reference

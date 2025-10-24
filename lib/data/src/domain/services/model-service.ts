@@ -1,4 +1,4 @@
-import type { AnyModelSchema } from '@declaro/core'
+import type { ActionDescriptor, AnyModelSchema, IActionDescriptor } from '@declaro/core'
 import type { InferDetail, InferInput, InferLookup, InferSummary } from '../../shared/utils/schema-inference'
 import { ModelMutationAction, ModelQueryEvent } from '../events/event-types'
 import { MutationEvent } from '../events/mutation-event'
@@ -8,6 +8,11 @@ import type { IActionOptions } from './base-model-service'
 
 export interface ICreateOptions extends IActionOptions {}
 export interface IUpdateOptions extends IActionOptions {}
+
+export interface INormalizeInputArgs<TSchema extends AnyModelSchema> {
+    existing?: InferDetail<TSchema>
+    descriptor: ActionDescriptor
+}
 
 export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelService<TSchema> {
     constructor(args: IModelServiceArgs<TSchema>) {
@@ -21,7 +26,10 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @param input The input data to normalize.
      * @returns The normalized input data.
      */
-    protected async normalizeInput(input: InferInput<TSchema>): Promise<InferInput<TSchema>> {
+    protected async normalizeInput(
+        input: InferInput<TSchema>,
+        args: INormalizeInputArgs<TSchema>,
+    ): Promise<InferInput<TSchema>> {
         return input
     }
 
@@ -82,7 +90,9 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
         // Normalize the input data
-        const normalizedInput = await this.normalizeInput(input)
+        const normalizedInput = await this.normalizeInput(input, {
+            descriptor: this.getDescriptor(ModelMutationAction.Create),
+        })
 
         // Emit the before create event
         const beforeCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
@@ -110,8 +120,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         input: InferInput<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>> {
+        const existing = await this.repository.load(lookup, options)
         // Normalize the input data
-        const normalizedInput = await this.normalizeInput(input)
+        const normalizedInput = await this.normalizeInput(input, {
+            existing,
+            descriptor: this.getDescriptor(ModelMutationAction.Update),
+        })
 
         // Emit the before update event
         const beforeUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
@@ -141,19 +155,19 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns The upserted record.
      */
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
-        // Normalize the input data
-        const normalizedInput = await this.normalizeInput(input)
+        const primaryKeyValue = this.getPrimaryKeyValue(input)
 
-        const primaryKeyValue = this.getPrimaryKeyValue(normalizedInput)
-
+        let operation: ModelMutationAction
         let beforeOperation: ModelMutationAction
         let afterOperation: ModelMutationAction
+        let existingItem: InferDetail<TSchema> | undefined = undefined
 
         if (primaryKeyValue === undefined) {
+            operation = ModelMutationAction.Create
             beforeOperation = ModelMutationAction.BeforeCreate
             afterOperation = ModelMutationAction.AfterCreate
         } else {
-            const existingItem = await this.load(
+            existingItem = await this.load(
                 {
                     [this.entityMetadata.primaryKey]: primaryKeyValue,
                 } as InferLookup<TSchema>,
@@ -161,13 +175,21 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             )
 
             if (existingItem) {
+                operation = ModelMutationAction.Update
                 beforeOperation = ModelMutationAction.BeforeUpdate
                 afterOperation = ModelMutationAction.AfterUpdate
             } else {
+                operation = ModelMutationAction.Create
                 beforeOperation = ModelMutationAction.BeforeCreate
                 afterOperation = ModelMutationAction.AfterCreate
             }
         }
+
+        // Normalize the input data
+        const normalizedInput = await this.normalizeInput(input, {
+            descriptor: this.getDescriptor(operation),
+            existing: existingItem,
+        })
 
         // Emit the before upsert event
         const beforeUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
@@ -204,82 +226,86 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             return []
         }
 
-        // Normalize all input data in parallel using Promise.all
-        const normalizedInputs = await Promise.all(inputs.map((input) => this.normalizeInput(input)))
-
-        // Build a map of primary key to input and lookup info
-        type EntityInfo = {
+        // Keep track of input metadata for each position (preserves order and duplicates)
+        type InputInfo = {
             input: InferInput<TSchema>
-            lookup: InferLookup<TSchema>
-            primaryKeyValue: string | number
+            index: number
+            primaryKeyValue?: string | number
             existingEntity?: InferDetail<TSchema>
             operation?: ModelMutationAction
         }
 
-        const entityInfoMap = new Map<string | number, EntityInfo>()
-        const inputsWithoutPrimaryKey: InferInput<TSchema>[] = []
+        const inputInfos: InputInfo[] = []
+        const uniqueLookups = new Map<string | number, InferLookup<TSchema>>()
 
-        // Process each normalized input and organize by primary key
-        for (const input of normalizedInputs) {
+        // Process each input and collect unique lookups
+        for (let i = 0; i < inputs.length; i++) {
+            const input = inputs[i]
             const primaryKeyValue = this.getPrimaryKeyValue(input)
 
+            const inputInfo: InputInfo = {
+                input,
+                index: i,
+                primaryKeyValue,
+            }
+            inputInfos.push(inputInfo)
+
+            // Collect unique lookups for entities that have primary keys
             if (primaryKeyValue !== undefined) {
-                const entityInfo: EntityInfo = {
-                    input,
-                    primaryKeyValue,
-                    lookup: {
-                        [this.entityMetadata.primaryKey]: primaryKeyValue,
-                    } as InferLookup<TSchema>,
-                }
-                entityInfoMap.set(primaryKeyValue, entityInfo)
-            } else {
-                // Inputs without primary keys are always creates
-                inputsWithoutPrimaryKey.push(input)
+                uniqueLookups.set(primaryKeyValue, {
+                    [this.entityMetadata.primaryKey]: primaryKeyValue,
+                } as InferLookup<TSchema>)
             }
         }
 
-        // Extract lookups for existing entities
-        const lookups = Array.from(entityInfoMap.values()).map((info) => info.lookup)
-
-        // Load existing entities and update the map
-        if (lookups.length > 0) {
+        // Load existing entities for unique primary keys
+        const existingEntitiesMap = new Map<string | number, InferDetail<TSchema>>()
+        if (uniqueLookups.size > 0) {
+            const lookups = Array.from(uniqueLookups.values())
             const existingEntities = await this.loadMany(lookups, options)
             existingEntities.forEach((entity) => {
                 if (entity) {
                     const pkValue = this.getPrimaryKeyValue(entity)
-                    if (pkValue !== undefined && entityInfoMap.has(pkValue)) {
-                        const entityInfo = entityInfoMap.get(pkValue)!
-                        entityInfo.existingEntity = entity
+                    if (pkValue !== undefined) {
+                        existingEntitiesMap.set(pkValue, entity)
                     }
                 }
             })
         }
 
-        // Determine operation types and prepare before events
-        const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+        // Normalize all inputs and determine operations in parallel
+        const normalizationPromises = inputInfos.map(async (inputInfo) => {
+            // Set existing entity if found
+            if (inputInfo.primaryKeyValue !== undefined) {
+                inputInfo.existingEntity = existingEntitiesMap.get(inputInfo.primaryKeyValue)
+            }
 
-        // Handle entities with primary keys
-        for (const entityInfo of entityInfoMap.values()) {
-            const operation = entityInfo.existingEntity
+            // Determine operation type
+            inputInfo.operation = inputInfo.existingEntity
                 ? ModelMutationAction.BeforeUpdate
                 : ModelMutationAction.BeforeCreate
 
-            entityInfo.operation = operation
-
-            beforeEvents.push(
-                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                    this.getDescriptor(operation),
-                    entityInfo.input,
+            // Normalize the input
+            const normalizedInput = await this.normalizeInput(inputInfo.input, {
+                existing: inputInfo.existingEntity,
+                descriptor: this.getDescriptor(
+                    inputInfo.existingEntity ? ModelMutationAction.Update : ModelMutationAction.Create,
                 ),
-            )
-        }
+            })
 
-        // Handle inputs without primary keys (always creates)
-        for (const input of inputsWithoutPrimaryKey) {
+            inputInfo.input = normalizedInput
+            return normalizedInput
+        })
+
+        const normalizedInputs = await Promise.all(normalizationPromises)
+
+        // Create before events
+        const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+        for (const inputInfo of inputInfos) {
             beforeEvents.push(
                 new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                    this.getDescriptor(ModelMutationAction.BeforeCreate),
-                    input,
+                    this.getDescriptor(inputInfo.operation!),
+                    inputInfo.input,
                 ),
             )
         }
@@ -287,59 +313,33 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         // Emit all before events
         await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
 
-        // Perform the bulk upsert operation with normalized inputs
+        // Perform the bulk upsert operation with all normalized inputs
         const results = await this.repository.bulkUpsert(normalizedInputs, options)
 
-        // Create a map of result primary keys to results for matching
-        const resultsByPrimaryKey = new Map<string | number, InferDetail<TSchema>>()
-        const resultsWithoutPrimaryKey: InferDetail<TSchema>[] = []
-
-        for (const result of results) {
-            const pkValue = this.getPrimaryKeyValue(result)
-            if (pkValue !== undefined) {
-                resultsByPrimaryKey.set(pkValue, result)
-            } else {
-                resultsWithoutPrimaryKey.push(result)
-            }
-        }
-
-        // Prepare after events by matching results back to original inputs
+        // Create after events and return results
         const afterEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
-        let resultsWithoutPkIndex = 0
 
-        // Handle entities with primary keys
-        for (const entityInfo of entityInfoMap.values()) {
-            const matchedResult = resultsByPrimaryKey.get(entityInfo.primaryKeyValue)!
+        for (let i = 0; i < inputInfos.length; i++) {
+            const inputInfo = inputInfos[i]
+            const result = results[i]
 
             const afterOperation =
-                entityInfo.operation === ModelMutationAction.BeforeCreate
+                inputInfo.operation === ModelMutationAction.BeforeCreate
                     ? ModelMutationAction.AfterCreate
                     : ModelMutationAction.AfterUpdate
 
             afterEvents.push(
                 new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
                     this.getDescriptor(afterOperation),
-                    entityInfo.input,
-                ).setResult(matchedResult),
-            )
-        }
-
-        // Handle inputs without primary keys (always creates)
-        for (const input of inputsWithoutPrimaryKey) {
-            const matchedResult = resultsWithoutPrimaryKey[resultsWithoutPkIndex++]
-
-            afterEvents.push(
-                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                    this.getDescriptor(ModelMutationAction.AfterCreate),
-                    input,
-                ).setResult(matchedResult),
+                    inputInfo.input,
+                ).setResult(result),
             )
         }
 
         // Emit all after events
         await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
 
-        // Return the results
+        // Return normalized results
         return await Promise.all(results.map((result) => this.normalizeDetail(result)))
     }
 }

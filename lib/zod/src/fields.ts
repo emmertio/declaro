@@ -1,7 +1,7 @@
 import type { ZodAny } from 'zod'
 
 export function privateField<TField extends ZodAny>(field: TField) {
-    return field.meta({
+    return field.optional().meta({
         private: true,
     })
 }

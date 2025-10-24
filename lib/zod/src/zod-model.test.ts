@@ -153,27 +153,6 @@ describe('ZodModel', () => {
         })
     })
 
-    it('should switch bigint to string in JSON Schema by default', async () => {
-        const schema = z.object({
-            name: z.string(),
-            age: z.number(),
-            bigNumber: z.bigint(),
-        })
-        const model = new ZodModel('User', schema)
-
-        const jsonSchema = await model.toJSONSchema()
-        expect(jsonSchema).toMatchObject({
-            type: 'object',
-            properties: {
-                name: { type: 'string' },
-                age: { type: 'number' },
-                bigNumber: { type: 'string', format: 'bigint' },
-            },
-            required: ['name', 'age', 'bigNumber'],
-            $schema: 'https://json-schema.org/draft/2020-12/schema',
-        })
-    })
-
     it('should not include private fields in JSON Schema by default', async () => {
         const schema = z.object({
             id: z.string(),

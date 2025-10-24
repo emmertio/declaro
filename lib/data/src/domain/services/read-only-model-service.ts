@@ -10,7 +10,6 @@ import { ModelQueryEvent } from '../events/event-types'
 import { QueryEvent } from '../events/query-event'
 import { BaseModelService, type IActionOptions } from './base-model-service'
 import type { IPaginationInput } from '../models/pagination'
-import type { IUpdateOptions } from './model-service'
 
 export interface ILoadOptions extends IActionOptions {}
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
@@ -27,15 +26,6 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      * @returns The normalized detail data.
      */
     async normalizeDetail(detail: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
-        const detailModel = this.schema.definition.detail as Model<any, any>
-        if (detailModel) {
-            const validation = await detailModel.validate(detail, { strict: false })
-            if (validation.issues) {
-                console.warn(`${detailModel.labels.singularLabel} shape did not match the expected schema`, validation)
-            } else {
-                return validation.value
-            }
-        }
         return detail
     }
 
@@ -48,15 +38,6 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      * @returns The normalized summary data.
      */
     async normalizeSummary(summary: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
-        const summaryModel = this.schema.definition.summary as Model<any, any>
-        if (summaryModel) {
-            const validation = await summaryModel.validate(summary, { strict: false })
-            if (validation.issues) {
-                console.warn(`${summaryModel.labels.singularLabel} shape did not match the expected schema`)
-            } else {
-                return validation.value
-            }
-        }
         return summary
     }
 

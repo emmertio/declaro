@@ -4,6 +4,7 @@ import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-r
 import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import { mock } from 'bun:test'
+import type { InferDetail } from '../../shared/utils/schema-inference'
 
 describe('ModelService', () => {
     const namespace = 'books'
@@ -881,16 +882,38 @@ describe('ModelService', () => {
             }
         }
 
-        class TestService extends ModelService<typeof mockSchema> {}
+        class TestServiceWithNormalization extends ModelService<typeof mockSchema> {
+            async normalizeDetail(detail: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+                // Handle null case (e.g., when load returns null)
+                if (!detail) return detail
+
+                // Convert string dates back to Date objects
+                if (typeof detail.publishedDate === 'string') {
+                    detail.publishedDate = new Date(detail.publishedDate) as any
+                }
+                return detail
+            }
+
+            async normalizeSummary(summary: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+                // Handle null case (e.g., when load returns null)
+                if (!summary) return summary
+
+                // Convert string dates back to Date objects
+                if (typeof summary.publishedDate === 'string') {
+                    summary.publishedDate = new Date(summary.publishedDate) as any
+                }
+                return summary
+            }
+        }
 
         let testRepository: TestRepository
-        let testService: TestService
+        let testService: TestServiceWithNormalization
 
         beforeEach(() => {
             testRepository = new TestRepository()
             emitter = new EventManager()
 
-            testService = new TestService({
+            testService = new TestServiceWithNormalization({
                 repository: testRepository,
                 emitter,
                 schema: mockSchema,
@@ -898,7 +921,7 @@ describe('ModelService', () => {
             })
         })
 
-        it('should normalize details in the create response', async () => {
+        it('should allow custom normalization of details in the create response when overridden', async () => {
             const input = { id: 200, title: 'Create Test', author: 'Creator', publishedDate: new Date() }
             const record = await testService.create(input)
 
@@ -909,7 +932,7 @@ describe('ModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize details in the update response', async () => {
+        it('should allow custom normalization of details in the update response when overridden', async () => {
             const input = { id: 201, title: 'Update Test', author: 'Updater', publishedDate: new Date() }
             await testRepository.create(input)
 
@@ -923,7 +946,7 @@ describe('ModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize details in the upsert response when creating', async () => {
+        it('should allow custom normalization of details in the upsert response when creating and overridden', async () => {
             const input = { id: 202, title: 'Upsert Create Test', author: 'Upserter', publishedDate: new Date() }
             const record = await testService.upsert(input)
 
@@ -934,7 +957,7 @@ describe('ModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize details in the upsert response when updating', async () => {
+        it('should allow custom normalization of details in the upsert response when updating and overridden', async () => {
             const input = { id: 203, title: 'Upsert Update Test', author: 'Upserter', publishedDate: new Date() }
             await testRepository.create(input)
 
@@ -953,7 +976,7 @@ describe('ModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize details in the bulkUpsert response', async () => {
+        it('should allow custom normalization of details in the bulkUpsert response when overridden', async () => {
             const input1 = { id: 204, title: 'Bulk Test 1', author: 'Bulk Author 1', publishedDate: new Date() }
             const input2 = { id: 205, title: 'Bulk Test 2', author: 'Bulk Author 2', publishedDate: new Date() }
 
@@ -968,7 +991,7 @@ describe('ModelService', () => {
             }
         })
 
-        it('should normalize details in the bulkUpsert response with mixed create and update', async () => {
+        it('should allow custom normalization of details in the bulkUpsert response with mixed create and update when overridden', async () => {
             const existingInput = { id: 206, title: 'Existing', author: 'Existing Author', publishedDate: new Date() }
             await testRepository.create(existingInput)
 
@@ -991,7 +1014,7 @@ describe('ModelService', () => {
             }
         })
 
-        it('should normalize summaries in the remove response', async () => {
+        it('should allow custom normalization of summaries in the remove response when overridden', async () => {
             const input = { id: 208, title: 'Remove Test', author: 'Remover', publishedDate: new Date() }
             await testRepository.create(input)
 
@@ -1004,7 +1027,7 @@ describe('ModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize summaries in the restore response', async () => {
+        it('should allow custom normalization of summaries in the restore response when overridden', async () => {
             const input = { id: 209, title: 'Restore Test', author: 'Restorer', publishedDate: new Date() }
             await testRepository.create(input)
             await testRepository.remove({ id: 209 })
@@ -1016,6 +1039,22 @@ describe('ModelService', () => {
 
             expect(actualDate).toEqual(expectedDate)
             expect(actualDate).toBeInstanceOf(Date)
+        })
+
+        it('should not normalize data by default when normalization methods are not overridden', async () => {
+            const defaultService = new ModelService({
+                repository: testRepository,
+                emitter,
+                schema: mockSchema,
+                namespace,
+            })
+
+            const input = { id: 210, title: 'Default Test', author: 'Default Author', publishedDate: new Date() }
+            const record = await defaultService.create(input)
+
+            // Should return the raw string from repository since no normalization is applied
+            expect(record.publishedDate as any).toBe('2024-01-01')
+            expect(typeof record.publishedDate).toBe('string')
         })
     })
 })

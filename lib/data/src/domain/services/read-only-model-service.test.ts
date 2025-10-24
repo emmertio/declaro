@@ -335,18 +335,41 @@ describe('ReadOnlyModelService', () => {
                 return results
             }
         }
-        class TestService extends ReadOnlyModelService<typeof mockSchema> {}
 
-        let testService: TestService
+        class TestServiceWithNormalization extends ReadOnlyModelService<typeof mockSchema> {
+            async normalizeDetail(detail: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+                // Handle null case (e.g., when load returns null)
+                if (!detail) return detail
+
+                // Convert string dates back to Date objects
+                if (typeof detail.publishedDate === 'string') {
+                    detail.publishedDate = new Date(detail.publishedDate) as any
+                }
+                return detail
+            }
+
+            async normalizeSummary(summary: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+                // Handle null case (e.g., when load returns null)
+                if (!summary) return summary
+
+                // Convert string dates back to Date objects
+                if (typeof summary.publishedDate === 'string') {
+                    summary.publishedDate = new Date(summary.publishedDate) as any
+                }
+                return summary
+            }
+        }
+
+        let testService: TestServiceWithNormalization
 
         beforeEach(() => {
             repository = new TestRepository()
             emitter = new EventManager()
 
-            testService = new TestService({ repository, emitter, schema: mockSchema, namespace })
+            testService = new TestServiceWithNormalization({ repository, emitter, schema: mockSchema, namespace })
         })
 
-        it('should normalize details in the load response', async () => {
+        it('should allow custom normalization of details in the load response when overridden', async () => {
             const input = { id: 100, title: 'Normalization Test', author: 'Normalizer', publishedDate: new Date() }
             await repository.create(input)
 
@@ -359,7 +382,7 @@ describe('ReadOnlyModelService', () => {
             expect(actualDate).toBeInstanceOf(Date)
         })
 
-        it('should normalize details in the loadMany response', async () => {
+        it('should allow custom normalization of details in the loadMany response when overridden', async () => {
             const input1 = { id: 101, title: 'Normalization Test 1', author: 'Normalizer 1', publishedDate: new Date() }
             const input2 = { id: 102, title: 'Normalization Test 2', author: 'Normalizer 2', publishedDate: new Date() }
             await repository.create(input1)
@@ -376,7 +399,7 @@ describe('ReadOnlyModelService', () => {
             }
         })
 
-        it('should normalize details in the search response', async () => {
+        it('should allow custom normalization of summaries in the search response when overridden', async () => {
             const input1 = { id: 103, title: 'Normalization Test 3', author: 'Normalizer 3', publishedDate: new Date() }
             const input2 = { id: 104, title: 'Normalization Test 4', author: 'Normalizer 4', publishedDate: new Date() }
             await repository.create(input1)
@@ -391,6 +414,19 @@ describe('ReadOnlyModelService', () => {
                 expect(actualDate).toEqual(expectedDate)
                 expect(actualDate).toBeInstanceOf(Date)
             }
+        })
+
+        it('should not normalize data by default when normalization methods are not overridden', async () => {
+            const defaultService = new ReadOnlyModelService({ repository, emitter, schema: mockSchema, namespace })
+
+            const input = { id: 105, title: 'Default Test', author: 'Default Author', publishedDate: new Date() }
+            await repository.create(input)
+
+            const record = await defaultService.load({ id: 105 })
+
+            // Should return the raw string from repository since no normalization is applied
+            expect(record.publishedDate as any).toBe('2024-01-01')
+            expect(typeof record.publishedDate).toBe('string')
         })
     })
 })

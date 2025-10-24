@@ -23,10 +23,6 @@ export class ZodModel<TName extends Readonly<string>, TSchema extends $ZodType<a
                     ctx.jsonSchema.type = 'string'
                     ctx.jsonSchema.format = 'date-time'
                 }
-                if (def.type === 'bigint') {
-                    ctx.jsonSchema.type = 'string'
-                    ctx.jsonSchema.format = 'bigint'
-                }
             },
             ...zodOptions,
         })

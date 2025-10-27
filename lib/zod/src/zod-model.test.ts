@@ -194,4 +194,24 @@ describe('ZodModel', () => {
             required: ['id', 'name'],
         })
     })
+
+    it('should have a hidden property in the schema for hidden fields', async () => {
+        const schema = z.object({
+            id: z.string(),
+            name: z.string(),
+            secret: z.string().optional().meta({ private: true }),
+            internalNote: z.string().optional().meta({ hidden: true }),
+        })
+        const model = new ZodModel('User', schema)
+
+        const jsonSchema = await model.toJSONSchema({ includePrivateFields: true })
+
+        const internalNoteSchema = (jsonSchema.properties as any).internalNote
+
+        if (typeof internalNoteSchema === 'object') {
+            expect(internalNoteSchema.hidden).toBe(true)
+        } else {
+            throw new Error('internalNote schema is not an object')
+        }
+    })
 })

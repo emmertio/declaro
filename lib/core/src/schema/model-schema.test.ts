@@ -255,4 +255,28 @@ describe('ModelSchema', () => {
 
         expect(Object.keys(jsonSchema.properties!)).toEqual(['id', 'name', 'secret', 'internalNote'])
     })
+
+    it('should include hidden fields in model schema when specified', () => {
+        const testModel = new MockModel(
+            'TestModel',
+            z.object({
+                id: z.string(),
+                name: z.string(),
+                secret: z.string().optional().meta({ private: true }),
+                internalNote: z.string().optional().meta({ hidden: true }),
+            }),
+        )
+
+        const jsonSchema = testModel.toJSONSchema()
+
+        expect(Object.keys(jsonSchema.properties!)).toEqual(['id', 'name', 'internalNote'])
+
+        const internalNoteSchema = jsonSchema.properties?.['internalNote']
+
+        if (typeof internalNoteSchema === 'object') {
+            expect(internalNoteSchema.hidden).toBe(true)
+        } else {
+            throw new Error('internalNote schema is not an object')
+        }
+    })
 })

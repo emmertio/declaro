@@ -1,6 +1,6 @@
 {
     "name": "@declaro/redis",
-    "version": "2.0.0-beta.116",
+    "version": "2.0.0-beta.117",
     "description": "Redis tools for Declaro",
     "main": "dist/node/index.cjs",
     "module": "dist/node/index.js",

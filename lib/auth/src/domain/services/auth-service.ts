@@ -58,13 +58,14 @@ export abstract class AuthService {
     }
 
     getSecret(): string {
-        if (!process.env.APP_SECRET && process.env.NODE_ENV !== 'test') {
+        const secret = this.authConfig.signingSecret ?? process.env.APP_SECRET
+        if (!secret && process.env.NODE_ENV !== 'test') {
             console.warn('APP_SECRET is not set, using a default secret for development purposes.')
         }
-        if (!process.env.APP_SECRET && process.env.NODE_ENV !== 'production') {
+        if (!secret && process.env.NODE_ENV !== 'production') {
             return 'shhhhh'
         }
-        return process.env.APP_SECRET!
+        return secret!
     }
 
     getSessionId(payload?: IAuthSessionInput) {

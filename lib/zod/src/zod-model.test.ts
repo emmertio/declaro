@@ -214,4 +214,186 @@ describe('ZodModel', () => {
             throw new Error('internalNote schema is not an object')
         }
     })
+
+    describe('Unrepresentable types', () => {
+        it('should convert z.bigint() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                id: z.bigint(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    id: {}, // bigint becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['id', 'name'],
+            })
+        })
+
+        it('should convert z.int64() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                id: z.int64(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    id: {}, // int64 becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['id', 'name'],
+            })
+        })
+
+        it('should convert z.symbol() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                sym: z.symbol(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    sym: {}, // symbol becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['sym', 'name'],
+            })
+        })
+
+        it('should convert z.void() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                result: z.void(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    result: {}, // void becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['result', 'name'],
+            })
+        })
+
+        it('should convert z.map() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                data: z.map(z.string(), z.number()),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    data: {}, // map becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['data', 'name'],
+            })
+        })
+
+        it('should convert z.set() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                tags: z.set(z.string()),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    tags: {}, // set becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['tags', 'name'],
+            })
+        })
+
+        it('should convert z.transform() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                value: z.string().transform((val) => val.length),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    value: {}, // transform becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['value', 'name'],
+            })
+        })
+
+        it('should convert z.nan() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                nanValue: z.nan(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    nanValue: {}, // nan becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['nanValue', 'name'],
+            })
+        })
+
+        it('should convert z.custom() to any (empty object) in JSON Schema', async () => {
+            const schema = z.object({
+                custom: z.custom<{ foo: string }>(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    custom: {}, // custom becomes {}
+                    name: { type: 'string' },
+                },
+                required: ['custom', 'name'],
+            })
+        })
+
+        it('should handle z.date() with custom override (not as empty object)', async () => {
+            const schema = z.object({
+                createdAt: z.date(),
+                name: z.string(),
+            })
+            const model = new ZodModel('User', schema)
+
+            const jsonSchema = await model.toJSONSchema()
+            expect(jsonSchema).toMatchObject({
+                type: 'object',
+                properties: {
+                    createdAt: { type: 'string', format: 'date-time' }, // date has custom handling
+                    name: { type: 'string' },
+                },
+                required: ['createdAt', 'name'],
+            })
+        })
+    })
 })

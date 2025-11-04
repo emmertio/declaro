@@ -6,18 +6,37 @@ import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
 
+/**
+ * Global interface for declaring dependencies available across all contexts.
+ * Extend this interface using declaration merging to add type-safe dependencies.
+ */
 export interface DeclaroDependencies {}
 
+/**
+ * Base scope interface for contexts with request and node middleware.
+ */
 export interface DeclaroScope {
+    /** Middleware that runs on request contexts */
     requestMiddleware: ContextMiddleware<Context>[]
+    /** Node.js-compatible middleware */
     nodeMiddleware: AllNodeMiddleware[]
 }
+
+/**
+ * Scope interface for request-specific contexts, extending the base scope with request data.
+ */
 export interface DeclaroRequestScope extends DeclaroScope {
+    /** The HTTP request object */
     request: Request
+    /** Incoming HTTP headers */
     headers: IncomingHttpHeaders
+    /** Helper function to retrieve a specific header value */
     header: <K extends keyof IncomingHttpHeaders>(header: K) => IncomingHttpHeaders[K] | undefined
 }
 
+/**
+ * Extracts the scope type from a Context type.
+ */
 export type ExtractScope<T extends Context<any>> = T extends Context<infer S> ? S : never
 
 /**
@@ -32,45 +51,102 @@ export type NarrowContext<TContext extends Context<any>, TNarrowScope extends ob
         : never
     : never
 
+/**
+ * Middleware function that can modify or extend a context.
+ */
 export type ContextMiddleware<C extends Context = Context> = (context: Context<ExtractScope<C>>) => any | Promise<any>
+
+/**
+ * Represents the state storage for a context, mapping keys to their attributes.
+ */
 export type ContextState<TContext extends Context> = Record<PropertyKey, ContextAttribute<TContext, StateValue<any>>>
 
+/**
+ * Function that resolves a value from a context.
+ */
 export type ContextResolver<T> = (context: Context) => StateValue<T>
 
+/**
+ * Wrapper type for state values.
+ */
 export type StateValue<T> = T
 
+/**
+ * Types of dependencies that can be registered in a context.
+ */
 export enum DependencyType {
+    /** A literal value dependency */
     VALUE = 'VALUE',
+    /** A factory function that creates the dependency */
     FACTORY = 'FACTORY',
+    /** A class constructor that instantiates the dependency */
     CLASS = 'CLASS',
 }
 
+/**
+ * Factory function type that takes arguments and returns a value.
+ */
 export type FactoryFn<T, A extends any[]> = (...args: A) => T
+
+/**
+ * Function that loads a value from a context with optional resolution options.
+ */
 export type ValueLoader<C extends Context, T> = (context: C, resolutionOptions?: ResolveOptions) => T
+
+/**
+ * Filters object keys to only those whose values match a specific type.
+ */
 export type FilterKeysByType<TScope, TValue> = {
     [Key in keyof TScope]: TScope[Key] extends TValue ? Key : never
 }[keyof TScope]
+
+/**
+ * Filters object keys to only those whose values match a specific type or Promise of that type.
+ */
 export type FilterKeysByAsyncType<TScope, TValue> = {
     [Key in keyof TScope]: TScope[Key] extends PromiseOrValue<TValue> ? Key : never
 }[keyof TScope]
+
+/**
+ * Maps an array of argument types to their corresponding scope keys.
+ */
 export type FilterArgsByType<TScope, TArgs extends any[]> = {
     [Key in keyof TArgs]: FilterKeysByType<TScope, TArgs[Key]>
 }
+
+/**
+ * Maps an array of argument types to their corresponding scope keys for async values.
+ */
 export type FilterAsyncArgsByType<TScope, TArgs extends any[]> = {
     [Key in keyof TArgs]: FilterKeysByAsyncType<TScope, TArgs[Key]>
 }
 
+/**
+ * Metadata describing how a dependency is registered and resolved in a context.
+ */
 export type ContextAttribute<TContext extends Context<any>, TValue> = {
+    /** The key under which this dependency is registered */
     key: PropertyKey
+    /** Function that loads the value from the context */
     value?: ValueLoader<TContext, TValue>
+    /** The type of dependency (value, factory, or class) */
     type: DependencyType
+    /** Options controlling how this dependency is resolved */
     resolveOptions?: ResolveOptions
+    /** Cached value for singleton or eager dependencies */
     cachedValue?: TValue
+    /** Keys of other dependencies that this dependency requires */
     inject: PropertyKey[]
 }
 
+/**
+ * Type-safe scope key extraction.
+ */
 export type ScopeKey<S extends object> = keyof S
 
+/**
+ * Listener function that responds to events in a context.
+ */
 export type ContextListener<C extends Context, E extends IEvent> = (context: C, event: E) => any
 
 /**
@@ -102,6 +178,12 @@ export interface ResolveProxy<T = any> {
     readonly valueOf: () => T
 }
 
+/**
+ * Type guard to check if a value is a circular dependency proxy.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a ResolveProxy
+ */
 export function isProxy(value: any): value is ResolveProxy {
     return value && typeof value === 'object' && value.__isProxy === true
 }
@@ -131,6 +213,12 @@ export interface ResolveOptions {
     resolutionContext?: Map<PropertyKey, any>
 }
 
+/**
+ * Extracts nested resolution options, preserving resolution state across calls.
+ *
+ * @param options - The resolve options to extract from
+ * @returns Internal resolution options with resolution stack and context
+ */
 export function getNestedResolveOptions(options?: ResolveOptions | InternalResolveOptions): InternalResolveOptions {
     return {
         resolutionStack: (options as InternalResolveOptions)?.resolutionStack,
@@ -138,10 +226,19 @@ export function getNestedResolveOptions(options?: ResolveOptions | InternalResol
     }
 }
 
+/**
+ * Internal interface extending ResolveOptions with resolution tracking.
+ */
 export interface InternalResolveOptions extends ResolveOptions {
+    /** Stack tracking the current resolution chain to detect circular dependencies */
     resolutionStack: Set<PropertyKey>
 }
 
+/**
+ * Returns the default resolution options for dependencies.
+ *
+ * @returns Default resolve options with strict, eager, and singleton all set to false
+ */
 export function defaultResolveOptions(): ResolveOptions {
     return {
         strict: false,
@@ -150,18 +247,43 @@ export function defaultResolveOptions(): ResolveOptions {
     }
 }
 
+/**
+ * Helper function to define type-safe context middleware.
+ *
+ * @param middleware - The middleware function to define
+ * @returns The same middleware function with proper typing
+ */
+export function defineContextMiddleware<C extends Context>(middleware: ContextMiddleware<C>): ContextMiddleware<C> {
+    return middleware
+}
+
+/**
+ * Configuration options for creating a context.
+ */
 export type ContextOptions = {
+    /** Default options to use when resolving dependencies */
     defaultResolveOptions?: ResolveOptions
 }
 
+/**
+ * Core dependency injection container that manages application dependencies and their lifecycle.
+ * Supports values, factories, and classes with automatic dependency resolution and circular dependency handling.
+ */
 export class Context<Scope extends object = any> {
     private readonly state: ContextState<this> = {}
     private readonly emitter = new EventManager()
 
+    /** The scope object providing typed access to all registered dependencies */
     public readonly scope: Scope = {} as Scope
 
+    /** Default options used when resolving dependencies if not overridden */
     protected readonly defaultResolveOptions: ResolveOptions
 
+    /**
+     * Creates a new context instance.
+     *
+     * @param options - Configuration options for the context
+     */
     constructor(options?: ContextOptions) {
         this.defaultResolveOptions = {
             ...defaultResolveOptions(),
@@ -169,10 +291,19 @@ export class Context<Scope extends object = any> {
         }
     }
 
+    /**
+     * Gets the event manager for this context.
+     *
+     * @returns The event manager instance
+     */
     get events() {
         return this.emitter
     }
 
+    /**
+     * Initializes all dependencies marked as eager.
+     * Should be called after all dependencies are registered to trigger eager initialization.
+     */
     async initializeEagerDependencies() {
         await Promise.all(
             Object.entries(this.state)
@@ -186,8 +317,8 @@ export class Context<Scope extends object = any> {
     /**
      * Set a value in context, to be injected later.
      *
-     * @param key
-     * @param payload
+     * @param key - The scope key to register the value under
+     * @param payload - The value to register
      * @deprecated Use `provideValue` instead, or you can register the same dependency as a factory with `provideFactory` or class with `provideClass`.
      */
     provide<K extends ScopeKey<Scope>>(key: K, payload: Scope[K]) {
@@ -228,6 +359,10 @@ export class Context<Scope extends object = any> {
 
     /**
      * Add a dependency to the context.
+     *
+     * @param key - The scope key to register under
+     * @param dep - The dependency attribute to add
+     * @returns The registered dependency attribute
      */
     protected addDep<K extends ScopeKey<Scope>>(key: K, dep: ContextAttribute<this, Scope[K]>) {
         this.state[key] = dep
@@ -244,8 +379,10 @@ export class Context<Scope extends object = any> {
     /**
      * Register a value in context scope.
      *
-     * @param key The key to register the dependency under
-     * @param value The value to register
+     * @param key - The key to register the dependency under
+     * @param value - The value to register
+     * @param defaultResolveOptions - Optional resolution options
+     * @returns The context instance for chaining
      */
     registerValue<K extends ScopeKey<Scope>>(key: K, value: Scope[K], defaultResolveOptions?: ResolveOptions) {
         const attribute: ContextAttribute<this, Scope[K]> = {
@@ -264,9 +401,10 @@ export class Context<Scope extends object = any> {
     /**
      * Register a dependency as a factory in context scope.
      *
-     * @param key The key to register the dependency under
-     * @param factory A factory function that will be called to generate the value when it is requested.
-     * @param inject An array of keys to use when injecting factory args.
+     * @param key - The key to register the dependency under
+     * @param factory - A factory function that will be called to generate the value when it is requested
+     * @param inject - An array of keys to use when injecting factory args
+     * @param defaultResolveOptions - Optional resolution options
      * @returns A chainable instance of context
      */
     registerFactory<K extends ScopeKey<Scope>, A extends any[]>(
@@ -294,6 +432,16 @@ export class Context<Scope extends object = any> {
         return this
     }
 
+    /**
+     * Register an async factory in context scope.
+     * The factory function and its dependencies can be asynchronous.
+     *
+     * @param key - The key to register the dependency under
+     * @param factory - An async factory function that will be called to generate the value
+     * @param inject - An array of keys to use when injecting factory args
+     * @param defaultResolveOptions - Optional resolution options
+     * @returns A chainable instance of context
+     */
     registerAsyncFactory<K extends FilterKeysByType<Scope, Promise<any>>, A extends any[]>(
         key: K,
         factory: FactoryFn<Scope[K], A>,
@@ -319,6 +467,16 @@ export class Context<Scope extends object = any> {
         return this
     }
 
+    /**
+     * Register a class constructor in context scope.
+     * The class will be instantiated with the specified dependencies.
+     *
+     * @param key - The key to register the dependency under
+     * @param Class - The class constructor
+     * @param inject - An array of keys to use when injecting constructor arguments
+     * @param defaultResolveOptions - Optional resolution options
+     * @returns A chainable instance of context
+     */
     registerClass<
         K extends FilterKeysByType<Scope, InstanceType<T>>,
         T extends Class<Scope[K] extends {} ? Scope[K] : never>,
@@ -345,6 +503,16 @@ export class Context<Scope extends object = any> {
         return this
     }
 
+    /**
+     * Register an async class constructor in context scope.
+     * The class constructor can have async dependencies.
+     *
+     * @param key - The key to register the dependency under
+     * @param Class - The class constructor
+     * @param inject - An array of keys to use when injecting constructor arguments
+     * @param defaultResolveOptions - Optional resolution options
+     * @returns A chainable instance of context
+     */
     registerAsyncClass<
         K extends FilterKeysByType<Scope, InstanceType<any>>,
         T extends Class<UnwrapPromise<Scope[K]> extends {} ? UnwrapPromise<Scope[K]> : never>,
@@ -374,6 +542,12 @@ export class Context<Scope extends object = any> {
         return this
     }
 
+    /**
+     * Gets all dependencies required by a specific dependency.
+     *
+     * @param key - The key of the dependency to inspect
+     * @returns Array of all direct and transitive dependencies
+     */
     getAllDependencies<K extends ScopeKey<Scope>>(key: K): ContextAttribute<this, any>[] {
         const attribute = this.state[key]
 
@@ -391,6 +565,14 @@ export class Context<Scope extends object = any> {
         return dependencies
     }
 
+    /**
+     * Gets all dependencies that depend on a specific dependency.
+     * Useful for cache invalidation when a dependency changes.
+     *
+     * @param key - The key of the dependency to inspect
+     * @param visited - Internal tracking set to prevent infinite recursion
+     * @returns Array of all direct and transitive dependents
+     */
     getAllDependents<K extends ScopeKey<Scope>>(key: K, visited = new Set<any>()): ContextAttribute<this, any>[] {
         if (visited.has(key)) {
             return []
@@ -410,12 +592,26 @@ export class Context<Scope extends object = any> {
         return dependents
     }
 
+    /**
+     * Introspects a dependency to get its metadata.
+     *
+     * @param key - The key of the dependency to inspect
+     * @returns The context attribute for the dependency, or undefined if not found
+     */
     introspect<K extends ScopeKey<Scope>>(key: K) {
         const attribute = this.state[key]
 
         return attribute
     }
 
+    /**
+     * Checks if a cached value is still valid for a dependency.
+     * A cache is invalid if the dependency or any of its transitive dependencies have been invalidated.
+     *
+     * @param key - The key of the dependency to check
+     * @param visited - Internal tracking set to prevent infinite recursion in circular dependencies
+     * @returns True if the cache is valid, false otherwise
+     */
     protected _cacheIsValid<K extends ScopeKey<Scope>>(key: K, visited = new Set<PropertyKey>()): boolean {
         // Prevent infinite recursion in circular dependencies
         if (visited.has(key)) {
@@ -443,6 +639,12 @@ export class Context<Scope extends object = any> {
         return result
     }
 
+    /**
+     * Creates a proxy object for handling circular dependencies.
+     * The proxy initially acts as a placeholder and is later resolved to the real target.
+     *
+     * @returns A proxy that can be resolved later
+     */
     protected createProxy<T>(): ResolveProxy<T> {
         let realTarget: any = null
         let isResolved = false
@@ -519,6 +721,14 @@ export class Context<Scope extends object = any> {
         return proxy as ResolveProxy<T>
     }
 
+    /**
+     * Internal method to resolve a dependency value with circular dependency handling.
+     * This is the core resolution logic that handles caching, proxies, and dependency injection.
+     *
+     * @param key - The key of the dependency to resolve
+     * @param resolveOptions - Options controlling the resolution behavior
+     * @returns The resolved dependency value
+     */
     protected _resolveValue<K extends ScopeKey<Scope>>(key: K, resolveOptions?: InternalResolveOptions): Scope[K] {
         const attributeResolveOptions: InternalResolveOptions = {
             ...this.defaultResolveOptions,
@@ -607,14 +817,22 @@ export class Context<Scope extends object = any> {
     /**
      * Extract a value from context.
      *
-     * @param key
-     * @returns
+     * @param key - The scope key to resolve
+     * @returns The resolved value or undefined if not found
      * @deprecated Use `resolve` instead
      */
     inject<T = any>(key: ScopeKey<Scope>): T | undefined {
         return this._resolveValue(key) as T
     }
 
+    /**
+     * Resolves a dependency from the context.
+     * This is the primary method for retrieving registered dependencies.
+     *
+     * @param key - The scope key to resolve
+     * @param resolveOptions - Options controlling resolution behavior
+     * @returns The resolved dependency value
+     */
     resolve<K extends ScopeKey<Scope>>(key: K, resolveOptions?: ResolveOptions): Scope[K] {
         // Create a default resolution context for top-level calls if none provided
         const options: InternalResolveOptions = {
@@ -628,8 +846,9 @@ export class Context<Scope extends object = any> {
     /**
      * Ensure that only one copy of this instance exists in this context. Provides the instance if it doesn't exist yet, otherwise inject the cached instance.
      *
-     * @param key
-     * @param instance
+     * @param key - The scope key to register under
+     * @param instance - The instance to register as a singleton
+     * @returns The singleton instance (either the provided one or the existing one)
      */
     singleton<T = any>(key: ScopeKey<Scope>, instance: T) {
         const existing = this.inject<T>(key)
@@ -642,10 +861,12 @@ export class Context<Scope extends object = any> {
     }
 
     /**
-     * Instantiate a ContextConsumer class
+     * Instantiate a ContextConsumer class.
+     * ContextConsumer classes have automatic access to the context instance.
      *
-     * @param Consumer
-     * @returns
+     * @param Consumer - The ContextConsumer class to instantiate
+     * @param args - Additional arguments to pass to the constructor
+     * @returns A new instance of the ContextConsumer
      */
     hydrate<T extends ContextConsumer<this, any[]>, A extends any[]>(
         Consumer: new (context: this, ...args: A) => T,
@@ -655,10 +876,11 @@ export class Context<Scope extends object = any> {
     }
 
     /**
-     * Create a new context from other instance(s) of Context
+     * Create a new context from other instance(s) of Context.
+     * Dependencies and event listeners from the provided contexts will be merged into this context.
      *
-     * @param contexts
-     * @returns
+     * @param contexts - One or more contexts to extend from
+     * @returns The current context instance for chaining
      */
     extend(...contexts: Context[]): this {
         contexts.forEach((context) => {
@@ -675,10 +897,10 @@ export class Context<Scope extends object = any> {
     }
 
     /**
-     * Modify context with middleware
+     * Modify context with middleware.
+     * Middleware can register dependencies, modify configuration, or perform other setup tasks.
      *
-     * @param middleware
-     * @returns
+     * @param middleware - One or more middleware functions to apply
      */
     async use<TNarrowScope extends Partial<Scope>>(
         ...middleware: ContextMiddleware<Context<TNarrowScope>>[]
@@ -696,17 +918,18 @@ export class Context<Scope extends object = any> {
     /**
      * Validate context ensuring all validators are valid.
      *
-     * @param validators
-     * @returns
+     * @param validators - One or more validator functions to run
+     * @returns The validation result
      */
     validate(...validators: Validator<Context>[]) {
         return validate(this, ...validators)
     }
 
     /**
-     * Validate context ensuring at least one validator is valid
-     * @param validators
-     * @returns
+     * Validate context ensuring at least one validator is valid.
+     *
+     * @param validators - One or more validator functions to run
+     * @returns The validation result
      */
     validateAny(...validators: Validator<Context>[]) {
         return validateAny(this, ...validators)
@@ -715,9 +938,9 @@ export class Context<Scope extends object = any> {
     /**
      * Add a callback to listen for an event in this context.
      *
-     * @param event
-     * @param listener
-     * @returns
+     * @param type - The event type to listen for
+     * @param listener - The callback function to invoke when the event is emitted
+     * @returns A function to unregister the listener
      */
     on<E extends IEvent = IEvent>(type: IEvent['type'], listener: ContextListener<this, E>) {
         return this.emitter.on(type, (event) => {
@@ -726,11 +949,10 @@ export class Context<Scope extends object = any> {
     }
 
     /**
-     * Emit an event in this context
+     * Emit an event in this context.
      *
-     * @param event
-     * @param args
-     * @returns
+     * @param event - The event type string or event object to emit
+     * @returns A promise that resolves when all event listeners have completed
      */
     async emit(event: string | IEvent) {
         const eventObject = typeof event === 'string' ? { type: event } : event

@@ -669,7 +669,7 @@ describe('ReadOnlyModelService', () => {
 
             it('should count both active and removed items with includeRemoved option', async () => {
                 await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
-                const removed = await repository.create({
+                await repository.create({
                     id: 2,
                     title: 'Removed Book',
                     author: 'Author 2',

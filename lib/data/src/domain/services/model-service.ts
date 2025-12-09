@@ -1,5 +1,11 @@
 import type { ActionDescriptor, AnyModelSchema, IActionDescriptor } from '@declaro/core'
-import type { InferDetail, InferInput, InferLookup, InferSummary } from '../../shared/utils/schema-inference'
+import type {
+    InferDetail,
+    InferFilters,
+    InferInput,
+    InferLookup,
+    InferSummary,
+} from '../../shared/utils/schema-inference'
 import { ModelMutationAction, ModelQueryEvent } from '../events/event-types'
 import { MutationEvent } from '../events/mutation-event'
 import type { IModelServiceArgs } from './model-service-args'
@@ -341,5 +347,86 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Return normalized results
         return await Promise.all(results.map((result) => this.normalizeDetail(result)))
+    }
+
+    /**
+     * Permanently deletes all items from trash, optionally filtered by the provided criteria.
+     * @param filters Optional filters to apply when selecting items to delete from trash.
+     * @returns The count of permanently deleted items.
+     */
+    async emptyTrash(filters?: InferFilters<TSchema>): Promise<number> {
+        // Emit the before empty trash event
+        const beforeEmptyTrashEvent = new MutationEvent<number, InferFilters<TSchema> | undefined>(
+            this.getDescriptor(ModelMutationAction.BeforeEmptyTrash),
+            filters,
+        )
+        await this.emitter.emitAsync(beforeEmptyTrashEvent)
+
+        // Perform the empty trash operation
+        const count = await this.repository.emptyTrash(filters)
+
+        // Emit the after empty trash event
+        const afterEmptyTrashEvent = new MutationEvent<number, InferFilters<TSchema> | undefined>(
+            this.getDescriptor(ModelMutationAction.AfterEmptyTrash),
+            filters,
+        ).setResult(count)
+        await this.emitter.emitAsync(afterEmptyTrashEvent)
+
+        // Return the count of deleted items
+        return count
+    }
+
+    /**
+     * Permanently deletes a specific item from trash based on the provided lookup.
+     * @param lookup The lookup criteria for the item to permanently delete from trash.
+     * @returns The permanently deleted item summary.
+     */
+    async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        // Emit the before permanently delete from trash event
+        const beforePermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+            this.getDescriptor(ModelMutationAction.BeforePermanentlyDeleteFromTrash),
+            lookup,
+        )
+        await this.emitter.emitAsync(beforePermanentlyDeleteFromTrashEvent)
+
+        // Perform the permanent deletion from trash
+        const result = await this.repository.permanentlyDeleteFromTrash(lookup)
+
+        // Emit the after permanently delete from trash event
+        const afterPermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+            this.getDescriptor(ModelMutationAction.AfterPermanentlyDeleteFromTrash),
+            lookup,
+        ).setResult(result)
+        await this.emitter.emitAsync(afterPermanentlyDeleteFromTrashEvent)
+
+        // Return the results of the permanent deletion
+        return await this.normalizeSummary(result)
+    }
+
+    /**
+     * Permanently deletes an item based on the provided lookup, regardless of whether it is active or in trash.
+     * @param lookup The lookup criteria for the item to permanently delete.
+     * @returns The permanently deleted item summary.
+     */
+    async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        // Emit the before permanently delete event
+        const beforePermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+            this.getDescriptor(ModelMutationAction.BeforePermanentlyDelete),
+            lookup,
+        )
+        await this.emitter.emitAsync(beforePermanentlyDeleteEvent)
+
+        // Perform the permanent deletion
+        const result = await this.repository.permanentlyDelete(lookup)
+
+        // Emit the after permanently delete event
+        const afterPermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+            this.getDescriptor(ModelMutationAction.AfterPermanentlyDelete),
+            lookup,
+        ).setResult(result)
+        await this.emitter.emitAsync(afterPermanentlyDeleteEvent)
+
+        // Return the results of the permanent deletion
+        return await this.normalizeSummary(result)
     }
 }

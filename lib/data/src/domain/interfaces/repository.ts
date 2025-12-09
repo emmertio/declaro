@@ -105,9 +105,32 @@ export interface IRepository<TSchema extends AnyModelSchema> {
      */
     count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number>
 
+    /**
+     * Permanently deletes all items from trash, optionally filtered by the provided criteria.
+     * Items deleted via this method cannot be restored.
+     *
+     * @param filters - Optional filters to apply when selecting items to delete from trash.
+     * @returns A promise resolving to the count of permanently deleted items.
+     */
     emptyTrash(filters?: InferFilters<TSchema>): Promise<number>
 
+    /**
+     * Permanently deletes a specific item from trash based on the provided lookup.
+     * The item must exist in trash (previously removed). Items deleted via this method cannot be restored.
+     *
+     * @param lookup - The lookup criteria for the item to permanently delete from trash.
+     * @returns A promise resolving to the permanently deleted item summary.
+     * @throws Error if the item is not found in trash.
+     */
     permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>>
 
+    /**
+     * Permanently deletes an item based on the provided lookup, regardless of whether it is active or in trash.
+     * Items deleted via this method cannot be restored.
+     *
+     * @param lookup - The lookup criteria for the item to permanently delete.
+     * @returns A promise resolving to the permanently deleted item summary.
+     * @throws Error if the item is not found in either active data or trash.
+     */
     permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>>
 }

@@ -503,13 +503,13 @@ describe('ReadOnlyModelService', () => {
 
             it('should return only removed items with removedOnly option', async () => {
                 await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
-                const removed1 = await repository.create({
+                await repository.create({
                     id: 2,
                     title: 'Removed Book 1',
                     author: 'Author 2',
                     publishedDate: new Date(),
                 })
-                const removed2 = await repository.create({
+                await repository.create({
                     id: 3,
                     title: 'Removed Book 2',
                     author: 'Author 3',
@@ -537,7 +537,7 @@ describe('ReadOnlyModelService', () => {
                     author: 'Author 2',
                     publishedDate: new Date(),
                 })
-                const removed = await repository.create({
+                await repository.create({
                     id: 3,
                     title: 'Removed Book',
                     author: 'Author 3',
@@ -633,7 +633,7 @@ describe('ReadOnlyModelService', () => {
         describe('count with trash options', () => {
             it('should count only active items by default', async () => {
                 await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
-                const removed = await repository.create({
+                await repository.create({
                     id: 2,
                     title: 'Removed Book',
                     author: 'Author 2',
@@ -647,13 +647,13 @@ describe('ReadOnlyModelService', () => {
 
             it('should count only removed items with removedOnly option', async () => {
                 await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
-                const removed1 = await repository.create({
+                await repository.create({
                     id: 2,
                     title: 'Removed Book 1',
                     author: 'Author 2',
                     publishedDate: new Date(),
                 })
-                const removed2 = await repository.create({
+                await repository.create({
                     id: 3,
                     title: 'Removed Book 2',
                     author: 'Author 3',
@@ -759,7 +759,7 @@ describe('ReadOnlyModelService', () => {
                     author: 'Author 3',
                     publishedDate: new Date(),
                 })
-                const active = await repositoryWithFilter.create({
+                await repositoryWithFilter.create({
                     title: 'Test Active Book',
                     author: 'Author 4',
                     publishedDate: new Date(),

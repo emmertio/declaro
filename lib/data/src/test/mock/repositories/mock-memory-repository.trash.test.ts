@@ -451,6 +451,32 @@ describe('MockMemoryRepository - Trash Functionality', () => {
             const activeResults = await repository.search({})
             expect(activeResults.results).toHaveLength(2)
         })
+
+        it('should return 0 when filters are provided but no filter function is configured', async () => {
+            // Create and remove items
+            const book1 = await repository.create({
+                title: 'Test Book 1',
+                author: 'Author 1',
+                publishedDate: new Date(),
+            })
+            const book2 = await repository.create({
+                title: 'Other Book 2',
+                author: 'Author 2',
+                publishedDate: new Date(),
+            })
+
+            await repository.remove({ id: book1.id })
+            await repository.remove({ id: book2.id })
+
+            // Try to empty trash with filters, but no filter function is configured
+            // This will return 0 because the filter cannot be applied
+            const deletedCount = await repository.emptyTrash({ text: 'Test' })
+            expect(deletedCount).toBe(0)
+
+            // Verify all items are still in trash
+            const trashResults = await repository.search({}, { removedOnly: true })
+            expect(trashResults.results).toHaveLength(2)
+        })
     })
 
     describe('restore', () => {
@@ -500,7 +526,7 @@ describe('MockMemoryRepository - Trash Functionality', () => {
 
     describe('count with trash options', () => {
         it('should count only active items by default', async () => {
-            const book1 = await repository.create({
+            await repository.create({
                 title: 'Active Book',
                 author: 'Author 1',
                 publishedDate: new Date(),
@@ -518,7 +544,7 @@ describe('MockMemoryRepository - Trash Functionality', () => {
         })
 
         it('should count only removed items with removedOnly option', async () => {
-            const book1 = await repository.create({
+            await repository.create({
                 title: 'Active Book',
                 author: 'Author 1',
                 publishedDate: new Date(),
@@ -542,7 +568,7 @@ describe('MockMemoryRepository - Trash Functionality', () => {
         })
 
         it('should count both removed and active items with includeRemoved option', async () => {
-            const book1 = await repository.create({
+            await repository.create({
                 title: 'Active Book',
                 author: 'Author 1',
                 publishedDate: new Date(),

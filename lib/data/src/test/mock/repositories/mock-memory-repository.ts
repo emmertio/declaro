@@ -319,6 +319,9 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
                 if (this.args.filter(item, filters)) {
                     itemsToDelete.push(key)
                 }
+            } else {
+                // No filter function provided - match all items
+                itemsToDelete.push(key)
             }
         }
 

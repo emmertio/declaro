@@ -71,6 +71,12 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         return undefined
     }
 
+    /**
+     * Loads a single item by lookup criteria.
+     * @param input - The lookup criteria.
+     * @param options - Optional load options including removedOnly and includeRemoved.
+     * @returns The found item or null if not found.
+     */
     async load(input: InferLookup<TSchema>, options: ILoadOptions = {}): Promise<InferDetail<TSchema> | null> {
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key is not defined in the schema metadata')

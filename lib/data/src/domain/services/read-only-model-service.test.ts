@@ -488,7 +488,7 @@ describe('ReadOnlyModelService', () => {
         describe('search with trash options', () => {
             it('should not return removed items by default', async () => {
                 await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
-                const removed = await repository.create({
+                await repository.create({
                     id: 2,
                     title: 'Removed Book',
                     author: 'Author 2',

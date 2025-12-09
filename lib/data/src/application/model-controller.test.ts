@@ -500,4 +500,195 @@ describe('ModelController', () => {
             await expect(controller.bulkUpsert([input])).rejects.toThrow(PermissionError)
         })
     })
+
+    describe('Trash Functionality', () => {
+        let permanentlyDeleteValidator: AuthValidator
+        let permanentlyDeleteFromTrashValidator: AuthValidator
+        let emptyTrashValidator: AuthValidator
+
+        beforeEach(() => {
+            permanentlyDeleteValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.permanently-delete:all'],
+                }),
+                null,
+                authService,
+            )
+            permanentlyDeleteFromTrashValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.permanently-delete-from-trash:all'],
+                }),
+                null,
+                authService,
+            )
+            emptyTrashValidator = new AuthValidator(
+                getMockAuthSession({
+                    claims: ['books::book.empty-trash:all'],
+                }),
+                null,
+                authService,
+            )
+        })
+
+        describe('permanentlyDelete', () => {
+            it('should permanently delete a record if permissions are valid', async () => {
+                const controller = new ModelController(service, permanentlyDeleteValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+
+                const deletedRecord = await controller.permanentlyDelete({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+
+            it('should throw PermissionError if permissions are invalid', async () => {
+                const controller = new ModelController(service, invalidAuthValidator)
+
+                await expect(controller.permanentlyDelete({ id: 42 })).rejects.toThrow(PermissionError)
+            })
+
+            it('should allow permanentlyDelete with specific permanently-delete permission', async () => {
+                const controller = new ModelController(service, permanentlyDeleteValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+
+                const deletedRecord = await controller.permanentlyDelete({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+        })
+
+        describe('permanentlyDeleteFromTrash', () => {
+            it('should permanently delete from trash if permissions are valid', async () => {
+                const controller = new ModelController(service, permanentlyDeleteFromTrashValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+
+                const deletedRecord = await controller.permanentlyDeleteFromTrash({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+
+            it('should throw PermissionError if permissions are invalid', async () => {
+                const controller = new ModelController(service, invalidAuthValidator)
+
+                await expect(controller.permanentlyDeleteFromTrash({ id: 42 })).rejects.toThrow(PermissionError)
+            })
+
+            it('should allow with permanently-delete-from-trash permission', async () => {
+                const controller = new ModelController(service, permanentlyDeleteFromTrashValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+
+                const deletedRecord = await controller.permanentlyDeleteFromTrash({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+
+            it('should allow with permanently-delete permission', async () => {
+                const controller = new ModelController(service, permanentlyDeleteValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+
+                const deletedRecord = await controller.permanentlyDeleteFromTrash({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+
+            it('should allow with empty-trash permission', async () => {
+                const controller = new ModelController(service, emptyTrashValidator)
+
+                const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+
+                const deletedRecord = await controller.permanentlyDeleteFromTrash({ id: 42 })
+
+                expect(deletedRecord).toEqual(input)
+            })
+        })
+
+        describe('emptyTrash', () => {
+            it('should empty trash if permissions are valid', async () => {
+                const controller = new ModelController(service, emptyTrashValidator)
+
+                const input1 = { id: 1, title: 'Test Book 1', author: 'Author Name', publishedDate: new Date() }
+                const input2 = { id: 2, title: 'Test Book 2', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+                await repository.remove({ id: 1 })
+                await repository.remove({ id: 2 })
+
+                const count = await controller.emptyTrash()
+
+                expect(count).toBe(2)
+            })
+
+            it('should throw PermissionError if permissions are invalid', async () => {
+                const controller = new ModelController(service, invalidAuthValidator)
+
+                await expect(controller.emptyTrash()).rejects.toThrow(PermissionError)
+            })
+
+            it('should empty trash with filters if permissions are valid', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ModelService({
+                    repository: repositoryWithFilter,
+                    emitter: new EventManager(),
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                const controller = new ModelController(serviceWithFilter, emptyTrashValidator)
+
+                await repositoryWithFilter.create({
+                    id: 1,
+                    title: 'Test Book 1',
+                    author: 'Author Name',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    id: 2,
+                    title: 'Other Book 2',
+                    author: 'Author Name',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.remove({ id: 1 })
+                await repositoryWithFilter.remove({ id: 2 })
+
+                const count = await controller.emptyTrash({ text: 'Test' })
+
+                expect(count).toBe(1)
+            })
+
+            it('should allow emptyTrash with specific empty-trash permission', async () => {
+                const controller = new ModelController(service, emptyTrashValidator)
+
+                const input = { id: 1, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 1 })
+
+                const count = await controller.emptyTrash()
+
+                expect(count).toBe(1)
+            })
+        })
+    })
 })

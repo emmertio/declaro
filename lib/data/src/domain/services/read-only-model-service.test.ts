@@ -429,4 +429,400 @@ describe('ReadOnlyModelService', () => {
             expect(typeof record.publishedDate).toBe('string')
         })
     })
+
+    describe('Trash Functionality', () => {
+        beforeEach(async () => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+            service = new ReadOnlyModelService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        describe('load with trash options', () => {
+            it('should not load removed items by default', async () => {
+                const input = { id: 1, title: 'Book to Remove', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 1 })
+
+                const record = await service.load({ id: 1 })
+                expect(record).toBeNull()
+            })
+
+            it('should load removed items with removedOnly option', async () => {
+                const input = { id: 2, title: 'Removed Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 2 })
+
+                const record = await service.load({ id: 2 }, { removedOnly: true })
+                expect(record).not.toBeNull()
+                expect(record?.title).toBe('Removed Book')
+            })
+
+            it('should not load active items with removedOnly option', async () => {
+                const input = { id: 3, title: 'Active Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const record = await service.load({ id: 3 }, { removedOnly: true })
+                expect(record).toBeNull()
+            })
+
+            it('should load removed items with includeRemoved option', async () => {
+                const input = { id: 4, title: 'Removed Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+                await repository.remove({ id: 4 })
+
+                const record = await service.load({ id: 4 }, { includeRemoved: true })
+                expect(record).not.toBeNull()
+                expect(record?.title).toBe('Removed Book')
+            })
+
+            it('should load active items with includeRemoved option', async () => {
+                const input = { id: 5, title: 'Active Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const record = await service.load({ id: 5 }, { includeRemoved: true })
+                expect(record).not.toBeNull()
+                expect(record?.title).toBe('Active Book')
+            })
+        })
+
+        describe('search with trash options', () => {
+            it('should not return removed items by default', async () => {
+                await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
+                const removed = await repository.create({
+                    id: 2,
+                    title: 'Removed Book',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: 2 })
+
+                const results = await service.search({})
+                expect(results.results).toHaveLength(1)
+                expect(results.results[0].title).toBe('Active Book')
+            })
+
+            it('should return only removed items with removedOnly option', async () => {
+                await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
+                const removed1 = await repository.create({
+                    id: 2,
+                    title: 'Removed Book 1',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const removed2 = await repository.create({
+                    id: 3,
+                    title: 'Removed Book 2',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repository.remove({ id: 2 })
+                await repository.remove({ id: 3 })
+
+                const results = await service.search({}, { removedOnly: true })
+                expect(results.results).toHaveLength(2)
+                expect(results.results.every((book) => book.title.startsWith('Removed'))).toBe(true)
+            })
+
+            it('should return both active and removed items with includeRemoved option', async () => {
+                await repository.create({
+                    id: 1,
+                    title: 'Active Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                await repository.create({
+                    id: 2,
+                    title: 'Active Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const removed = await repository.create({
+                    id: 3,
+                    title: 'Removed Book',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repository.remove({ id: 3 })
+
+                const results = await service.search({}, { includeRemoved: true })
+                expect(results.results).toHaveLength(3)
+            })
+
+            it('should filter removed items with removedOnly option', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ReadOnlyModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                const removed1 = await repositoryWithFilter.create({
+                    title: 'Test Removed Book',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                const removed2 = await repositoryWithFilter.create({
+                    title: 'Other Removed Book',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: removed1.id })
+                await repositoryWithFilter.remove({ id: removed2.id })
+
+                const results = await serviceWithFilter.search({ text: 'Test' }, { removedOnly: true })
+                expect(results.results).toHaveLength(1)
+                expect(results.results[0].title).toBe('Test Removed Book')
+            })
+
+            it('should filter across active and removed items with includeRemoved option', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ReadOnlyModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                await repositoryWithFilter.create({
+                    title: 'Test Active Book',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                const removed = await repositoryWithFilter.create({
+                    title: 'Test Removed Book',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    title: 'Other Book',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: removed.id })
+
+                const results = await serviceWithFilter.search({ text: 'Test' }, { includeRemoved: true })
+                expect(results.results).toHaveLength(2)
+                expect(results.results.some((book) => book.title === 'Test Active Book')).toBe(true)
+                expect(results.results.some((book) => book.title === 'Test Removed Book')).toBe(true)
+            })
+        })
+
+        describe('count with trash options', () => {
+            it('should count only active items by default', async () => {
+                await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
+                const removed = await repository.create({
+                    id: 2,
+                    title: 'Removed Book',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: 2 })
+
+                const count = await service.count({})
+                expect(count).toBe(1)
+            })
+
+            it('should count only removed items with removedOnly option', async () => {
+                await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
+                const removed1 = await repository.create({
+                    id: 2,
+                    title: 'Removed Book 1',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const removed2 = await repository.create({
+                    id: 3,
+                    title: 'Removed Book 2',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repository.remove({ id: 2 })
+                await repository.remove({ id: 3 })
+
+                const count = await service.count({}, { removedOnly: true })
+                expect(count).toBe(2)
+            })
+
+            it('should count both active and removed items with includeRemoved option', async () => {
+                await repository.create({ id: 1, title: 'Active Book', author: 'Author 1', publishedDate: new Date() })
+                const removed = await repository.create({
+                    id: 2,
+                    title: 'Removed Book',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: 2 })
+
+                const count = await service.count({}, { includeRemoved: true })
+                expect(count).toBe(2)
+            })
+
+            it('should count filtered active items by default', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ReadOnlyModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                await repositoryWithFilter.create({
+                    title: 'Test Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    title: 'Test Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    title: 'Other Book',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+                const removed = await repositoryWithFilter.create({
+                    title: 'Test Book 3',
+                    author: 'Author 4',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: removed.id })
+
+                const count = await serviceWithFilter.count({ text: 'Test' })
+                expect(count).toBe(2)
+            })
+
+            it('should count filtered removed items with removedOnly option', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ReadOnlyModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                const removed1 = await repositoryWithFilter.create({
+                    title: 'Test Removed Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                const removed2 = await repositoryWithFilter.create({
+                    title: 'Test Removed Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const removed3 = await repositoryWithFilter.create({
+                    title: 'Other Removed Book',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+                const active = await repositoryWithFilter.create({
+                    title: 'Test Active Book',
+                    author: 'Author 4',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: removed1.id })
+                await repositoryWithFilter.remove({ id: removed2.id })
+                await repositoryWithFilter.remove({ id: removed3.id })
+
+                const count = await serviceWithFilter.count({ text: 'Test' }, { removedOnly: true })
+                expect(count).toBe(2)
+            })
+
+            it('should count filtered items across active and removed with includeRemoved option', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ReadOnlyModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    namespace,
+                    schema: mockSchema,
+                })
+
+                await repositoryWithFilter.create({
+                    title: 'Test Active Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    title: 'Test Active Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const removed1 = await repositoryWithFilter.create({
+                    title: 'Test Removed Book 1',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+                const removed2 = await repositoryWithFilter.create({
+                    title: 'Test Removed Book 2',
+                    author: 'Author 4',
+                    publishedDate: new Date(),
+                })
+                await repositoryWithFilter.create({
+                    title: 'Other Active Book',
+                    author: 'Author 5',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: removed1.id })
+                await repositoryWithFilter.remove({ id: removed2.id })
+
+                const count = await serviceWithFilter.count({ text: 'Test' }, { includeRemoved: true })
+                expect(count).toBe(4)
+            })
+        })
+    })
 })

@@ -22,4 +22,13 @@ export enum ModelMutationAction {
     Restore = 'restore',
     BeforeRestore = 'beforeRestore',
     AfterRestore = 'afterRestore',
+    EmptyTrash = 'emptyTrash',
+    BeforeEmptyTrash = 'beforeEmptyTrash',
+    AfterEmptyTrash = 'afterEmptyTrash',
+    PermanentlyDeleteFromTrash = 'permanentlyDeleteFromTrash',
+    BeforePermanentlyDeleteFromTrash = 'beforePermanentlyDeleteFromTrash',
+    AfterPermanentlyDeleteFromTrash = 'afterPermanentlyDeleteFromTrash',
+    PermanentlyDelete = 'permanentlyDelete',
+    BeforePermanentlyDelete = 'beforePermanentlyDelete',
+    AfterPermanentlyDelete = 'afterPermanentlyDelete',
 }

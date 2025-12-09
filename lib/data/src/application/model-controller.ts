@@ -1,7 +1,7 @@
 import type { AuthValidator } from '@declaro/auth'
 import { PermissionValidator, type AnyModelSchema } from '@declaro/core'
 import type { ModelService, ICreateOptions, IUpdateOptions } from '../domain/services/model-service'
-import type { InferDetail, InferInput, InferLookup, InferSummary } from '../shared/utils/schema-inference'
+import type { InferDetail, InferFilters, InferInput, InferLookup, InferSummary } from '../shared/utils/schema-inference'
 import { ReadOnlyModelController } from './read-only-model-controller'
 
 export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyModelController<TSchema> {
@@ -88,5 +88,48 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
             v.someOf([createAndUpdateValidator, this.service.getDescriptor('write', '*').toString()]),
         )
         return this.service.bulkUpsert(inputs, options)
+    }
+
+    /**
+     * Permanently deletes a specific entity from the trash.
+     * Requires 'permanently-delete-from-trash', 'permanently-delete', or 'empty-trash' permission.
+     * @param lookup The lookup object containing entity identifiers
+     * @returns The permanently deleted entity summary
+     */
+    async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([
+                this.service.getDescriptor('permanently-delete-from-trash', '*').toString(),
+                this.service.getDescriptor('permanently-delete', '*').toString(),
+                this.service.getDescriptor('empty-trash', '*').toString(),
+            ]),
+        )
+        return this.service.permanentlyDeleteFromTrash(lookup)
+    }
+
+    /**
+     * Permanently deletes an entity without moving it to trash first.
+     * Requires 'permanently-delete' permission.
+     * @param lookup The lookup object containing entity identifiers
+     * @returns The permanently deleted entity summary
+     */
+    async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([this.service.getDescriptor('permanently-delete', '*').toString()]),
+        )
+        return this.service.permanentlyDelete(lookup)
+    }
+
+    /**
+     * Empties the trash by permanently deleting entities that have been marked as removed.
+     * Requires 'empty-trash' permission.
+     * @param filters Optional filters to apply when selecting entities to delete
+     * @returns The count of entities permanently deleted
+     */
+    async emptyTrash(filters?: InferFilters<TSchema>): Promise<number> {
+        this.authValidator.validatePermissions((v) =>
+            v.someOf([this.service.getDescriptor('empty-trash', '*').toString()]),
+        )
+        return this.service.emptyTrash(filters)
     }
 }

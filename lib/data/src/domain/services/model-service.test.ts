@@ -630,4 +630,311 @@ describe('ModelService', () => {
             expect(results).toEqual(inputs)
         })
     })
+
+    describe('Trash Functionality', () => {
+        const beforeEmptyTrashSpy = mock((event) => {})
+        const afterEmptyTrashSpy = mock((event) => {})
+        const beforePermanentlyDeleteFromTrashSpy = mock((event) => {})
+        const afterPermanentlyDeleteFromTrashSpy = mock((event) => {})
+        const beforePermanentlyDeleteSpy = mock((event) => {})
+        const afterPermanentlyDeleteSpy = mock((event) => {})
+
+        beforeEach(() => {
+            emitter.on('books::book.beforeEmptyTrash', beforeEmptyTrashSpy)
+            emitter.on('books::book.afterEmptyTrash', afterEmptyTrashSpy)
+            emitter.on('books::book.beforePermanentlyDeleteFromTrash', beforePermanentlyDeleteFromTrashSpy)
+            emitter.on('books::book.afterPermanentlyDeleteFromTrash', afterPermanentlyDeleteFromTrashSpy)
+            emitter.on('books::book.beforePermanentlyDelete', beforePermanentlyDeleteSpy)
+            emitter.on('books::book.afterPermanentlyDelete', afterPermanentlyDeleteSpy)
+
+            beforeEmptyTrashSpy.mockClear()
+            afterEmptyTrashSpy.mockClear()
+            beforePermanentlyDeleteFromTrashSpy.mockClear()
+            afterPermanentlyDeleteFromTrashSpy.mockClear()
+            beforePermanentlyDeleteSpy.mockClear()
+            afterPermanentlyDeleteSpy.mockClear()
+        })
+
+        describe('emptyTrash', () => {
+            it('should permanently delete all items from trash', async () => {
+                // Create and remove multiple items
+                const book1 = await repository.create({
+                    title: 'Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                const book2 = await repository.create({
+                    title: 'Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const book3 = await repository.create({
+                    title: 'Book 3',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repository.remove({ id: book1.id })
+                await repository.remove({ id: book2.id })
+                await repository.remove({ id: book3.id })
+
+                // Empty trash
+                const count = await service.emptyTrash()
+
+                expect(count).toBe(3)
+
+                // Verify items are no longer in trash
+                const inTrash1 = await repository.load({ id: book1.id }, { removedOnly: true })
+                const inTrash2 = await repository.load({ id: book2.id }, { removedOnly: true })
+                const inTrash3 = await repository.load({ id: book3.id }, { removedOnly: true })
+
+                expect(inTrash1).toBeNull()
+                expect(inTrash2).toBeNull()
+                expect(inTrash3).toBeNull()
+            })
+
+            it('should permanently delete filtered items from trash', async () => {
+                const repositoryWithFilter = new MockMemoryRepository({
+                    schema: mockSchema,
+                    filter: (data, filters) => {
+                        if (filters.text) {
+                            return data.title.toLowerCase().includes(filters.text.toLowerCase())
+                        }
+                        return true
+                    },
+                })
+
+                const serviceWithFilter = new ModelService({
+                    repository: repositoryWithFilter,
+                    emitter,
+                    schema: mockSchema,
+                    namespace,
+                })
+
+                const book1 = await repositoryWithFilter.create({
+                    title: 'Test Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                })
+                const book2 = await repositoryWithFilter.create({
+                    title: 'Test Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                })
+                const book3 = await repositoryWithFilter.create({
+                    title: 'Other Book',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+
+                await repositoryWithFilter.remove({ id: book1.id })
+                await repositoryWithFilter.remove({ id: book2.id })
+                await repositoryWithFilter.remove({ id: book3.id })
+
+                // Empty trash with filter
+                const count = await serviceWithFilter.emptyTrash({ text: 'Test' })
+
+                expect(count).toBe(2)
+
+                // Verify only filtered items were deleted
+                const inTrash1 = await repositoryWithFilter.load({ id: book1.id }, { removedOnly: true })
+                const inTrash2 = await repositoryWithFilter.load({ id: book2.id }, { removedOnly: true })
+                const inTrash3 = await repositoryWithFilter.load({ id: book3.id }, { removedOnly: true })
+
+                expect(inTrash1).toBeNull()
+                expect(inTrash2).toBeNull()
+                expect(inTrash3).not.toBeNull()
+                expect(inTrash3?.title).toBe('Other Book')
+            })
+
+            it('should return 0 when trash is empty', async () => {
+                const count = await service.emptyTrash()
+                expect(count).toBe(0)
+            })
+
+            it('should trigger before and after events for emptyTrash', async () => {
+                const book = await repository.create({
+                    title: 'Book to Remove',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: book.id })
+
+                await service.emptyTrash()
+
+                expect(beforeEmptyTrashSpy).toHaveBeenCalledTimes(1)
+                expect(beforeEmptyTrashSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.beforeEmptyTrash' }),
+                )
+                expect(afterEmptyTrashSpy).toHaveBeenCalledTimes(1)
+                expect(afterEmptyTrashSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.afterEmptyTrash' }),
+                )
+            })
+
+            it('should not affect non-removed items', async () => {
+                await repository.create({ title: 'Active Book 1', author: 'Author 1', publishedDate: new Date() })
+                await repository.create({ title: 'Active Book 2', author: 'Author 2', publishedDate: new Date() })
+
+                const book3 = await repository.create({
+                    title: 'Book to Remove',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: book3.id })
+
+                // Empty trash
+                await service.emptyTrash()
+
+                // Verify active items are still there
+                const results = await repository.search({})
+                expect(results.results).toHaveLength(2)
+            })
+        })
+
+        describe('permanentlyDeleteFromTrash', () => {
+            it('should permanently delete a removed item from trash', async () => {
+                const book = await repository.create({
+                    title: 'Book to Delete',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+
+                // Remove the book
+                await repository.remove({ id: book.id })
+
+                // Verify it's in trash
+                const inTrash = await repository.load({ id: book.id }, { removedOnly: true })
+                expect(inTrash).not.toBeNull()
+
+                // Permanently delete from trash
+                const deleted = await service.permanentlyDeleteFromTrash({ id: book.id })
+
+                expect(deleted.id).toBe(book.id)
+                expect(deleted.title).toBe('Book to Delete')
+
+                // Verify it's no longer in trash
+                const afterDelete = await repository.load({ id: book.id }, { removedOnly: true })
+                expect(afterDelete).toBeNull()
+
+                // Verify it's not in main data either
+                const inMain = await repository.load({ id: book.id })
+                expect(inMain).toBeNull()
+            })
+
+            it('should throw error when trying to delete non-existent item from trash', async () => {
+                await expect(service.permanentlyDeleteFromTrash({ id: 999 })).rejects.toThrow()
+            })
+
+            it('should throw error when trying to delete active item from trash', async () => {
+                const book = await repository.create({
+                    title: 'Active Book',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+
+                // Should fail because item is not in trash
+                await expect(service.permanentlyDeleteFromTrash({ id: book.id })).rejects.toThrow()
+            })
+
+            it('should trigger before and after events for permanentlyDeleteFromTrash', async () => {
+                const book = await repository.create({
+                    title: 'Book to Delete',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+                await repository.remove({ id: book.id })
+
+                await service.permanentlyDeleteFromTrash({ id: book.id })
+
+                expect(beforePermanentlyDeleteFromTrashSpy).toHaveBeenCalledTimes(1)
+                expect(beforePermanentlyDeleteFromTrashSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.beforePermanentlyDeleteFromTrash' }),
+                )
+                expect(afterPermanentlyDeleteFromTrashSpy).toHaveBeenCalledTimes(1)
+                expect(afterPermanentlyDeleteFromTrashSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.afterPermanentlyDeleteFromTrash' }),
+                )
+            })
+        })
+
+        describe('permanentlyDelete', () => {
+            it('should permanently delete a removed item', async () => {
+                const book = await repository.create({
+                    title: 'Book to Delete',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+
+                // Remove the book first
+                await repository.remove({ id: book.id })
+
+                // Verify it's in trash
+                const inTrash = await repository.load({ id: book.id }, { removedOnly: true })
+                expect(inTrash).not.toBeNull()
+
+                // Permanently delete
+                const deleted = await service.permanentlyDelete({ id: book.id })
+
+                expect(deleted.id).toBe(book.id)
+                expect(deleted.title).toBe('Book to Delete')
+
+                // Verify it's no longer anywhere
+                const afterDelete = await repository.load({ id: book.id }, { removedOnly: true })
+                expect(afterDelete).toBeNull()
+
+                const inMain = await repository.load({ id: book.id })
+                expect(inMain).toBeNull()
+            })
+
+            it('should permanently delete an active item', async () => {
+                const book = await repository.create({
+                    title: 'Active Book to Delete',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+
+                // Verify it exists
+                const exists = await repository.load({ id: book.id })
+                expect(exists).not.toBeNull()
+
+                // Permanently delete without removing first
+                const deleted = await service.permanentlyDelete({ id: book.id })
+
+                expect(deleted.id).toBe(book.id)
+                expect(deleted.title).toBe('Active Book to Delete')
+
+                // Verify it's no longer in main data
+                const afterDelete = await repository.load({ id: book.id })
+                expect(afterDelete).toBeNull()
+
+                // Verify it's not in trash either
+                const inTrash = await repository.load({ id: book.id }, { removedOnly: true })
+                expect(inTrash).toBeNull()
+            })
+
+            it('should throw error when trying to delete non-existent item', async () => {
+                await expect(service.permanentlyDelete({ id: 999 })).rejects.toThrow()
+            })
+
+            it('should trigger before and after events for permanentlyDelete', async () => {
+                const book = await repository.create({
+                    title: 'Book to Delete',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                })
+
+                await service.permanentlyDelete({ id: book.id })
+
+                expect(beforePermanentlyDeleteSpy).toHaveBeenCalledTimes(1)
+                expect(beforePermanentlyDeleteSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.beforePermanentlyDelete' }),
+                )
+                expect(afterPermanentlyDeleteSpy).toHaveBeenCalledTimes(1)
+                expect(afterPermanentlyDeleteSpy).toHaveBeenCalledWith(
+                    expect.objectContaining({ type: 'books::book.afterPermanentlyDelete' }),
+                )
+            })
+        })
+    })
 })

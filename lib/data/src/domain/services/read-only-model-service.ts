@@ -27,7 +27,13 @@ export interface ILoadOptions extends IActionOptions {
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
     pagination?: IPaginationInput
     sort?: InferSort<TSchema>
+    /**
+     * If true, only removed (soft-deleted) records will be returned.
+     */
     removedOnly?: boolean
+    /**
+     * If true, both removed and non-removed records will be returned.
+     */
     includeRemoved?: boolean
 }
 

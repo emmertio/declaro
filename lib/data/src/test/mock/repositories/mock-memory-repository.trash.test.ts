@@ -452,7 +452,7 @@ describe('MockMemoryRepository - Trash Functionality', () => {
             expect(activeResults.results).toHaveLength(2)
         })
 
-        it('should return 0 when filters are provided but no filter function is configured', async () => {
+        it('when no filter function is configured, remove all items from trash', async () => {
             // Create and remove items
             const book1 = await repository.create({
                 title: 'Test Book 1',
@@ -468,14 +468,14 @@ describe('MockMemoryRepository - Trash Functionality', () => {
             await repository.remove({ id: book1.id })
             await repository.remove({ id: book2.id })
 
-            // Try to empty trash with filters, but no filter function is configured
-            // This will return 0 because the filter cannot be applied
+            // Empty trash with filter
+            // Since no filter function is provided, all items in trash should be deleted
             const deletedCount = await repository.emptyTrash({ text: 'Test' })
-            expect(deletedCount).toBe(0)
+            expect(deletedCount).toBe(2)
 
             // Verify all items are still in trash
             const trashResults = await repository.search({}, { removedOnly: true })
-            expect(trashResults.results).toHaveLength(2)
+            expect(trashResults.results).toHaveLength(0)
         })
     })
 

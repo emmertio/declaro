@@ -11,10 +11,24 @@ import { QueryEvent } from '../events/query-event'
 import { BaseModelService, type IActionOptions } from './base-model-service'
 import type { IPaginationInput } from '../models/pagination'
 
-export interface ILoadOptions extends IActionOptions {}
+/**
+ * Options for loading records.
+ */
+export interface ILoadOptions extends IActionOptions {
+    /**
+     * If true, only removed (soft-deleted) records will be returned.
+     */
+    removedOnly?: boolean
+    /**
+     * If true, both removed and non-removed records will be returned.
+     */
+    includeRemoved?: boolean
+}
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
     pagination?: IPaginationInput
     sort?: InferSort<TSchema>
+    removedOnly?: boolean
+    includeRemoved?: boolean
 }
 
 export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
@@ -56,7 +70,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         await this.emitter.emitAsync(beforeLoadEvent)
 
         // Load the details from the repository
-        const details = await this.repository.load(lookup)
+        const details = await this.repository.load(lookup, options)
 
         // Emit the after load event
         const afterLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
@@ -83,7 +97,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         await this.emitter.emitAsync(beforeLoadManyEvent)
 
         // Load the details from the repository
-        const details = await this.repository.loadMany(lookups)
+        const details = await this.repository.loadMany(lookups, options)
 
         // Emit the after load many event
         const afterLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(

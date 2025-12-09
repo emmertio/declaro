@@ -10,7 +10,7 @@ import type {
     InferSummary,
 } from '../../../shared/utils/schema-inference'
 import { v4 as uuid } from 'uuid'
-import type { ISearchOptions } from '../../../domain/services/read-only-model-service'
+import type { ILoadOptions, ISearchOptions } from '../../../domain/services/read-only-model-service'
 import type { ICreateOptions, IUpdateOptions } from '../../../domain/services/model-service'
 
 export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
@@ -33,17 +33,57 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         }
     }
 
-    async load(input: InferLookup<TSchema>): Promise<InferDetail<TSchema> | null> {
+    private findOne(
+        lookup: InferLookup<TSchema>,
+        map: Map<string, InferDetail<TSchema>>,
+    ): InferDetail<TSchema> | undefined {
+        if (typeof this.args.lookup === 'function') {
+            return Array.from(map.values()).find((data) => this.args.lookup!(data, lookup))
+        } else {
+            // Default lookup by primary key
+            return map.get(lookup[this.entityMetadata.primaryKey])
+        }
+    }
+
+    /**
+     * Find an item and return both the item and its key
+     * @param lookup - The lookup criteria
+     * @param map - The map to search in
+     * @returns Object containing the item and its key, or undefined if not found
+     */
+    private findOneWithKey(
+        lookup: InferLookup<TSchema>,
+        map: Map<string, InferDetail<TSchema>>,
+    ): { item: InferDetail<TSchema>; key: string } | undefined {
+        if (typeof this.args.lookup === 'function') {
+            const item = Array.from(map.values()).find((data) => this.args.lookup!(data, lookup))
+            if (item) {
+                return { item, key: item[this.entityMetadata.primaryKey!] }
+            }
+        } else {
+            // Default lookup by primary key
+            const key = lookup[this.entityMetadata.primaryKey]
+            const item = map.get(key)
+            if (item) {
+                return { item, key }
+            }
+        }
+        return undefined
+    }
+
+    async load(input: InferLookup<TSchema>, options: ILoadOptions = {}): Promise<InferDetail<TSchema> | null> {
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
         let item: InferDetail<TSchema> | undefined
-        if (typeof this.args.lookup === 'function') {
-            item = Array.from(this.data.values()).find((data) => this.args.lookup!(data, input))
+
+        if (options.removedOnly) {
+            item = this.findOne(input, this.trash)
+        } else if (options.includeRemoved) {
+            item = this.findOne(input, this.data) ?? this.findOne(input, this.trash)
         } else {
-            // Default lookup by primary key
-            item = await this.data.get(input[this.entityMetadata.primaryKey])
+            item = this.findOne(input, this.data)
         }
 
         return item || null
@@ -73,7 +113,7 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         options?: ISearchOptions<TSchema>,
     ): Promise<InferSearchResults<TSchema>> {
         const pagination = options?.pagination || { page: 1, pageSize: 25 }
-        let items = this.applyFilters(input)
+        let items = this.applyFilters(input, options)
 
         // Apply sorting if provided
         if (options?.sort && Array.isArray(options.sort)) {
@@ -119,54 +159,30 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        let item: InferDetail<TSchema> | undefined
-        let itemKey: string
-
-        if (typeof this.args.lookup === 'function') {
-            item = Array.from(this.data.values()).find((data) => this.args.lookup!(data, lookup))
-            if (item) {
-                itemKey = item[this.entityMetadata.primaryKey!]
-            }
-        } else {
-            // Default lookup by primary key
-            itemKey = lookup[this.entityMetadata.primaryKey]
-            item = this.data.get(itemKey)
-        }
-
-        if (!item) {
+        const found = this.findOneWithKey(lookup, this.data)
+        if (!found) {
             throw new Error('Item not found')
         }
+
         // Move the item to trash
-        this.trash.set(itemKey!, item)
+        this.trash.set(found.key, found.item)
         // Remove the item from data
-        this.data.delete(itemKey!)
-        return item
+        this.data.delete(found.key)
+        return found.item
     }
     async restore(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key is not defined in the schema metadata')
         }
 
-        let item: InferDetail<TSchema> | undefined
-        let itemKey: string
-
-        if (typeof this.args.lookup === 'function') {
-            item = Array.from(this.trash.values()).find((data) => this.args.lookup!(data, lookup))
-            if (item) {
-                itemKey = item[this.entityMetadata.primaryKey!]
-            }
-        } else {
-            // Default lookup by primary key
-            itemKey = lookup[this.entityMetadata.primaryKey]
-            item = this.trash.get(itemKey)
-        }
-
-        if (!item) {
+        const found = this.findOneWithKey(lookup, this.trash)
+        if (!found) {
             throw new Error('Item not found in trash')
         }
-        this.trash.delete(itemKey!)
-        this.data.set(itemKey!, item)
-        return item
+
+        this.trash.delete(found.key)
+        this.data.set(found.key, found.item)
+        return found.item
     }
 
     async create(input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
@@ -224,7 +240,7 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
     }
 
     async count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema> | undefined): Promise<number> {
-        const filteredItems = this.applyFilters(search)
+        const filteredItems = this.applyFilters(search, options)
         return filteredItems.length
     }
 
@@ -253,13 +269,88 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         return await Promise.all(inputs.map((input) => this.upsert(input, options)))
     }
 
+    async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        if (!this.entityMetadata?.primaryKey) {
+            throw new Error('Primary key is not defined in the schema metadata')
+        }
+
+        // Try to find in main data first, then trash
+        const foundInData = this.findOneWithKey(lookup, this.data)
+        if (foundInData) {
+            this.data.delete(foundInData.key)
+            return foundInData.item
+        }
+
+        const foundInTrash = this.findOneWithKey(lookup, this.trash)
+        if (foundInTrash) {
+            this.trash.delete(foundInTrash.key)
+            return foundInTrash.item
+        }
+
+        throw new Error('Item not found')
+    }
+
+    async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        if (!this.entityMetadata?.primaryKey) {
+            throw new Error('Primary key is not defined in the schema metadata')
+        }
+
+        const found = this.findOneWithKey(lookup, this.trash)
+        if (!found) {
+            throw new Error('Item not found in trash')
+        }
+
+        this.trash.delete(found.key)
+        return found.item
+    }
+
+    async emptyTrash(filters?: InferFilters<TSchema>): Promise<number> {
+        if (!filters || Object.keys(filters).length === 0) {
+            // Delete all items from trash
+            const count = this.trash.size
+            this.trash.clear()
+            return count
+        }
+
+        // Apply filters to trash items
+        const itemsToDelete: string[] = []
+        for (const [key, item] of this.trash.entries()) {
+            if (typeof this.args.filter === 'function') {
+                if (this.args.filter(item, filters)) {
+                    itemsToDelete.push(key)
+                }
+            }
+        }
+
+        // Delete filtered items
+        for (const key of itemsToDelete) {
+            this.trash.delete(key)
+        }
+
+        return itemsToDelete.length
+    }
+
     /**
      * Apply filtering logic to all items based on the provided search criteria
      * @param input - The search/filter criteria
+     * @param options - Optional search options including removedOnly and includeRemoved
      * @returns Filtered array of items
      */
-    protected applyFilters(input: InferFilters<TSchema>): InferDetail<TSchema>[] {
-        return Array.from(this.data.values()).filter((item) => {
+    protected applyFilters(input: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): InferDetail<TSchema>[] {
+        let sourceItems: InferDetail<TSchema>[]
+
+        if (options?.removedOnly) {
+            // Only search in trash
+            sourceItems = Array.from(this.trash.values())
+        } else if (options?.includeRemoved) {
+            // Search in both data and trash
+            sourceItems = [...Array.from(this.data.values()), ...Array.from(this.trash.values())]
+        } else {
+            // Default: only search in active data
+            sourceItems = Array.from(this.data.values())
+        }
+
+        return sourceItems.filter((item) => {
             // Apply filtering logic based on the input
             if (typeof this.args.filter === 'function') {
                 return this.args.filter(item, input)

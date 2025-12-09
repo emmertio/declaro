@@ -104,4 +104,10 @@ export interface IRepository<TSchema extends AnyModelSchema> {
      * @returns A promise resolving to the count of matching elements.
      */
     count(search: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number>
+
+    emptyTrash(filters?: InferFilters<TSchema>): Promise<number>
+
+    permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>>
+
+    permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>>
 }

@@ -20,6 +20,11 @@ interface ISearchParams {
     year?: number
 }
 
+interface ICustomMeta {
+    customField?: string
+    anotherField?: number
+}
+
 describe('QueryEvent', () => {
     it('should create a query event with params and descriptor', () => {
         const params: ILoadParams = { id: '1' }
@@ -54,7 +59,7 @@ describe('QueryEvent', () => {
     it('should update meta correctly', () => {
         const params: ISearchParams = { text: '1984' }
         const descriptor: IActionDescriptorInput = { namespace: 'books', resource: 'book', action: 'search' }
-        const event = new QueryEvent<IBookResult[], ISearchParams>(descriptor, params)
+        const event = new QueryEvent<IBookResult[], ISearchParams, ICustomMeta>(descriptor, params)
 
         event.setMeta({ customField: 'custom value' })
 
@@ -95,7 +100,7 @@ describe('QueryEvent', () => {
         }
 
         const descriptor: IActionDescriptorInput = { namespace: 'books', resource: 'book', action: 'load' }
-        const event = new QueryEvent<IBookResult, ILoadParams>(descriptor, params)
+        const event = new QueryEvent<IBookResult, ILoadParams, ICustomMeta>(descriptor, params)
             .setMeta({ customField: 'value' })
             .setResult(result)
 
@@ -200,7 +205,7 @@ describe('QueryEvent', () => {
     it('should serialize meta to JSON', () => {
         const params: ISearchParams = { text: 'test' }
         const descriptor: IActionDescriptorInput = { namespace: 'books', resource: 'book', action: 'search' }
-        const event = new QueryEvent<IBookResult[], ISearchParams>(descriptor, params, {
+        const event = new QueryEvent<IBookResult[], ISearchParams, ICustomMeta>(descriptor, params, {
             customField: 'custom value',
             anotherField: 123,
         })

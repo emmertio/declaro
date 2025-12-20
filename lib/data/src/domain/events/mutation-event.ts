@@ -1,7 +1,15 @@
 import type { IActionDescriptorInput } from '@declaro/core'
-import { RequestEvent } from './request-event'
+import { RequestEvent, type IRequestEventMeta } from './request-event'
 
-export class MutationEvent<TResult, TInput, TMeta = any> extends RequestEvent<TResult, TInput, TMeta> {
+export interface IMutationEventMeta<TResult> extends IRequestEventMeta {
+    existing?: TResult
+}
+
+export class MutationEvent<
+    TResult,
+    TInput,
+    TMeta extends IMutationEventMeta<TResult> = IMutationEventMeta<TResult>,
+> extends RequestEvent<TResult, TInput, TMeta> {
     constructor(descriptor: IActionDescriptorInput, input: TInput, meta: TMeta = {} as TMeta) {
         super(descriptor, input, meta)
     }

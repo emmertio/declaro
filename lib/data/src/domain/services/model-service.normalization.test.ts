@@ -138,13 +138,13 @@ describe('ModelService - Normalization', () => {
             const beforeCreateCall = beforeCreateSpy.mock.calls[0][0]
             const afterCreateCall = afterCreateSpy.mock.calls[0][0]
 
-            expect(beforeCreateCall.meta.input.title).toBe('Test Book')
-            expect(beforeCreateCall.meta.input.author).toBe('Author Name')
-            expect(beforeCreateCall.meta.input.publishedDate).toEqual(new Date('2023-01-01'))
+            expect(beforeCreateCall.input.title).toBe('Test Book')
+            expect(beforeCreateCall.input.author).toBe('Author Name')
+            expect(beforeCreateCall.input.publishedDate).toEqual(new Date('2023-01-01'))
 
-            expect(afterCreateCall.meta.input.title).toBe('Test Book')
-            expect(afterCreateCall.meta.input.author).toBe('Author Name')
-            expect(afterCreateCall.meta.input.publishedDate).toEqual(new Date('2023-01-01'))
+            expect(afterCreateCall.input.title).toBe('Test Book')
+            expect(afterCreateCall.input.author).toBe('Author Name')
+            expect(afterCreateCall.input.publishedDate).toEqual(new Date('2023-01-01'))
         })
 
         it('should call normalizeInput method exactly once per input during bulkUpsert with Promise.all', async () => {

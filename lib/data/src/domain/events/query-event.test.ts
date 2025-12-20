@@ -186,8 +186,8 @@ describe('QueryEvent', () => {
 
         const result: IBookResult = {
             id: '42',
-            title: 'The Hitchhiker\'s Guide to the Galaxy',
-            description: 'Don\'t Panic',
+            title: "The Hitchhiker's Guide to the Galaxy",
+            description: "Don't Panic",
             author: 'Douglas Adams',
             year: 1979,
         }

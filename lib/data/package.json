@@ -1,6 +1,6 @@
 {
     "name": "@declaro/data",
-    "version": "2.0.0-beta.122",
+    "version": "2.0.0-beta.123",
     "description": "A data-mapper framework for managing application data across integrated systems.",
     "main": "dist/node/index.cjs",
     "module": "dist/node/index.js",

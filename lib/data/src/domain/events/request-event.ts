@@ -13,9 +13,9 @@ export class RequestEvent<TResult, TInput, TMeta extends IRequestEventMeta = IRe
 > {
     input: TInput
 
-    constructor(descriptor: IActionDescriptorInput, input: TInput, meta?: TMeta) {
+    constructor(descriptor: IActionDescriptorInput, input: TInput, meta: TMeta = {} as TMeta) {
         super({
-            meta: meta,
+            meta,
             descriptor,
         })
 

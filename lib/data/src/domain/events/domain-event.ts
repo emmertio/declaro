@@ -24,7 +24,7 @@ export interface IDomainEventOptions<TData, TMeta = any> {
 export interface IDomainEventJSON<T, M = any> {
     eventId: string
     data?: T
-    meta?: M
+    meta: M
     timestamp: string // JSON-compatible format
     type: string
     session?: { id: string } // Simplified session representation

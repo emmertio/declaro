@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach } from 'bun:test'
-import { ModelService } from './model-service'
-import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
-import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
-import { mock } from 'bun:test'
-import type { InferDetail } from '../../shared/utils/schema-inference'
-import { ModelMutationAction } from '../events/event-types'
+import { beforeEach, describe, expect, it, mock } from 'bun:test'
+import { MockBookSchema } from '../../test/mock/models/mock-book-models'
+import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
+import { ModelService } from './model-service'
 
 describe('ModelService', () => {
     const namespace = 'books'

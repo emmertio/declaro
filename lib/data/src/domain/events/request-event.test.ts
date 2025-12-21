@@ -10,7 +10,7 @@ describe('RequestEvent', () => {
         })
 
         expect(event.meta.foo).toBe('bar')
-        expect(event.meta.input?.key).toBe('value')
+        expect(event.input?.key).toBe('value')
     })
 
     it('should update meta correctly', () => {

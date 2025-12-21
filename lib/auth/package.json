@@ -23,9 +23,9 @@
         "typecheck": "bun tsc --noEmit"
     },
     "devDependencies": {
-        "@declaro/core": "workspace:^",
+        "@declaro/core": "^2.0.0-beta.123",
         "@declaro/redis": "workspace:^",
-        "@declaro/zod": "workspace:^",
+        "@declaro/zod": "^2.0.0-beta.123",
         "@types/bun": "^1.2.12",
         "@types/jsonwebtoken": "^9.0.10",
         "@types/luxon": "^3.7.1",
@@ -39,7 +39,7 @@
         "zod": "^4.1.11"
     },
     "optionalDependencies": {
-        "@declaro/redis": "^2.0.0-beta.50",
+        "@declaro/redis": "^2.0.0-beta.123",
         "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.2"
     },
@@ -58,5 +58,6 @@
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.cjs"
-    }
+    },
+    "gitHead": "c4e8895041c00ec51f891ef1400870e363343845"
 }

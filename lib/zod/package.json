@@ -22,7 +22,7 @@
         "typecheck": "bun tsc --noEmit"
     },
     "devDependencies": {
-        "@declaro/core": "workspace:^",
+        "@declaro/core": "^2.0.0-beta.123",
         "@types/bun": "^1.2.12",
         "typescript": "^5.5.4",
         "zod": "^4.1.11"
@@ -37,5 +37,6 @@
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.cjs",
         "browser": "./dist/browser/index.js"
-    }
+    },
+    "gitHead": "c4e8895041c00ec51f891ef1400870e363343845"
 }

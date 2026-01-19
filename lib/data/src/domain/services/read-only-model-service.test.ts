@@ -891,10 +891,7 @@ describe('ReadOnlyModelService', () => {
                 afterSearchSpy,
             )
 
-            emitter.on<QueryEvent<number, InferFilters<typeof mockSchema>>>(
-                'books::book.beforeCount',
-                beforeCountSpy,
-            )
+            emitter.on<QueryEvent<number, InferFilters<typeof mockSchema>>>('books::book.beforeCount', beforeCountSpy)
             emitter.on<QueryEvent<number, InferFilters<typeof mockSchema>>>('books::book.afterCount', afterCountSpy)
 
             service = new ReadOnlyModelService({ repository, emitter, schema: mockSchema, namespace })

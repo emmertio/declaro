@@ -5,48 +5,79 @@ import type { InferDetail, InferFilters, InferInput, InferLookup, InferSummary }
 import { ReadOnlyModelController } from './read-only-model-controller'
 
 export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyModelController<TSchema> {
-    constructor(protected readonly service: ModelService<TSchema>, protected readonly authValidator: AuthValidator) {
+    constructor(
+        protected readonly service: ModelService<TSchema>,
+        protected readonly authValidator: AuthValidator,
+    ) {
         super(service, authValidator)
     }
 
+    async createPermissions(input: InferInput<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('create', '*').toString(),
+            this.service.getDescriptor('write', '*').toString(),
+        ])
+    }
+
     async create(input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('create', '*').toString(),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
-        )
+        const permissions = await this.createPermissions(input)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.create(input)
     }
 
+    async updatePermissions(lookup: InferLookup<TSchema>, input: InferInput<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('update', '*').toString(),
+            this.service.getDescriptor('write', '*').toString(),
+        ])
+    }
+
     async update(lookup: InferLookup<TSchema>, input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('update', '*').toString(),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
-        )
+        const permissions = await this.updatePermissions(lookup, input)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.update(lookup, input)
     }
 
+    async removePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('remove', '*').toString(),
+            this.service.getDescriptor('write', '*').toString(),
+        ])
+    }
+
     async remove(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('remove', '*').toString(),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
-        )
+        const permissions = await this.removePermissions(lookup)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.remove(lookup)
     }
 
+    async restorePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('restore', '*').toString(),
+            this.service.getDescriptor('write', '*').toString(),
+        ])
+    }
+
     async restore(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('restore', '*').toString(),
-                this.service.getDescriptor('write', '*').toString(),
-            ]),
-        )
+        const permissions = await this.restorePermissions(lookup)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.restore(lookup)
+    }
+
+    async upsertPermissions(
+        input: InferInput<TSchema>,
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<PermissionValidator> {
+        // Create nested validator for (create AND update) permissions
+        const createAndUpdateValidator = PermissionValidator.create().allOf([
+            this.service.getDescriptor('create', '*').toString(),
+            this.service.getDescriptor('update', '*').toString(),
+        ])
+
+        return PermissionValidator.create().someOf([
+            createAndUpdateValidator,
+            this.service.getDescriptor('write', '*').toString(),
+        ])
     }
 
     /**
@@ -56,16 +87,25 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
      * @returns The upserted record.
      */
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
+        const permissions = await this.upsertPermissions(input, options)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
+        return this.service.upsert(input, options)
+    }
+
+    async bulkUpsertPermissions(
+        inputs: InferInput<TSchema>[],
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<PermissionValidator> {
         // Create nested validator for (create AND update) permissions
         const createAndUpdateValidator = PermissionValidator.create().allOf([
             this.service.getDescriptor('create', '*').toString(),
             this.service.getDescriptor('update', '*').toString(),
         ])
 
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([createAndUpdateValidator, this.service.getDescriptor('write', '*').toString()]),
-        )
-        return this.service.upsert(input, options)
+        return PermissionValidator.create().someOf([
+            createAndUpdateValidator,
+            this.service.getDescriptor('write', '*').toString(),
+        ])
     }
 
     /**
@@ -78,16 +118,17 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
         inputs: InferInput<TSchema>[],
         options?: ICreateOptions | IUpdateOptions,
     ): Promise<InferDetail<TSchema>[]> {
-        // Create nested validator for (create AND update) permissions
-        const createAndUpdateValidator = PermissionValidator.create().allOf([
-            this.service.getDescriptor('create', '*').toString(),
-            this.service.getDescriptor('update', '*').toString(),
-        ])
-
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([createAndUpdateValidator, this.service.getDescriptor('write', '*').toString()]),
-        )
+        const permissions = await this.bulkUpsertPermissions(inputs, options)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.bulkUpsert(inputs, options)
+    }
+
+    async permanentlyDeleteFromTrashPermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('permanently-delete-from-trash', '*').toString(),
+            this.service.getDescriptor('permanently-delete', '*').toString(),
+            this.service.getDescriptor('empty-trash', '*').toString(),
+        ])
     }
 
     /**
@@ -97,14 +138,13 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
      * @returns The permanently deleted entity summary
      */
     async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('permanently-delete-from-trash', '*').toString(),
-                this.service.getDescriptor('permanently-delete', '*').toString(),
-                this.service.getDescriptor('empty-trash', '*').toString(),
-            ]),
-        )
+        const permissions = await this.permanentlyDeleteFromTrashPermissions(lookup)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.permanentlyDeleteFromTrash(lookup)
+    }
+
+    async permanentlyDeletePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([this.service.getDescriptor('permanently-delete', '*').toString()])
     }
 
     /**
@@ -114,10 +154,13 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
      * @returns The permanently deleted entity summary
      */
     async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([this.service.getDescriptor('permanently-delete', '*').toString()]),
-        )
+        const permissions = await this.permanentlyDeletePermissions(lookup)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.permanentlyDelete(lookup)
+    }
+
+    async emptyTrashPermissions(filters?: InferFilters<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([this.service.getDescriptor('empty-trash', '*').toString()])
     }
 
     /**
@@ -127,9 +170,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
      * @returns The count of entities permanently deleted
      */
     async emptyTrash(filters?: InferFilters<TSchema>): Promise<number> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([this.service.getDescriptor('empty-trash', '*').toString()]),
-        )
+        const permissions = await this.emptyTrashPermissions(filters)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.emptyTrash(filters)
     }
 }

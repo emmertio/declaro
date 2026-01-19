@@ -1,6 +1,6 @@
 import type { AuthValidator } from '@declaro/auth'
 import {} from '@declaro/auth'
-import type { AnyModelSchema } from '@declaro/core'
+import { PermissionValidator, type AnyModelSchema } from '@declaro/core'
 import type { ILoadOptions, ISearchOptions, ReadOnlyModelService } from '../domain/services/read-only-model-service'
 import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../shared/utils/schema-inference'
 
@@ -10,37 +10,59 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
         protected readonly authValidator: AuthValidator,
     ) {}
 
+    async loadPermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('load', '*').toString(),
+            this.service.getDescriptor('read', '*').toString(),
+        ])
+    }
+
     async load(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferDetail<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('load', '*').toString(),
-                this.service.getDescriptor('read', '*').toString(),
-            ]),
-        )
+        const permissions = await this.loadPermissions(lookup)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.load(lookup, options)
     }
 
+    async loadManyPermissions(lookups: InferLookup<TSchema>[]): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('loadMany', '*').toString(),
+            this.service.getDescriptor('read', '*').toString(),
+        ])
+    }
+
     async loadMany(lookups: InferLookup<TSchema>[], options?: ILoadOptions): Promise<InferDetail<TSchema>[]> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('loadMany', '*').toString(),
-                this.service.getDescriptor('read', '*').toString(),
-            ]),
-        )
+        const permissions = await this.loadManyPermissions(lookups)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.loadMany(lookups, options)
+    }
+
+    async searchPermissions(
+        input: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('search', '*').toString(),
+            this.service.getDescriptor('read', '*').toString(),
+        ])
     }
 
     async search(
         input: InferFilters<TSchema>,
         options?: ISearchOptions<TSchema>,
     ): Promise<InferSearchResults<TSchema>> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('search', '*').toString(),
-                this.service.getDescriptor('read', '*').toString(),
-            ]),
-        )
+        const permissions = await this.searchPermissions(input, options)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.search(input, options)
+    }
+
+    async countPermissions(
+        input: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<PermissionValidator> {
+        return PermissionValidator.create().someOf([
+            this.service.getDescriptor('count', '*').toString(),
+            this.service.getDescriptor('read', '*').toString(),
+        ])
     }
 
     /**
@@ -50,12 +72,8 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
      * @returns The count of matching records.
      */
     async count(input: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number> {
-        this.authValidator.validatePermissions((v) =>
-            v.someOf([
-                this.service.getDescriptor('count', '*').toString(),
-                this.service.getDescriptor('read', '*').toString(),
-            ]),
-        )
+        const permissions = await this.countPermissions(input, options)
+        this.authValidator.validatePermissions((v) => v.extend(permissions))
         return this.service.count(input, options)
     }
 }

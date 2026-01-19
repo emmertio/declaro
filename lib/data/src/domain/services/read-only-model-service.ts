@@ -23,6 +23,11 @@ export interface ILoadOptions extends IActionOptions {
      * If true, both removed and non-removed records will be returned.
      */
     includeRemoved?: boolean
+
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
 }
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
     pagination?: IPaginationInput
@@ -35,6 +40,10 @@ export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionO
      * If true, both removed and non-removed records will be returned.
      */
     includeRemoved?: boolean
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
 }
 
 export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
@@ -69,21 +78,25 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      */
     async load(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferDetail<TSchema>> {
         // Emit the before load event
-        const beforeLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.BeforeLoad, options?.scope),
-            lookup,
-        )
-        await this.emitter.emitAsync(beforeLoadEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeLoad, options?.scope),
+                lookup,
+            )
+            await this.emitter.emitAsync(beforeLoadEvent)
+        }
 
         // Load the details from the repository
         const details = await this.repository.load(lookup, options)
 
         // Emit the after load event
-        const afterLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.AfterLoad, options?.scope),
-            lookup,
-        ).setResult(details)
-        await this.emitter.emitAsync(afterLoadEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterLoad, options?.scope),
+                lookup,
+            ).setResult(details)
+            await this.emitter.emitAsync(afterLoadEvent)
+        }
 
         return await this.normalizeDetail(details)
     }
@@ -96,21 +109,25 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      */
     async loadMany(lookups: InferLookup<TSchema>[], options?: ILoadOptions): Promise<InferDetail<TSchema>[]> {
         // Emit the before load many event
-        const beforeLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
-            this.getDescriptor(ModelQueryEvent.BeforeLoadMany, options?.scope),
-            lookups,
-        )
-        await this.emitter.emitAsync(beforeLoadManyEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
+                this.getDescriptor(ModelQueryEvent.BeforeLoadMany, options?.scope),
+                lookups,
+            )
+            await this.emitter.emitAsync(beforeLoadManyEvent)
+        }
 
         // Load the details from the repository
         const details = await this.repository.loadMany(lookups, options)
 
         // Emit the after load many event
-        const afterLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
-            this.getDescriptor(ModelQueryEvent.AfterLoadMany, options?.scope),
-            lookups,
-        ).setResult(details)
-        await this.emitter.emitAsync(afterLoadManyEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
+                this.getDescriptor(ModelQueryEvent.AfterLoadMany, options?.scope),
+                lookups,
+            ).setResult(details)
+            await this.emitter.emitAsync(afterLoadManyEvent)
+        }
 
         return await Promise.all(details.map((detail) => this.normalizeDetail(detail)))
     }
@@ -126,21 +143,25 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         options?: ISearchOptions<TSchema>,
     ): Promise<InferSearchResults<TSchema>> {
         // Emit the before search event
-        const beforeSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.BeforeSearch, options?.scope),
-            filters,
-        )
-        await this.emitter.emitAsync(beforeSearchEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeSearch, options?.scope),
+                filters,
+            )
+            await this.emitter.emitAsync(beforeSearchEvent)
+        }
 
         // Search the repository with the provided filters
         const results = await this.repository.search(filters, options)
 
         // Emit the after search event
-        const afterSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.AfterSearch, options?.scope),
-            filters,
-        ).setResult(results)
-        await this.emitter.emitAsync(afterSearchEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterSearch, options?.scope),
+                filters,
+            ).setResult(results)
+            await this.emitter.emitAsync(afterSearchEvent)
+        }
 
         // Return the search results
         return {
@@ -156,21 +177,25 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      */
     async count(filters: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number> {
         // Emit the before count event
-        const beforeCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.BeforeCount, options?.scope),
-            filters,
-        )
-        await this.emitter.emitAsync(beforeCountEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeCount, options?.scope),
+                filters,
+            )
+            await this.emitter.emitAsync(beforeCountEvent)
+        }
 
         // Count the records in the repository
         const count = await this.repository.count(filters, options)
 
         // Emit the after count event
-        const afterCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
-            this.getDescriptor(ModelQueryEvent.AfterCount, options?.scope),
-            filters,
-        ).setResult(count)
-        await this.emitter.emitAsync(afterCountEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterCount, options?.scope),
+                filters,
+            ).setResult(count)
+            await this.emitter.emitAsync(afterCountEvent)
+        }
 
         // Return the count
         return count

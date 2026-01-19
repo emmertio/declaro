@@ -825,4 +825,237 @@ describe('ReadOnlyModelService', () => {
             })
         })
     })
+
+    describe('doNotDispatchEvents Option', () => {
+        const beforeLoadSpy = mock(
+            (event: QueryEvent<InferDetail<typeof mockSchema>, InferLookup<typeof mockSchema>>) => {},
+        )
+        const afterLoadSpy = mock(
+            (event: QueryEvent<InferDetail<typeof mockSchema>, InferLookup<typeof mockSchema>>) => {},
+        )
+
+        const beforeLoadManySpy = mock(
+            (event: QueryEvent<InferDetail<typeof mockSchema>[], InferLookup<typeof mockSchema>[]>) => {},
+        )
+        const afterLoadManySpy = mock(
+            (event: QueryEvent<InferDetail<typeof mockSchema>[], InferLookup<typeof mockSchema>[]>) => {},
+        )
+
+        const beforeSearchSpy = mock(
+            (event: QueryEvent<InferSearchResults<typeof mockSchema>[], InferFilters<typeof mockSchema>[]>) => {},
+        )
+        const afterSearchSpy = mock(
+            (event: QueryEvent<InferSearchResults<typeof mockSchema>[], InferFilters<typeof mockSchema>[]>) => {},
+        )
+
+        const beforeCountSpy = mock((event: QueryEvent<number, InferFilters<typeof mockSchema>>) => {})
+        const afterCountSpy = mock((event: QueryEvent<number, InferFilters<typeof mockSchema>>) => {})
+
+        beforeEach(() => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+
+            beforeLoadSpy.mockClear()
+            afterLoadSpy.mockClear()
+            beforeLoadManySpy.mockClear()
+            afterLoadManySpy.mockClear()
+            beforeSearchSpy.mockClear()
+            afterSearchSpy.mockClear()
+            beforeCountSpy.mockClear()
+            afterCountSpy.mockClear()
+
+            emitter.on<QueryEvent<InferDetail<typeof mockSchema>, InferLookup<typeof mockSchema>>>(
+                'books::book.beforeLoad',
+                beforeLoadSpy,
+            )
+            emitter.on<QueryEvent<InferDetail<typeof mockSchema>, InferLookup<typeof mockSchema>>>(
+                'books::book.afterLoad',
+                afterLoadSpy,
+            )
+
+            emitter.on<QueryEvent<InferDetail<typeof mockSchema>[], InferLookup<typeof mockSchema>[]>>(
+                'books::book.beforeLoadMany',
+                beforeLoadManySpy,
+            )
+            emitter.on<QueryEvent<InferDetail<typeof mockSchema>[], InferLookup<typeof mockSchema>[]>>(
+                'books::book.afterLoadMany',
+                afterLoadManySpy,
+            )
+
+            emitter.on<QueryEvent<InferSearchResults<typeof mockSchema>[], InferFilters<typeof mockSchema>[]>>(
+                'books::book.beforeSearch',
+                beforeSearchSpy,
+            )
+            emitter.on<QueryEvent<InferSearchResults<typeof mockSchema>[], InferFilters<typeof mockSchema>[]>>(
+                'books::book.afterSearch',
+                afterSearchSpy,
+            )
+
+            emitter.on<QueryEvent<number, InferFilters<typeof mockSchema>>>(
+                'books::book.beforeCount',
+                beforeCountSpy,
+            )
+            emitter.on<QueryEvent<number, InferFilters<typeof mockSchema>>>('books::book.afterCount', afterCountSpy)
+
+            service = new ReadOnlyModelService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        describe('load', () => {
+            it('should not dispatch events when doNotDispatchEvents is true', async () => {
+                const input = { id: 1, title: 'Test Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const result = await service.load({ id: 1 }, { doNotDispatchEvents: true })
+
+                expect(result).toEqual(input)
+                expect(beforeLoadSpy).not.toHaveBeenCalled()
+                expect(afterLoadSpy).not.toHaveBeenCalled()
+            })
+
+            it('should dispatch events when doNotDispatchEvents is false', async () => {
+                const input = { id: 2, title: 'Test Book 2', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const result = await service.load({ id: 2 }, { doNotDispatchEvents: false })
+
+                expect(result).toEqual(input)
+                expect(beforeLoadSpy).toHaveBeenCalledTimes(1)
+                expect(afterLoadSpy).toHaveBeenCalledTimes(1)
+            })
+
+            it('should dispatch events when doNotDispatchEvents is not specified', async () => {
+                const input = { id: 3, title: 'Test Book 3', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const result = await service.load({ id: 3 })
+
+                expect(result).toEqual(input)
+                expect(beforeLoadSpy).toHaveBeenCalledTimes(1)
+                expect(afterLoadSpy).toHaveBeenCalledTimes(1)
+            })
+        })
+
+        describe('loadMany', () => {
+            it('should not dispatch events when doNotDispatchEvents is true', async () => {
+                const input1 = { id: 1, title: 'Test Book 1', author: 'Author 1', publishedDate: new Date() }
+                const input2 = { id: 2, title: 'Test Book 2', author: 'Author 2', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.loadMany([{ id: 1 }, { id: 2 }], { doNotDispatchEvents: true })
+
+                expect(result).toEqual([input1, input2])
+                expect(beforeLoadManySpy).not.toHaveBeenCalled()
+                expect(afterLoadManySpy).not.toHaveBeenCalled()
+            })
+
+            it('should dispatch events when doNotDispatchEvents is false', async () => {
+                const input1 = { id: 3, title: 'Test Book 3', author: 'Author 3', publishedDate: new Date() }
+                const input2 = { id: 4, title: 'Test Book 4', author: 'Author 4', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.loadMany([{ id: 3 }, { id: 4 }], { doNotDispatchEvents: false })
+
+                expect(result).toEqual([input1, input2])
+                expect(beforeLoadManySpy).toHaveBeenCalledTimes(1)
+                expect(afterLoadManySpy).toHaveBeenCalledTimes(1)
+            })
+
+            it('should dispatch events when doNotDispatchEvents is not specified', async () => {
+                const input1 = { id: 5, title: 'Test Book 5', author: 'Author 5', publishedDate: new Date() }
+                const input2 = { id: 6, title: 'Test Book 6', author: 'Author 6', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.loadMany([{ id: 5 }, { id: 6 }])
+
+                expect(result).toEqual([input1, input2])
+                expect(beforeLoadManySpy).toHaveBeenCalledTimes(1)
+                expect(afterLoadManySpy).toHaveBeenCalledTimes(1)
+            })
+        })
+
+        describe('search', () => {
+            it('should not dispatch events when doNotDispatchEvents is true', async () => {
+                const input1 = { id: 1, title: 'Test Book 1', author: 'Author 1', publishedDate: new Date() }
+                const input2 = { id: 2, title: 'Test Book 2', author: 'Author 2', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.search({}, { doNotDispatchEvents: true })
+
+                expect(result.results).toEqual([input1, input2])
+                expect(beforeSearchSpy).not.toHaveBeenCalled()
+                expect(afterSearchSpy).not.toHaveBeenCalled()
+            })
+
+            it('should dispatch events when doNotDispatchEvents is false', async () => {
+                const input1 = { id: 3, title: 'Test Book 3', author: 'Author 3', publishedDate: new Date() }
+                const input2 = { id: 4, title: 'Test Book 4', author: 'Author 4', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.search({}, { doNotDispatchEvents: false })
+
+                expect(result.results).toEqual([input1, input2])
+                expect(beforeSearchSpy).toHaveBeenCalledTimes(1)
+                expect(afterSearchSpy).toHaveBeenCalledTimes(1)
+            })
+
+            it('should dispatch events when doNotDispatchEvents is not specified', async () => {
+                const input1 = { id: 5, title: 'Test Book 5', author: 'Author 5', publishedDate: new Date() }
+                const input2 = { id: 6, title: 'Test Book 6', author: 'Author 6', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.search({})
+
+                expect(result.results).toEqual([input1, input2])
+                expect(beforeSearchSpy).toHaveBeenCalledTimes(1)
+                expect(afterSearchSpy).toHaveBeenCalledTimes(1)
+            })
+        })
+
+        describe('count', () => {
+            it('should not dispatch events when doNotDispatchEvents is true', async () => {
+                const input1 = { id: 1, title: 'Test Book 1', author: 'Author 1', publishedDate: new Date() }
+                const input2 = { id: 2, title: 'Test Book 2', author: 'Author 2', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.count({}, { doNotDispatchEvents: true })
+
+                expect(result).toBe(2)
+                expect(beforeCountSpy).not.toHaveBeenCalled()
+                expect(afterCountSpy).not.toHaveBeenCalled()
+            })
+
+            it('should dispatch events when doNotDispatchEvents is false', async () => {
+                const input1 = { id: 3, title: 'Test Book 3', author: 'Author 3', publishedDate: new Date() }
+                const input2 = { id: 4, title: 'Test Book 4', author: 'Author 4', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.count({}, { doNotDispatchEvents: false })
+
+                expect(result).toBe(2)
+                expect(beforeCountSpy).toHaveBeenCalledTimes(1)
+                expect(afterCountSpy).toHaveBeenCalledTimes(1)
+            })
+
+            it('should dispatch events when doNotDispatchEvents is not specified', async () => {
+                const input1 = { id: 5, title: 'Test Book 5', author: 'Author 5', publishedDate: new Date() }
+                const input2 = { id: 6, title: 'Test Book 6', author: 'Author 6', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.count({})
+
+                expect(result).toBe(2)
+                expect(beforeCountSpy).toHaveBeenCalledTimes(1)
+                expect(afterCountSpy).toHaveBeenCalledTimes(1)
+            })
+        })
+    })
 })

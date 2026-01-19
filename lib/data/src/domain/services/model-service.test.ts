@@ -934,4 +934,284 @@ describe('ModelService', () => {
             })
         })
     })
+
+    describe('doNotDispatchEvents option', () => {
+        const beforeLoadSpy = mock(() => {})
+        const afterLoadSpy = mock(() => {})
+        const beforeLoadManySpy = mock(() => {})
+        const afterLoadManySpy = mock(() => {})
+
+        beforeEach(() => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+
+            beforeLoadSpy.mockClear()
+            afterLoadSpy.mockClear()
+            beforeLoadManySpy.mockClear()
+            afterLoadManySpy.mockClear()
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+            beforeUpdateSpy.mockClear()
+            afterUpdateSpy.mockClear()
+
+            emitter.on('books::book.beforeLoad', beforeLoadSpy)
+            emitter.on('books::book.afterLoad', afterLoadSpy)
+            emitter.on('books::book.beforeLoadMany', beforeLoadManySpy)
+            emitter.on('books::book.afterLoadMany', afterLoadManySpy)
+            emitter.on('books::book.beforeCreate', beforeCreateSpy)
+            emitter.on('books::book.afterCreate', afterCreateSpy)
+            emitter.on('books::book.beforeUpdate', beforeUpdateSpy)
+            emitter.on('books::book.afterUpdate', afterUpdateSpy)
+
+            service = new ModelService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        describe('upsert', () => {
+            it('should not dispatch any events when doNotDispatchEvents is true', async () => {
+                const input = {
+                    id: 1,
+                    title: 'Existing Book',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input)
+
+                const updatedInput = {
+                    id: 1,
+                    title: 'Updated Book',
+                    author: 'Updated Author',
+                    publishedDate: new Date(),
+                }
+
+                await service.upsert(updatedInput, { doNotDispatchEvents: true })
+
+                // Load events should not be dispatched due to propagation
+                expect(beforeLoadSpy).not.toHaveBeenCalled()
+                expect(afterLoadSpy).not.toHaveBeenCalled()
+
+                // Update events should not be dispatched either
+                expect(beforeUpdateSpy).not.toHaveBeenCalled()
+                expect(afterUpdateSpy).not.toHaveBeenCalled()
+            })
+
+            it('should not dispatch load events even when doNotDispatchEvents is false', async () => {
+                const input = {
+                    id: 2,
+                    title: 'Existing Book',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input)
+
+                const updatedInput = {
+                    id: 2,
+                    title: 'Updated Book',
+                    author: 'Updated Author',
+                    publishedDate: new Date(),
+                }
+
+                await service.upsert(updatedInput, { doNotDispatchEvents: false })
+
+                // Load events should NOT be dispatched (forced internally)
+                expect(beforeLoadSpy).not.toHaveBeenCalled()
+                expect(afterLoadSpy).not.toHaveBeenCalled()
+
+                // Update events should be dispatched
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+            })
+
+            it('should not dispatch load events even when doNotDispatchEvents is not specified', async () => {
+                const input = {
+                    id: 3,
+                    title: 'Existing Book',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input)
+
+                const updatedInput = {
+                    id: 3,
+                    title: 'Updated Book',
+                    author: 'Updated Author',
+                    publishedDate: new Date(),
+                }
+
+                await service.upsert(updatedInput)
+
+                // Load events should NOT be dispatched (forced internally)
+                expect(beforeLoadSpy).not.toHaveBeenCalled()
+                expect(afterLoadSpy).not.toHaveBeenCalled()
+
+                // Update events should be dispatched
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+            })
+        })
+
+        describe('bulkUpsert', () => {
+            it('should not dispatch any events when doNotDispatchEvents is true', async () => {
+                const input1 = {
+                    id: 1,
+                    title: 'Existing Book 1',
+                    author: 'Author 1',
+                    publishedDate: new Date(),
+                }
+                const input2 = {
+                    id: 2,
+                    title: 'Existing Book 2',
+                    author: 'Author 2',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const updatedInputs = [
+                    {
+                        id: 1,
+                        title: 'Updated Book 1',
+                        author: 'Updated Author 1',
+                        publishedDate: new Date(),
+                    },
+                    {
+                        id: 2,
+                        title: 'Updated Book 2',
+                        author: 'Updated Author 2',
+                        publishedDate: new Date(),
+                    },
+                ]
+
+                await service.bulkUpsert(updatedInputs, { doNotDispatchEvents: true })
+
+                // LoadMany events should not be dispatched due to propagation
+                expect(beforeLoadManySpy).not.toHaveBeenCalled()
+                expect(afterLoadManySpy).not.toHaveBeenCalled()
+
+                // Update events should not be dispatched either
+                expect(beforeUpdateSpy).not.toHaveBeenCalled()
+                expect(afterUpdateSpy).not.toHaveBeenCalled()
+            })
+
+            it('should not dispatch loadMany events even when doNotDispatchEvents is false', async () => {
+                const input1 = {
+                    id: 3,
+                    title: 'Existing Book 3',
+                    author: 'Author 3',
+                    publishedDate: new Date(),
+                }
+                const input2 = {
+                    id: 4,
+                    title: 'Existing Book 4',
+                    author: 'Author 4',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const updatedInputs = [
+                    {
+                        id: 3,
+                        title: 'Updated Book 3',
+                        author: 'Updated Author 3',
+                        publishedDate: new Date(),
+                    },
+                    {
+                        id: 4,
+                        title: 'Updated Book 4',
+                        author: 'Updated Author 4',
+                        publishedDate: new Date(),
+                    },
+                ]
+
+                await service.bulkUpsert(updatedInputs, { doNotDispatchEvents: false })
+
+                // LoadMany events should NOT be dispatched (forced internally)
+                expect(beforeLoadManySpy).not.toHaveBeenCalled()
+                expect(afterLoadManySpy).not.toHaveBeenCalled()
+
+                // Update events should be dispatched (2 updates)
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+            })
+
+            it('should not dispatch loadMany events even when doNotDispatchEvents is not specified', async () => {
+                const input1 = {
+                    id: 5,
+                    title: 'Existing Book 5',
+                    author: 'Author 5',
+                    publishedDate: new Date(),
+                }
+                const input2 = {
+                    id: 6,
+                    title: 'Existing Book 6',
+                    author: 'Author 6',
+                    publishedDate: new Date(),
+                }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const updatedInputs = [
+                    {
+                        id: 5,
+                        title: 'Updated Book 5',
+                        author: 'Updated Author 5',
+                        publishedDate: new Date(),
+                    },
+                    {
+                        id: 6,
+                        title: 'Updated Book 6',
+                        author: 'Updated Author 6',
+                        publishedDate: new Date(),
+                    },
+                ]
+
+                await service.bulkUpsert(updatedInputs)
+
+                // LoadMany events should NOT be dispatched (forced internally)
+                expect(beforeLoadManySpy).not.toHaveBeenCalled()
+                expect(afterLoadManySpy).not.toHaveBeenCalled()
+
+                // Update events should be dispatched (2 updates)
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+            })
+
+            it('should not dispatch any events with doNotDispatchEvents for mixed create and update operations', async () => {
+                const existingInput = {
+                    id: 7,
+                    title: 'Existing Book',
+                    author: 'Author',
+                    publishedDate: new Date(),
+                }
+                await repository.create(existingInput)
+
+                const inputs = [
+                    {
+                        id: 7,
+                        title: 'Updated Book',
+                        author: 'Updated Author',
+                        publishedDate: new Date(),
+                    },
+                    {
+                        id: 8,
+                        title: 'New Book',
+                        author: 'New Author',
+                        publishedDate: new Date(),
+                    },
+                ]
+
+                await service.bulkUpsert(inputs, { doNotDispatchEvents: true })
+
+                // LoadMany events should not be dispatched
+                expect(beforeLoadManySpy).not.toHaveBeenCalled()
+                expect(afterLoadManySpy).not.toHaveBeenCalled()
+
+                // Neither create nor update events should be dispatched
+                expect(beforeCreateSpy).not.toHaveBeenCalled()
+                expect(afterCreateSpy).not.toHaveBeenCalled()
+                expect(beforeUpdateSpy).not.toHaveBeenCalled()
+                expect(afterUpdateSpy).not.toHaveBeenCalled()
+            })
+        })
+    })
 })

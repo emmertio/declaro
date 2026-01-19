@@ -12,8 +12,18 @@ import type { IModelServiceArgs } from './model-service-args'
 import { ReadOnlyModelService, type ILoadOptions } from './read-only-model-service'
 import type { IActionOptions } from './base-model-service'
 
-export interface ICreateOptions extends IActionOptions {}
-export interface IUpdateOptions extends IActionOptions {}
+export interface ICreateOptions extends IActionOptions {
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
+}
+export interface IUpdateOptions extends IActionOptions {
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
+}
 
 export interface INormalizeInputArgs<TSchema extends AnyModelSchema> {
     existing?: InferDetail<TSchema>
@@ -101,21 +111,25 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         })
 
         // Emit the before create event
-        const beforeCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(ModelMutationAction.BeforeCreate),
-            normalizedInput,
-        )
-        await this.emitter.emitAsync(beforeCreateEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(ModelMutationAction.BeforeCreate),
+                normalizedInput,
+            )
+            await this.emitter.emitAsync(beforeCreateEvent)
+        }
 
         // Perform the creation
         const result = await this.repository.create(normalizedInput, options)
 
         // Emit the after create event
-        const afterCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(ModelMutationAction.AfterCreate),
-            normalizedInput,
-        ).setResult(result)
-        await this.emitter.emitAsync(afterCreateEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(ModelMutationAction.AfterCreate),
+                normalizedInput,
+            ).setResult(result)
+            await this.emitter.emitAsync(afterCreateEvent)
+        }
 
         // Return the results of the creation
         return await this.normalizeDetail(result)
@@ -126,7 +140,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         input: InferInput<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>> {
-        const existing = await this.repository.load(lookup, options)
+        const existing = await this.repository.load(lookup, { ...options, doNotDispatchEvents: true })
         // Normalize the input data
         const normalizedInput = await this.normalizeInput(input, {
             existing,
@@ -134,21 +148,25 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         })
 
         // Emit the before update event
-        const beforeUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(ModelMutationAction.BeforeUpdate),
-            normalizedInput,
-        )
-        await this.emitter.emitAsync(beforeUpdateEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(ModelMutationAction.BeforeUpdate),
+                normalizedInput,
+            )
+            await this.emitter.emitAsync(beforeUpdateEvent)
+        }
 
         // Perform the update
         const result = await this.repository.update(lookup, normalizedInput, options)
 
         // Emit the after update event
-        const afterUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(ModelMutationAction.AfterUpdate),
-            normalizedInput,
-        ).setResult(result)
-        await this.emitter.emitAsync(afterUpdateEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(ModelMutationAction.AfterUpdate),
+                normalizedInput,
+            ).setResult(result)
+            await this.emitter.emitAsync(afterUpdateEvent)
+        }
 
         // Return the results of the update
         return await this.normalizeDetail(result)
@@ -177,7 +195,10 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
                 {
                     [this.entityMetadata.primaryKey]: primaryKeyValue,
                 } as InferLookup<TSchema>,
-                options,
+                {
+                    ...options,
+                    doNotDispatchEvents: true,
+                },
             )
 
             if (existingItem) {
@@ -198,21 +219,25 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         })
 
         // Emit the before upsert event
-        const beforeUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(beforeOperation),
-            normalizedInput,
-        )
-        await this.emitter.emitAsync(beforeUpsertEvent)
+        if (!options?.doNotDispatchEvents) {
+            const beforeUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(beforeOperation),
+                normalizedInput,
+            )
+            await this.emitter.emitAsync(beforeUpsertEvent)
+        }
 
         // Perform the upsert operation
         const result = await this.repository.upsert(normalizedInput, options)
 
         // Emit the after upsert event
-        const afterUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-            this.getDescriptor(afterOperation),
-            normalizedInput,
-        ).setResult(result)
-        await this.emitter.emitAsync(afterUpsertEvent)
+        if (!options?.doNotDispatchEvents) {
+            const afterUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                this.getDescriptor(afterOperation),
+                normalizedInput,
+            ).setResult(result)
+            await this.emitter.emitAsync(afterUpsertEvent)
+        }
 
         // Return the results of the upsert operation
         return await this.normalizeDetail(result)
@@ -268,7 +293,10 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         const existingEntitiesMap = new Map<string | number, InferDetail<TSchema>>()
         if (uniqueLookups.size > 0) {
             const lookups = Array.from(uniqueLookups.values())
-            const existingEntities = await this.loadMany(lookups, options)
+            const existingEntities = await this.loadMany(lookups, {
+                ...options,
+                doNotDispatchEvents: true,
+            })
             existingEntities.forEach((entity) => {
                 if (entity) {
                     const pkValue = this.getPrimaryKeyValue(entity)
@@ -306,44 +334,48 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         const normalizedInputs = await Promise.all(normalizationPromises)
 
         // Create before events
-        const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
-        for (const inputInfo of inputInfos) {
-            beforeEvents.push(
-                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                    this.getDescriptor(inputInfo.operation!),
-                    inputInfo.input,
-                ),
-            )
-        }
+        if (!options?.doNotDispatchEvents) {
+            const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+            for (const inputInfo of inputInfos) {
+                beforeEvents.push(
+                    new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                        this.getDescriptor(inputInfo.operation!),
+                        inputInfo.input,
+                    ),
+                )
+            }
 
-        // Emit all before events
-        await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
+            // Emit all before events
+            await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
+        }
 
         // Perform the bulk upsert operation with all normalized inputs
         const results = await this.repository.bulkUpsert(normalizedInputs, options)
 
         // Create after events and return results
-        const afterEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+        if (!options?.doNotDispatchEvents) {
+            const afterEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
 
-        for (let i = 0; i < inputInfos.length; i++) {
-            const inputInfo = inputInfos[i]
-            const result = results[i]
+            for (let i = 0; i < inputInfos.length; i++) {
+                const inputInfo = inputInfos[i]
+                const result = results[i]
 
-            const afterOperation =
-                inputInfo.operation === ModelMutationAction.BeforeCreate
-                    ? ModelMutationAction.AfterCreate
-                    : ModelMutationAction.AfterUpdate
+                const afterOperation =
+                    inputInfo.operation === ModelMutationAction.BeforeCreate
+                        ? ModelMutationAction.AfterCreate
+                        : ModelMutationAction.AfterUpdate
 
-            afterEvents.push(
-                new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                    this.getDescriptor(afterOperation),
-                    inputInfo.input,
-                ).setResult(result),
-            )
+                afterEvents.push(
+                    new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+                        this.getDescriptor(afterOperation),
+                        inputInfo.input,
+                    ).setResult(result),
+                )
+            }
+
+            // Emit all after events
+            await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
         }
-
-        // Emit all after events
-        await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
 
         // Return normalized results
         return await Promise.all(results.map((result) => this.normalizeDetail(result)))

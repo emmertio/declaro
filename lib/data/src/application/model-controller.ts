@@ -1,6 +1,7 @@
 import type { AuthValidator } from '@declaro/auth'
 import { PermissionValidator, type AnyModelSchema } from '@declaro/core'
 import type { ModelService, ICreateOptions, IUpdateOptions } from '../domain/services/model-service'
+import type { ILoadOptions } from '../domain/services/read-only-model-service'
 import type { InferDetail, InferFilters, InferInput, InferLookup, InferSummary } from '../shared/utils/schema-inference'
 import { ReadOnlyModelController } from './read-only-model-controller'
 
@@ -12,56 +13,64 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
         super(service, authValidator)
     }
 
-    async createPermissions(input: InferInput<TSchema>): Promise<PermissionValidator> {
+    async createPermissions(input: InferInput<TSchema>, options?: ICreateOptions): Promise<PermissionValidator> {
         return PermissionValidator.create().someOf([
             this.service.getDescriptor('create', '*').toString(),
             this.service.getDescriptor('write', '*').toString(),
         ])
     }
 
-    async create(input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
-        const permissions = await this.createPermissions(input)
+    async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
+        const permissions = await this.createPermissions(input, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.create(input)
+        return this.service.create(input, options)
     }
 
-    async updatePermissions(lookup: InferLookup<TSchema>, input: InferInput<TSchema>): Promise<PermissionValidator> {
+    async updatePermissions(
+        lookup: InferLookup<TSchema>,
+        input: InferInput<TSchema>,
+        options?: IUpdateOptions,
+    ): Promise<PermissionValidator> {
         return PermissionValidator.create().someOf([
             this.service.getDescriptor('update', '*').toString(),
             this.service.getDescriptor('write', '*').toString(),
         ])
     }
 
-    async update(lookup: InferLookup<TSchema>, input: InferInput<TSchema>): Promise<InferDetail<TSchema>> {
-        const permissions = await this.updatePermissions(lookup, input)
+    async update(
+        lookup: InferLookup<TSchema>,
+        input: InferInput<TSchema>,
+        options?: IUpdateOptions,
+    ): Promise<InferDetail<TSchema>> {
+        const permissions = await this.updatePermissions(lookup, input, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.update(lookup, input)
+        return this.service.update(lookup, input, options)
     }
 
-    async removePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+    async removePermissions(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<PermissionValidator> {
         return PermissionValidator.create().someOf([
             this.service.getDescriptor('remove', '*').toString(),
             this.service.getDescriptor('write', '*').toString(),
         ])
     }
 
-    async remove(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        const permissions = await this.removePermissions(lookup)
+    async remove(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
+        const permissions = await this.removePermissions(lookup, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.remove(lookup)
+        return this.service.remove(lookup, options)
     }
 
-    async restorePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
+    async restorePermissions(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<PermissionValidator> {
         return PermissionValidator.create().someOf([
             this.service.getDescriptor('restore', '*').toString(),
             this.service.getDescriptor('write', '*').toString(),
         ])
     }
 
-    async restore(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
-        const permissions = await this.restorePermissions(lookup)
+    async restore(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
+        const permissions = await this.restorePermissions(lookup, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.restore(lookup)
+        return this.service.restore(lookup, options)
     }
 
     async upsertPermissions(

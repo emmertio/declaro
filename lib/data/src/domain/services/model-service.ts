@@ -1,4 +1,4 @@
-import type { ActionDescriptor, AnyModelSchema, IActionDescriptor } from '@declaro/core'
+import type { ActionDescriptor, AnyModelSchema, IActionDescriptor, IAnyModel } from '@declaro/core'
 import type {
     InferDetail,
     InferFilters,
@@ -47,6 +47,72 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         args: INormalizeInputArgs<TSchema>,
     ): Promise<InferInput<TSchema>> {
         return input
+    }
+
+    /**
+     * Converts a detail object to a valid input for this service's schema.
+     * Picks only fields that exist in the input model and validates/coerces
+     * them through the input schema. Useful for duplicating entities or
+     * converting a detail from one entity type into an input for another.
+     * @param detail The detail object to convert (can be from any schema).
+     * @returns A validated input object with coerced values.
+     */
+    async detailsToInput(detail: Record<string, unknown>): Promise<InferInput<TSchema>> {
+        const inputModel: IAnyModel = this.schema.definition.input
+        const inputJsonSchema = inputModel.toJSONSchema()
+        const inputFields = Object.keys(inputJsonSchema.properties ?? {})
+
+        // Pick only fields that exist in the input model
+        const picked: Record<string, unknown> = {}
+        for (const field of inputFields) {
+            if (field in detail) {
+                picked[field] = detail[field]
+            }
+        }
+
+        // Validate through the input model to coerce values
+        const result = await inputModel.validate(picked as any)
+
+        if ('value' in result) {
+            return result.value as InferInput<TSchema>
+        }
+
+        return picked as InferInput<TSchema>
+    }
+
+    /**
+     * Duplicates an existing entity by loading it, converting to input, removing the
+     * primary key, and creating a new record. Accepts an optional partial input to
+     * merge on top of the converted copy before creation.
+     * @param lookup The lookup criteria to find the record to duplicate.
+     * @param overrides Optional partial input to merge on top of the duplicated data.
+     * @param options Optional create options.
+     * @returns The newly created duplicate record.
+     */
+    async duplicate(
+        lookup: InferLookup<TSchema>,
+        overrides?: Partial<InferInput<TSchema>>,
+        options?: ICreateOptions,
+    ): Promise<InferDetail<TSchema>> {
+        // Load the existing entity
+        const existing = await this.load(lookup)
+        if (!existing) {
+            throw new Error('Item not found')
+        }
+
+        // Convert the detail to an input
+        const input = await this.detailsToInput(existing as Record<string, unknown>)
+
+        // Remove the primary key to ensure a new record gets created
+        if (this.entityMetadata?.primaryKey) {
+            delete (input as Record<string, unknown>)[this.entityMetadata.primaryKey]
+        }
+
+        // Merge optional overrides
+        const finalInput = overrides ? Object.assign({}, input, overrides) : input
+
+        // Create the new record
+        return this.create(finalInput as InferInput<TSchema>, options)
     }
 
     /**

@@ -935,6 +935,186 @@ describe('ModelService', () => {
         })
     })
 
+    describe('detailsToInput', () => {
+        it('should convert a detail object to an input by picking only input fields', async () => {
+            const detail = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const input = await service.detailsToInput(detail)
+
+            expect(input.title).toBe('Test Book')
+            expect(input.author).toBe('Author Name')
+            expect(input.publishedDate).toEqual(new Date('2023-06-15'))
+        })
+
+        it('should exclude fields not present in the input model', async () => {
+            const detailWithExtras = {
+                id: 42,
+                title: 'Test Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+                extraField: 'should be excluded',
+                anotherExtra: 123,
+            }
+            const input = await service.detailsToInput(detailWithExtras)
+
+            expect(input.title).toBe('Test Book')
+            expect(input.author).toBe('Author Name')
+            expect((input as any).extraField).toBeUndefined()
+            expect((input as any).anotherExtra).toBeUndefined()
+        })
+
+        it('should coerce values through the input schema', async () => {
+            // publishedDate uses z.coerce.date(), so a string should be coerced to a Date
+            const detailWithStringDate = {
+                id: 42,
+                title: 'Test Book',
+                author: 'Author Name',
+                publishedDate: '2023-06-15T00:00:00.000Z',
+            }
+            const input = await service.detailsToInput(detailWithStringDate)
+
+            expect(input.publishedDate).toBeInstanceOf(Date)
+            expect(input.publishedDate).toEqual(new Date('2023-06-15T00:00:00.000Z'))
+        })
+
+        it('should include the primary key field when present in the source', async () => {
+            const detail = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date() }
+            const input = await service.detailsToInput(detail)
+
+            // id is optional in the input model but should be included if present
+            expect(input.id).toBe(42)
+        })
+
+        it('should work with partial source data that satisfies required input fields', async () => {
+            const minimalDetail = {
+                title: 'Minimal Book',
+                author: 'Some Author',
+                publishedDate: new Date(),
+            }
+            const input = await service.detailsToInput(minimalDetail)
+
+            expect(input.title).toBe('Minimal Book')
+            expect(input.author).toBe('Some Author')
+            expect(input.id).toBeUndefined()
+        })
+
+        it('should produce a valid input that can be used with create', async () => {
+            const detail = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const input = await service.detailsToInput(detail)
+
+            // Remove the primary key and create a new record
+            delete (input as any).id
+            const created = await service.create(input)
+
+            expect(created.title).toBe('Test Book')
+            expect(created.author).toBe('Author Name')
+            expect(created.id).toBeDefined()
+            expect(created.id).not.toBe(42)
+        })
+    })
+
+    describe('duplicate', () => {
+        it('should create a duplicate of an existing record with a new primary key', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            await repository.create(original)
+
+            const duplicate = await service.duplicate({ id: 42 })
+
+            expect(duplicate.title).toBe('Original Book')
+            expect(duplicate.author).toBe('Author Name')
+            expect(duplicate.publishedDate).toEqual(new Date('2023-06-15'))
+            expect(duplicate.id).toBeDefined()
+            expect(duplicate.id).not.toBe(42)
+        })
+
+        it('should apply overrides to the duplicated record', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            await repository.create(original)
+
+            const duplicate = await service.duplicate({ id: 42 }, { title: 'Duplicated Book' })
+
+            expect(duplicate.title).toBe('Duplicated Book')
+            expect(duplicate.author).toBe('Author Name')
+            expect(duplicate.id).toBeDefined()
+            expect(duplicate.id).not.toBe(42)
+        })
+
+        it('should throw an error when trying to duplicate a non-existent record', async () => {
+            await expect(service.duplicate({ id: 999 })).rejects.toThrow()
+        })
+
+        it('should trigger create events for the duplicate', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(original)
+
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            await service.duplicate({ id: 42 })
+
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+        })
+
+        it('should not modify the original record', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            await repository.create(original)
+
+            await service.duplicate({ id: 42 }, { title: 'Modified Title' })
+
+            const loaded = await repository.load({ id: 42 })
+            expect(loaded?.title).toBe('Original Book')
+            expect(loaded?.author).toBe('Author Name')
+        })
+
+        it('should allow overriding multiple fields', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            await repository.create(original)
+
+            const newDate = new Date('2024-01-01')
+            const duplicate = await service.duplicate({ id: 42 }, {
+                title: 'New Title',
+                author: 'New Author',
+                publishedDate: newDate,
+            })
+
+            expect(duplicate.title).toBe('New Title')
+            expect(duplicate.author).toBe('New Author')
+            expect(duplicate.publishedDate).toEqual(newDate)
+            expect(duplicate.id).not.toBe(42)
+        })
+
+        it('should create independent records that can be modified separately', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            await repository.create(original)
+
+            const duplicate = await service.duplicate({ id: 42 })
+
+            // Update the duplicate
+            await service.update({ id: duplicate.id }, { title: 'Updated Duplicate', author: 'Updated Author', publishedDate: new Date() })
+
+            // Verify original is unchanged
+            const loadedOriginal = await repository.load({ id: 42 })
+            expect(loadedOriginal?.title).toBe('Original Book')
+
+            // Verify duplicate was updated
+            const loadedDuplicate = await repository.load({ id: duplicate.id })
+            expect(loadedDuplicate?.title).toBe('Updated Duplicate')
+        })
+
+        it('should respect doNotDispatchEvents option', async () => {
+            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date() }
+            await repository.create(original)
+
+            beforeCreateSpy.mockClear()
+            afterCreateSpy.mockClear()
+
+            await service.duplicate({ id: 42 }, undefined, { doNotDispatchEvents: true })
+
+            expect(beforeCreateSpy).not.toHaveBeenCalled()
+            expect(afterCreateSpy).not.toHaveBeenCalled()
+        })
+    })
+
     describe('doNotDispatchEvents option', () => {
         const beforeLoadSpy = mock(() => {})
         const afterLoadSpy = mock(() => {})

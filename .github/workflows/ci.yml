@@ -52,6 +52,11 @@ jobs:
               run: bun test 2>&1 | tee test-output.txt
               continue-on-error: true
 
+            - name: Integration Tests
+              id: integration
+              run: cd lib/zod && bun run test:integration 2>&1 | tee ../../integration-output.txt
+              continue-on-error: true
+
             - name: Create PR comment
               if: github.event_name == 'pull_request'
               uses: actions/github-script@v7
@@ -62,18 +67,21 @@ jobs:
                       const buildStatus = '${{ steps.build.outcome }}';
                       const typecheckStatus = '${{ steps.typecheck.outcome }}';
                       const testStatus = '${{ steps.test.outcome }}';
+                      const integrationStatus = '${{ steps.integration.outcome }}';
 
                       const icon = (status) => status === 'success' ? '✅' : '❌';
 
                       let buildOutput = '';
                       let typecheckOutput = '';
                       let testOutput = '';
+                      let integrationOutput = '';
 
                       try { buildOutput = fs.readFileSync('build-output.txt', 'utf8'); } catch {}
                       try { typecheckOutput = fs.readFileSync('typecheck-output.txt', 'utf8'); } catch {}
                       try { testOutput = fs.readFileSync('test-output.txt', 'utf8'); } catch {}
+                      try { integrationOutput = fs.readFileSync('integration-output.txt', 'utf8'); } catch {}
 
-                      const allPassed = buildStatus === 'success' && typecheckStatus === 'success' && testStatus === 'success';
+                      const allPassed = buildStatus === 'success' && typecheckStatus === 'success' && testStatus === 'success' && integrationStatus === 'success';
                       const header = allPassed ? '## ✅ CI Passed' : '## ❌ CI Failed';
 
                       let body = `${header}\n\n`;
@@ -81,7 +89,8 @@ jobs:
                       body += `| --- | --- |\n`;
                       body += `| Build | ${icon(buildStatus)} ${buildStatus} |\n`;
                       body += `| Typecheck | ${icon(typecheckStatus)} ${typecheckStatus} |\n`;
-                      body += `| Test | ${icon(testStatus)} ${testStatus} |\n\n`;
+                      body += `| Test | ${icon(testStatus)} ${testStatus} |\n`;
+                      body += `| Integration | ${icon(integrationStatus)} ${integrationStatus} |\n\n`;
 
                       // Extract test summary line (e.g. "Ran 553 tests across 45 files")
                       const testSummaryMatch = testOutput.match(/Ran \d+ tests across \d+ files.*/);
@@ -101,6 +110,7 @@ jobs:
                       if (buildStatus !== 'success') failures.push(['Build', buildOutput]);
                       if (typecheckStatus !== 'success') failures.push(['Typecheck', typecheckOutput]);
                       if (testStatus !== 'success') failures.push(['Test', testOutput]);
+                      if (integrationStatus !== 'success') failures.push(['Integration', integrationOutput]);
 
                       for (const [name, output] of failures) {
                           const truncated = output.length > 3000 ? '…' + output.slice(-3000) : output;
@@ -140,5 +150,5 @@ jobs:
                       }
 
             - name: Fail if any step failed
-              if: steps.build.outcome != 'success' || steps.typecheck.outcome != 'success' || steps.test.outcome != 'success'
+              if: steps.build.outcome != 'success' || steps.typecheck.outcome != 'success' || steps.test.outcome != 'success' || steps.integration.outcome != 'success'
               run: exit 1

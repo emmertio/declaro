@@ -24,6 +24,7 @@
         "build:js": "bun run scripts/build.ts",
         "build": "bun run clean && bun run build:js && bun run build:typedefs",
         "test": "bun test",
+        "test:integration": "bun run build && bun run scripts/integration-test.ts && bun run scripts/integration-test-cjs.ts",
         "test:watch": "bun test --watch",
         "typecheck": "bun tsc --noEmit"
     },

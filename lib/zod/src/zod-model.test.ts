@@ -1,7 +1,7 @@
 import { ZodModel } from './zod-model'
 import { z } from 'zod/v4'
 import { describe, it, expect } from 'bun:test'
-import { ValidationError } from '@declaro/core'
+import { ValidationError, Model } from '@declaro/core'
 
 describe('ZodModel', () => {
     it('should be an instance of Model', () => {
@@ -395,5 +395,50 @@ describe('ZodModel', () => {
                 required: ['createdAt', 'name'],
             })
         })
+    })
+})
+
+describe('ZodModel - Instance Prototype Chain', () => {
+    /**
+     * This test ensures that ZodModel instances have proper prototype chain
+     * and instanceof checks work correctly. This is critical for catching
+     * CI environment issues where module resolution might break class instantiation.
+     * See: https://github.com/emmertio/declaro/issues/XXX
+     */
+    it('should have correct prototype chain', () => {
+        const schema = z.object({ name: z.string() })
+        const model = new ZodModel('Test', schema)
+
+        // Check instanceof
+        expect(model).toBeInstanceOf(ZodModel)
+        expect(model).toBeInstanceOf(Model)
+
+        // Check prototype
+        expect(Object.getPrototypeOf(model)).toBe(ZodModel.prototype)
+        expect(Object.getPrototypeOf(Object.getPrototypeOf(model))).toBe(Model.prototype)
+
+        // Check constructor
+        expect(model.constructor.name).toBe('ZodModel')
+
+        // Check that methods are accessible
+        expect(typeof model.validate).toBe('function')
+        expect(typeof model.toJSONSchema).toBe('function')
+        expect(typeof model.stripExcludedFields).toBe('function')
+    })
+
+    it('should have all expected properties from Model base class', () => {
+        const schema = z.object({ name: z.string() })
+        const model = new ZodModel('Test', schema)
+
+        // Check properties
+        expect(model).toHaveProperty('name')
+        expect(model).toHaveProperty('schema')
+        expect(model).toHaveProperty('validate')
+        expect(model).toHaveProperty('labels')
+
+        // Check property values
+        expect(model.name).toBe('Test')
+        expect(model.schema).toBe(schema)
+        expect(model.labels).toBeDefined()
     })
 })

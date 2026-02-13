@@ -46,11 +46,16 @@
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
     "gitHead": "c4e8895041c00ec51f891ef1400870e363343845",
+    "files": [
+        "dist",
+        "src",
+        "readme.md"
+    ],
     "exports": {
-        "bun": "./src/index.ts",
         "types": "./dist/ts/index.d.ts",
         "import": "./dist/node/index.js",
         "require": "./dist/node/index.cjs",
-        "browser": "./dist/browser/index.js"
+        "browser": "./dist/browser/index.js",
+        "default": "./dist/node/index.js"
     }
 }

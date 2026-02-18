@@ -35,7 +35,6 @@
         "zod": "^4.1.11"
     },
     "peerDependencies": {
-        "@declaro/core": "^2.0.0-beta.50",
         "zod": "^4.1.11"
     },
     "exports": {

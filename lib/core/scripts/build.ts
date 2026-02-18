@@ -1,4 +1,4 @@
-import { build } from 'bun'
+import { build, type BunPlugin } from 'bun'
 import { resolve } from 'path'
 import packageJson from '../package.json'
 
@@ -31,6 +31,15 @@ const getExternalPackages = (): string[] => {
 
 const externalPackages = getExternalPackages()
 
+const shimAsyncHooks: BunPlugin = {
+    name: 'shim-async-hooks',
+    setup(build) {
+        build.onResolve({ filter: /^node:async_hooks$|^async_hooks$/ }, () => ({
+            path: resolve(__dirname, '../src/shims/async-local-storage.ts'),
+        }))
+    },
+}
+
 const defaults = {
     entrypoints: [resolve(__dirname, '../src/index.ts'), resolve(__dirname, '../src/scope/index.ts')],
 }
@@ -56,7 +65,7 @@ await Promise.all([
         naming: '[dir]/[name].js',
         external: externalPackages,
     }),
-    // Browser build - same external behavior for consistency
+    // Browser build - shim node:async_hooks with synchronous polyfill
     build({
         ...defaults,
         target: 'browser',
@@ -64,5 +73,6 @@ await Promise.all([
         sourcemap: 'linked',
         minify: true,
         external: externalPackages,
+        plugins: [shimAsyncHooks],
     }),
 ])

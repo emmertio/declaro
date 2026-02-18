@@ -168,7 +168,7 @@ describe('withContext / useContext', () => {
             baz: boolean
         }
 
-        it('useContext() inside an event listener returns the withContext scope, not the listener registration scope', async () => {
+        it('event listener receives the emitter\'s context, not the registration context', async () => {
             const appContext = new Context<AppScope>()
 
             let capturedViaALS: Context | null = null
@@ -176,9 +176,9 @@ describe('withContext / useContext', () => {
 
             // Register the listener BEFORE extending so it gets copied into requestContext
             appContext.on('testEvent', async (listenerContext) => {
-                // The argument is always the context the listener was registered on
+                // Both the arg and useContext() now reflect the emitter's context (requestContext),
+                // not the context the listener was registered on (appContext)
                 capturedViaArg = listenerContext
-                // useContext() reads from ALS — returns the innermost withContext scope
                 capturedViaALS = useContext()
             })
 
@@ -190,9 +190,7 @@ describe('withContext / useContext', () => {
                 })
             })
 
-            // The listener arg reflects where it was registered (appContext)
-            expect(capturedViaArg).toBe(appContext)
-            // useContext() reflects the innermost withContext (requestContext)
+            expect(capturedViaArg).toBe(requestContext)
             expect(capturedViaALS).toBe(requestContext)
         })
 
@@ -246,22 +244,18 @@ describe('withContext / useContext', () => {
             expect(resolvedBaz).toBe(true)
         })
 
-        it('strict useContext() throws when emitting outside any withContext', async () => {
+        it('strict useContext() succeeds inside a listener because emit sets the context', async () => {
             const appContext = new Context<AppScope>()
-            let thrown: Error | null = null
+            let capturedContext: Context | null = null
 
             appContext.on('testEvent', async () => {
-                try {
-                    useContext({ strict: true })
-                } catch (e) {
-                    thrown = e as Error
-                }
+                // emit() wraps with withContext(this), so the context is always available in listeners
+                capturedContext = useContext({ strict: true })
             })
 
-            // emit without any wrapping withContext
             await appContext.emit('testEvent')
 
-            expect(thrown!.message).toMatch('useContext() was called outside of an active context')
+            expect(capturedContext).toBe(appContext)
         })
     })
 })

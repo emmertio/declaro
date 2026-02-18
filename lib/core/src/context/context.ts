@@ -5,6 +5,7 @@ import type { AllNodeMiddleware } from '../http/request-context'
 import type { Class, PromiseOrValue, UnwrapPromise } from '../typescript'
 import { validate, validateAny, type Validator } from '../validation'
 import { ContextConsumer } from './context-consumer'
+import { useContext, withContext } from './async-context'
 
 /**
  * Global interface for declaring dependencies available across all contexts.
@@ -944,7 +945,7 @@ export class Context<Scope extends object = any> {
      */
     on<E extends IEvent = IEvent>(type: IEvent['type'], listener: ContextListener<this, E>) {
         return this.emitter.on(type, (event) => {
-            return listener(this, event as E)
+            return listener((useContext() ?? this) as this, event as E)
         })
     }
 
@@ -957,7 +958,7 @@ export class Context<Scope extends object = any> {
     async emit(event: string | IEvent) {
         const eventObject = typeof event === 'string' ? { type: event } : event
 
-        return await this.emitter.emitAsync(eventObject)
+        return await withContext(this, () => this.emitter.emitAsync(eventObject))
     }
 
     /**

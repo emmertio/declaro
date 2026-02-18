@@ -157,4 +157,111 @@ describe('withContext / useContext', () => {
             expect(useContext()).toBeNull()
         })
     })
+
+    describe('typed scopes with event listeners', () => {
+        interface AppScope {
+            foo: string
+            bar: number
+        }
+
+        interface RequestScope extends AppScope {
+            baz: boolean
+        }
+
+        it('useContext() inside an event listener returns the withContext scope, not the listener registration scope', async () => {
+            const appContext = new Context<AppScope>()
+
+            let capturedViaALS: Context | null = null
+            let capturedViaArg: Context | null = null
+
+            // Register the listener BEFORE extending so it gets copied into requestContext
+            appContext.on('testEvent', async (listenerContext) => {
+                // The argument is always the context the listener was registered on
+                capturedViaArg = listenerContext
+                // useContext() reads from ALS — returns the innermost withContext scope
+                capturedViaALS = useContext()
+            })
+
+            const requestContext = new Context<RequestScope>().extend(appContext)
+
+            await withContext(appContext, async () => {
+                await withContext(requestContext, async () => {
+                    await requestContext.emit('testEvent')
+                })
+            })
+
+            // The listener arg reflects where it was registered (appContext)
+            expect(capturedViaArg).toBe(appContext)
+            // useContext() reflects the innermost withContext (requestContext)
+            expect(capturedViaALS).toBe(requestContext)
+        })
+
+        it('useContext() returns the correct typed context across nested scopes', async () => {
+            const appContext = new Context<AppScope>()
+            appContext.registerValue('foo', 'hello')
+            appContext.registerValue('bar', 42)
+
+            const snapshots: (Context | null)[] = []
+
+            // Register the listener BEFORE extending so it gets copied into requestContext
+            appContext.on('testEvent', async () => {
+                snapshots.push(useContext())
+            })
+
+            const requestContext = new Context<RequestScope>().extend(appContext)
+            requestContext.registerValue('baz', true)
+
+            await withContext(appContext, async () => {
+                snapshots.push(useContext())
+
+                await withContext(requestContext, async () => {
+                    snapshots.push(useContext())
+                    await requestContext.emit('testEvent')
+                })
+
+                snapshots.push(useContext())
+            })
+
+            expect(snapshots).toEqual([appContext, requestContext, requestContext, appContext])
+        })
+
+        it('useContext<RequestScope>() narrows the type inside the request scope', async () => {
+            const appContext = new Context<AppScope>()
+
+            let resolvedBaz: boolean | undefined
+
+            // Register the listener BEFORE extending so it gets copied into requestContext
+            appContext.on('testEvent', async () => {
+                const ctx = useContext<Context<RequestScope>>()
+                resolvedBaz = ctx?.resolve('baz')
+            })
+
+            const requestContext = new Context<RequestScope>().extend(appContext)
+            requestContext.registerValue('baz', true)
+
+            await withContext(requestContext, async () => {
+                await requestContext.emit('testEvent')
+            })
+
+            expect(resolvedBaz).toBe(true)
+        })
+
+        it('strict useContext() throws when emitting outside any withContext', async () => {
+            const appContext = new Context<AppScope>()
+            let thrown: Error | null = null
+
+            appContext.on('testEvent', async () => {
+                try {
+                    useContext({ strict: true })
+                } catch (e) {
+                    thrown = e as Error
+                }
+            })
+
+            // emit without any wrapping withContext
+            await appContext.emit('testEvent')
+
+            expect(thrown!.message).toMatch('useContext() was called outside of an active context')
+        })
+    })
 })

@@ -80,4 +80,81 @@ describe('withContext / useContext', () => {
 
         expect(results).toEqual([context, context])
     })
+
+    describe('nested async contexts (request → event fork)', () => {
+        it('full lifecycle: null → outer → inner → outer → null', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
+            const snapshots: (Context | null)[] = []
+
+            // Before any withContext
+            snapshots.push(useContext())
+
+            await withContext(requestContext, async () => {
+                // Inside request context
+                snapshots.push(useContext())
+
+                await withContext(eventContext, async () => {
+                    // Inside forked event context
+                    await Promise.resolve()
+                    snapshots.push(useContext())
+                })
+
+                // Back in request context after event completes
+                snapshots.push(useContext())
+            })
+
+            // After all withContext blocks
+            snapshots.push(useContext())
+
+            expect(snapshots).toEqual([null, requestContext, eventContext, requestContext, null])
+        })
+
+        it('concurrent async tasks each see their own context independently', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
+            const requestSnapshots: (Context | null)[] = []
+            const eventSnapshots: (Context | null)[] = []
+
+            // Simulate a request handler and an event handler running concurrently
+            await Promise.all([
+                withContext(requestContext, async () => {
+                    requestSnapshots.push(useContext())
+                    await new Promise((resolve) => setTimeout(resolve, 10))
+                    requestSnapshots.push(useContext())
+                }),
+                withContext(eventContext, async () => {
+                    eventSnapshots.push(useContext())
+                    await new Promise((resolve) => setTimeout(resolve, 5))
+                    eventSnapshots.push(useContext())
+                }),
+            ])
+
+            expect(requestSnapshots).toEqual([requestContext, requestContext])
+            expect(eventSnapshots).toEqual([eventContext, eventContext])
+        })
+
+        it('inner withContext with forked context does not bleed into outer after completion', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
+
+            await withContext(requestContext, async () => {
+                // Fire-and-forget style: event runs in its own context
+                const eventDone = withContext(eventContext, async () => {
+                    await Promise.resolve()
+                    expect(useContext()).toBe(eventContext)
+                })
+
+                // The outer context is unaffected while event runs
+                expect(useContext()).toBe(requestContext)
+
+                await eventDone
+
+                // Still unaffected after event finishes
+                expect(useContext()).toBe(requestContext)
+            })
+
+            expect(useContext()).toBeNull()
+        })
+    })
 })

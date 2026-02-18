@@ -10,16 +10,10 @@ import {
 import { Context } from './context'
 
 // ---------------------------------------------------------------------------
-// Shared test suite — runs for every storage implementation.
-// asyncPropagates: whether context survives an `await` boundary (only true
-// for native AsyncLocalStorage; the synchronous browser shim cannot do this).
+// Shared test suite — sync behavior that works for every storage implementation.
 // ---------------------------------------------------------------------------
-function sharedContextTests(
-    storage: AsyncContextStorage<Context> | undefined,
-    { asyncPropagates }: { asyncPropagates: boolean },
-) {
+function sharedContextTests(storage: AsyncContextStorage<Context> | undefined) {
     const { withContext, useContext } = createContextAPI<Context>(storage)
-    const itAsync = asyncPropagates ? it : it.skip
 
     it('returns the fn result synchronously', () => {
         const context = new Context()
@@ -36,14 +30,6 @@ function sharedContextTests(
     it('useContext() returns the active context inside withContext', () => {
         const context = new Context()
         withContext(context, () => {
-            expect(useContext()).toBe(context)
-        })
-    })
-
-    itAsync('useContext() returns the active context inside async withContext', async () => {
-        const context = new Context()
-        await withContext(context, async () => {
-            await Promise.resolve()
             expect(useContext()).toBe(context)
         })
     })
@@ -85,8 +71,25 @@ function sharedContextTests(
         withContext(context, () => {})
         expect(useContext()).toBeNull()
     })
+}
 
-    itAsync('context propagates across async boundaries', async () => {
+// ---------------------------------------------------------------------------
+// Async propagation suite — only for storage types with true async support
+// (native AsyncLocalStorage). The synchronous browser shim cannot propagate
+// context across await boundaries.
+// ---------------------------------------------------------------------------
+function asyncPropagationTests(storage: AsyncContextStorage<Context> | undefined) {
+    const { withContext, useContext } = createContextAPI<Context>(storage)
+
+    it('useContext() returns the active context inside async withContext', async () => {
+        const context = new Context()
+        await withContext(context, async () => {
+            await Promise.resolve()
+            expect(useContext()).toBe(context)
+        })
+    })
+
+    it('context propagates across async boundaries', async () => {
         const context = new Context()
         const results: (Context | null)[] = []
 
@@ -119,65 +122,51 @@ function sharedContextTests(
 
             snapshots.push(useContext())
 
-            // With native ALS the full sequence is preserved.
-            // With the synchronous shim, context is only visible in the
-            // synchronous portion of each run(), so the inner awaited snapshot
-            // and the post-await outer snapshot both fall back to null.
-            if (asyncPropagates) {
-                expect(snapshots).toEqual([null, requestContext, eventContext, requestContext, null])
-            } else {
-                expect(snapshots).toEqual([null, requestContext, eventContext, null, null])
-            }
+            expect(snapshots).toEqual([null, requestContext, eventContext, requestContext, null])
         })
 
-        itAsync(
-            'concurrent async tasks each see their own context independently',
-            async () => {
-                const requestContext = new Context()
-                const eventContext = new Context()
-                const requestSnapshots: (Context | null)[] = []
-                const eventSnapshots: (Context | null)[] = []
+        it('concurrent async tasks each see their own context independently', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
+            const requestSnapshots: (Context | null)[] = []
+            const eventSnapshots: (Context | null)[] = []
 
-                await Promise.all([
-                    withContext(requestContext, async () => {
-                        requestSnapshots.push(useContext())
-                        await new Promise((resolve) => setTimeout(resolve, 10))
-                        requestSnapshots.push(useContext())
-                    }),
-                    withContext(eventContext, async () => {
-                        eventSnapshots.push(useContext())
-                        await new Promise((resolve) => setTimeout(resolve, 5))
-                        eventSnapshots.push(useContext())
-                    }),
-                ])
+            await Promise.all([
+                withContext(requestContext, async () => {
+                    requestSnapshots.push(useContext())
+                    await new Promise((resolve) => setTimeout(resolve, 10))
+                    requestSnapshots.push(useContext())
+                }),
+                withContext(eventContext, async () => {
+                    eventSnapshots.push(useContext())
+                    await new Promise((resolve) => setTimeout(resolve, 5))
+                    eventSnapshots.push(useContext())
+                }),
+            ])
 
-                expect(requestSnapshots).toEqual([requestContext, requestContext])
-                expect(eventSnapshots).toEqual([eventContext, eventContext])
-            }
-        )
+            expect(requestSnapshots).toEqual([requestContext, requestContext])
+            expect(eventSnapshots).toEqual([eventContext, eventContext])
+        })
 
-        itAsync(
-            'inner withContext with forked context does not bleed into outer after completion',
-            async () => {
-                const requestContext = new Context()
-                const eventContext = new Context()
+        it('inner withContext with forked context does not bleed into outer after completion', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
 
-                await withContext(requestContext, async () => {
-                    const eventDone = withContext(eventContext, async () => {
-                        await Promise.resolve()
-                        expect(useContext()).toBe(eventContext)
-                    })
-
-                    expect(useContext()).toBe(requestContext)
-
-                    await eventDone
-
-                    expect(useContext()).toBe(requestContext)
+            await withContext(requestContext, async () => {
+                const eventDone = withContext(eventContext, async () => {
+                    await Promise.resolve()
+                    expect(useContext()).toBe(eventContext)
                 })
 
-                expect(useContext()).toBeNull()
-            }
-        )
+                expect(useContext()).toBe(requestContext)
+
+                await eventDone
+
+                expect(useContext()).toBe(requestContext)
+            })
+
+            expect(useContext()).toBeNull()
+        })
     })
 }
 
@@ -185,7 +174,8 @@ function sharedContextTests(
 // Native AsyncLocalStorage — full async propagation
 // ---------------------------------------------------------------------------
 describe('withContext / useContext (native AsyncLocalStorage)', () => {
-    sharedContextTests(new NativeALS<Context>(), { asyncPropagates: true })
+    sharedContextTests(new NativeALS<Context>())
+    asyncPropagationTests(new NativeALS<Context>())
 
     // These tests exercise Context.emit() which calls the module-level
     // withContext (always native). They verify the framework integration and
@@ -287,13 +277,64 @@ describe('withContext / useContext (native AsyncLocalStorage)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Browser shim — synchronous propagation only
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Browser shim — synchronous propagation only
+// Browser shim — synchronous propagation only.
+// Context is available within the synchronous call stack of withContext, but
+// is not propagated across await boundaries. This is expected and correct for
+// browser environments where native async hooks are unavailable.
 // ---------------------------------------------------------------------------
 describe('withContext / useContext (browser shim AsyncLocalStorage)', () => {
-    sharedContextTests(new ShimALS<Context>(), { asyncPropagates: false })
+    sharedContextTests(new ShimALS<Context>())
+
+    const { withContext, useContext } = createContextAPI<Context>(new ShimALS<Context>())
+
+    describe('async behavior (sync-only shim)', () => {
+        it('context is available at the start of an async fn before any await', async () => {
+            const context = new Context()
+            let captured: Context | null = null
+
+            await withContext(context, async () => {
+                captured = useContext()
+            })
+
+            expect(captured).toBe(context)
+        })
+
+        it('context is not available after an await boundary (expected shim behavior)', async () => {
+            const context = new Context()
+            let captured: Context | null | 'sentinel' = 'sentinel'
+
+            await withContext(context, async () => {
+                await Promise.resolve()
+                captured = useContext()
+            })
+
+            expect(captured).toBeNull()
+        })
+
+        it('full lifecycle: null → outer → inner → null → null (sync-only)', async () => {
+            const requestContext = new Context()
+            const eventContext = new Context()
+            const snapshots: (Context | null)[] = []
+
+            snapshots.push(useContext())
+
+            await withContext(requestContext, async () => {
+                snapshots.push(useContext())
+
+                await withContext(eventContext, async () => {
+                    snapshots.push(useContext())
+                })
+
+                snapshots.push(useContext())
+            })
+
+            snapshots.push(useContext())
+
+            // The shim restores context synchronously when run() exits.
+            // After awaiting the inner withContext, the outer context is gone.
+            expect(snapshots).toEqual([null, requestContext, eventContext, null, null])
+        })
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -302,5 +343,6 @@ describe('withContext / useContext (browser shim AsyncLocalStorage)', () => {
 // In Node/Bun (where tests run) it resolves to native AsyncLocalStorage.
 // ---------------------------------------------------------------------------
 describe('withContext / useContext (default storage)', () => {
-    sharedContextTests(undefined, { asyncPropagates: true })
+    sharedContextTests(undefined)
+    asyncPropagationTests(undefined)
 })

@@ -45,6 +45,16 @@ const defaults = {
 }
 
 await Promise.all([
+    // Bun build - bundle devDependencies, keep source maps for IDE navigation
+    build({
+        ...defaults,
+        target: 'bun',
+        format: 'esm',
+        outdir: 'dist/bun',
+        sourcemap: 'linked',
+        naming: '[dir]/[name].js',
+        external: externalPackages,
+    }),
     // CommonJS build for Node.js - externalize all dependencies and peerDependencies
     build({
         ...defaults,

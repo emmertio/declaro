@@ -1,8 +1,6 @@
-import { MockModel } from 'src/schema/test/mock-model'
 import { describe, expect, it } from 'vitest'
-import z4 from 'zod/v4'
+import type { JSONSchema } from '../../schema/json-schema'
 import { stripPrivateFieldsFromSchema } from './schema-utils'
-import type { JSONSchema } from 'src/schema/json-schema'
 
 describe('Schema Utils', () => {
     it('should strip private fields from schema', () => {

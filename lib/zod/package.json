@@ -35,7 +35,8 @@
         "zod": "^4.1.11"
     },
     "peerDependencies": {
-        "zod": "^4.1.11"
+        "zod": "^4.1.11",
+        "@declaro/core": "^2.0.0-beta.133"
     },
     "exports": {
         "types": "./dist/ts/index.d.ts",

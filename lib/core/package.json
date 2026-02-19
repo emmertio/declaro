@@ -55,7 +55,7 @@
         "src/**/*"
     ],
     "exports": {
-        "bun": "./src/index.ts",
+        "bun": "./dist/bun/index.js",
         "import": {
             "browser": "./dist/browser/index.js",
             "types": "./dist/ts/index.d.ts",
@@ -67,7 +67,7 @@
     },
     "imports": {
         "#scope": {
-            "bun": "./src/scope/index.ts",
+            "bun": "./dist/bun/scope/index.js",
             "types": "./dist/ts/scope/index.d.ts",
             "import": "./dist/node/scope/index.js",
             "require": "./dist/node/scope/index.cjs",

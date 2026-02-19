@@ -1,4 +1,4 @@
-import type { JSONSchema } from 'src/schema/json-schema'
+import type { JSONSchema } from '../../schema/json-schema'
 
 export function stripPrivateFieldsFromSchema(schema: JSONSchema): JSONSchema {
     if (typeof schema?.properties === 'object') {

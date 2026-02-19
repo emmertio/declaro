@@ -27,7 +27,7 @@ export class ZodModel<TName extends Readonly<string>, TSchema extends $ZodType<a
             ...zodOptions,
         })
         if (options?.includePrivateFields !== true) {
-            stripPrivateFieldsFromSchema(jsonSchema)
+            stripPrivateFieldsFromSchema(jsonSchema as JSONSchema)
         }
         return jsonSchema as JSONSchema
     }

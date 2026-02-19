@@ -1,7 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http'
-import { Context, type ContextMiddleware, type DeclaroRequestScope, type DeclaroScope } from '../context/context'
-
-import type { RequestScope, AppScope } from '#scope'
+import { Context, type ContextMiddleware, type DeclaroScope } from '../context/context'
 
 /**
  * Get the request middleware for the current context.

@@ -5,6 +5,7 @@ import type {
     InferLookup,
     InferSearchResults,
     InferSort,
+    InferSummary,
 } from '../../shared/utils/schema-inference'
 import { ModelQueryEvent } from '../events/event-types'
 import { QueryEvent } from '../events/query-event'
@@ -66,7 +67,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      * @param summary The summary data to normalize.
      * @returns The normalized summary data.
      */
-    async normalizeSummary(summary: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
+    async normalizeSummary(summary: InferSummary<TSchema>): Promise<InferSummary<TSchema>> {
         return summary
     }
 
@@ -166,7 +167,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         // Return the search results
         return {
             ...results,
-            results: await Promise.all(results.results.map((detail) => this.normalizeSummary(detail))),
+            results: await Promise.all(results.results.map((summary) => this.normalizeSummary(summary))),
         }
     }
 

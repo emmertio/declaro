@@ -4,7 +4,13 @@ import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-r
 import { MockBookSchema, type MockBookDetail, type MockBookLookup } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import type { QueryEvent } from '../events/query-event'
-import type { InferDetail, InferFilters, InferLookup, InferSearchResults } from '../../shared/utils/schema-inference'
+import type {
+    InferDetail,
+    InferFilters,
+    InferLookup,
+    InferSearchResults,
+    InferSummary,
+} from '../../shared/utils/schema-inference'
 
 describe('ReadOnlyModelService', () => {
     const namespace = 'books'
@@ -348,7 +354,7 @@ describe('ReadOnlyModelService', () => {
                 return detail
             }
 
-            async normalizeSummary(summary: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+            async normalizeSummary(summary: InferSummary<typeof mockSchema>): Promise<InferSummary<typeof mockSchema>> {
                 // Handle null case (e.g., when load returns null)
                 if (!summary) return summary
 

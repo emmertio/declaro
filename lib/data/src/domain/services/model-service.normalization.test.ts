@@ -4,7 +4,7 @@ import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-r
 import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import { mock } from 'bun:test'
-import type { InferDetail } from '../../shared/utils/schema-inference'
+import type { InferDetail, InferSummary } from '../../shared/utils/schema-inference'
 import { ModelMutationAction } from '../events/event-types'
 
 describe('ModelService - Normalization', () => {
@@ -538,7 +538,7 @@ describe('ModelService - Normalization', () => {
                 return detail
             }
 
-            async normalizeSummary(summary: InferDetail<typeof mockSchema>): Promise<InferDetail<typeof mockSchema>> {
+            async normalizeSummary(summary: InferSummary<typeof mockSchema>): Promise<InferSummary<typeof mockSchema>> {
                 // Handle null case (e.g., when load returns null)
                 if (!summary) return summary
 

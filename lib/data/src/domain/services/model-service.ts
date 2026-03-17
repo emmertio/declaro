@@ -7,7 +7,14 @@ import type {
     InferSummary,
 } from '../../shared/utils/schema-inference'
 import { ModelMutationAction, ModelQueryEvent } from '../events/event-types'
-import { MutationEvent } from '../events/mutation-event'
+import {
+    MutationEvent,
+    type ICreateEventMeta,
+    type IUpdateEventMeta,
+    type IRemoveEventMeta,
+    type IRestoreEventMeta,
+    type IDuplicateEventMeta,
+} from '../events/mutation-event'
 import type { IModelServiceArgs } from './model-service-args'
 import { ReadOnlyModelService, type ILoadOptions } from './read-only-model-service'
 import type { IActionOptions } from './base-model-service'
@@ -111,8 +118,36 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         // Merge optional overrides
         const finalInput = overrides ? Object.assign({}, input, overrides) : input
 
-        // Create the new record
-        return this.create(finalInput as InferInput<TSchema>, options)
+        // Emit the before duplicate event
+        if (!options?.doNotDispatchEvents) {
+            const beforeDuplicateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                IDuplicateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
+            >(
+                this.getDescriptor(ModelMutationAction.BeforeDuplicate),
+                finalInput as InferInput<TSchema>,
+            ).setMeta({ existing, args: { lookup, overrides, options: options as Record<string, unknown> } })
+            await this.emitter.emitAsync(beforeDuplicateEvent)
+        }
+
+        // Create the new record (also emits beforeCreate/afterCreate)
+        const result = await this.create(finalInput as InferInput<TSchema>, options)
+
+        // Emit the after duplicate event
+        if (!options?.doNotDispatchEvents) {
+            const afterDuplicateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                IDuplicateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
+            >(
+                this.getDescriptor(ModelMutationAction.AfterDuplicate),
+                finalInput as InferInput<TSchema>,
+            ).setMeta({ existing, args: { lookup, overrides, options: options as Record<string, unknown> } }).setResult(result)
+            await this.emitter.emitAsync(afterDuplicateEvent)
+        }
+
+        return result
     }
 
     /**
@@ -122,20 +157,28 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async remove(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         // Emit the before remove event
-        const beforeRemoveEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+        const beforeRemoveEvent = new MutationEvent<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
+        >(
             this.getDescriptor(ModelMutationAction.BeforeRemove),
             lookup,
-        )
+        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } })
         await this.emitter.emitAsync(beforeRemoveEvent)
 
         // Perform the removal
         const result = await this.repository.remove(lookup, options)
 
         // Emit the after remove event
-        const afterRemoveEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+        const afterRemoveEvent = new MutationEvent<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
+        >(
             this.getDescriptor(ModelMutationAction.AfterRemove),
             lookup,
-        ).setResult(result)
+        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } }).setResult(result)
         await this.emitter.emitAsync(afterRemoveEvent)
 
         // Return the results of the removal
@@ -150,20 +193,28 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async restore(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         // Emit the before restore event
-        const beforeRestoreEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+        const beforeRestoreEvent = new MutationEvent<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
+        >(
             this.getDescriptor(ModelMutationAction.BeforeRestore),
             lookup,
-        )
+        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } })
         await this.emitter.emitAsync(beforeRestoreEvent)
 
         // Perform the restore operation
         const result = await this.repository.restore(lookup, options)
 
         // Emit the after restore event
-        const afterRestoreEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
+        const afterRestoreEvent = new MutationEvent<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
+        >(
             this.getDescriptor(ModelMutationAction.AfterRestore),
             lookup,
-        ).setResult(result)
+        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } }).setResult(result)
         await this.emitter.emitAsync(afterRestoreEvent)
 
         // Return the results of the restore operation
@@ -178,10 +229,14 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Emit the before create event
         if (!options?.doNotDispatchEvents) {
-            const beforeCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+            const beforeCreateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                ICreateEventMeta<InferDetail<TSchema>, InferInput<TSchema>>
+            >(
                 this.getDescriptor(ModelMutationAction.BeforeCreate),
                 normalizedInput,
-            )
+            ).setMeta({ args: { input: normalizedInput, options: options as Record<string, unknown> } })
             await this.emitter.emitAsync(beforeCreateEvent)
         }
 
@@ -190,10 +245,14 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Emit the after create event
         if (!options?.doNotDispatchEvents) {
-            const afterCreateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+            const afterCreateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                ICreateEventMeta<InferDetail<TSchema>, InferInput<TSchema>>
+            >(
                 this.getDescriptor(ModelMutationAction.AfterCreate),
                 normalizedInput,
-            ).setResult(result)
+            ).setMeta({ args: { input: normalizedInput, options: options as Record<string, unknown> } }).setResult(result)
             await this.emitter.emitAsync(afterCreateEvent)
         }
 
@@ -215,10 +274,14 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Emit the before update event
         if (!options?.doNotDispatchEvents) {
-            const beforeUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+            const beforeUpdateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                IUpdateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
+            >(
                 this.getDescriptor(ModelMutationAction.BeforeUpdate),
                 normalizedInput,
-            )
+            ).setMeta({ existing, args: { lookup, input, options: options as Record<string, unknown> } })
             await this.emitter.emitAsync(beforeUpdateEvent)
         }
 
@@ -227,10 +290,14 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Emit the after update event
         if (!options?.doNotDispatchEvents) {
-            const afterUpdateEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
+            const afterUpdateEvent = new MutationEvent<
+                InferDetail<TSchema>,
+                InferInput<TSchema>,
+                IUpdateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
+            >(
                 this.getDescriptor(ModelMutationAction.AfterUpdate),
                 normalizedInput,
-            ).setResult(result)
+            ).setMeta({ existing, args: { lookup, input, options: options as Record<string, unknown> } }).setResult(result)
             await this.emitter.emitAsync(afterUpdateEvent)
         }
 

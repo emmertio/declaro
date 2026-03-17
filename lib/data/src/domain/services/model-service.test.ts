@@ -26,6 +26,8 @@ describe('ModelService', () => {
     const afterRemoveSpy = mock((event) => {})
     const beforeRestoreSpy = mock((event) => {})
     const afterRestoreSpy = mock((event) => {})
+    const beforeDuplicateSpy = mock((event) => {})
+    const afterDuplicateSpy = mock((event) => {})
 
     beforeEach(() => {
         emitter.on('books::book.beforeCreate', beforeCreateSpy)
@@ -36,6 +38,8 @@ describe('ModelService', () => {
         emitter.on('books::book.afterRemove', afterRemoveSpy)
         emitter.on('books::book.beforeRestore', beforeRestoreSpy)
         emitter.on('books::book.afterRestore', afterRestoreSpy)
+        emitter.on('books::book.beforeDuplicate', beforeDuplicateSpy)
+        emitter.on('books::book.afterDuplicate', afterDuplicateSpy)
 
         beforeCreateSpy.mockClear()
         afterCreateSpy.mockClear()
@@ -45,6 +49,8 @@ describe('ModelService', () => {
         afterRemoveSpy.mockClear()
         beforeRestoreSpy.mockClear()
         afterRestoreSpy.mockClear()
+        beforeDuplicateSpy.mockClear()
+        afterDuplicateSpy.mockClear()
     })
 
     it('should create a record', async () => {
@@ -1042,15 +1048,21 @@ describe('ModelService', () => {
             await expect(service.duplicate({ id: 999 })).rejects.toThrow()
         })
 
-        it('should trigger create events for the duplicate', async () => {
+        it('should trigger beforeDuplicate and afterDuplicate events alongside create events', async () => {
             const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date() }
             await repository.create(original)
 
-            beforeCreateSpy.mockClear()
-            afterCreateSpy.mockClear()
-
             await service.duplicate({ id: 42 })
 
+            expect(beforeDuplicateSpy).toHaveBeenCalledTimes(1)
+            expect(beforeDuplicateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.beforeDuplicate' }),
+            )
+            expect(afterDuplicateSpy).toHaveBeenCalledTimes(1)
+            expect(afterDuplicateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.afterDuplicate' }),
+            )
+            // create events also fire since a record is genuinely being created
             expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
             expect(afterCreateSpy).toHaveBeenCalledTimes(1)
         })
@@ -1105,11 +1117,11 @@ describe('ModelService', () => {
             const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date() }
             await repository.create(original)
 
-            beforeCreateSpy.mockClear()
-            afterCreateSpy.mockClear()
-
             await service.duplicate({ id: 42 }, undefined, { doNotDispatchEvents: true })
 
+            expect(beforeDuplicateSpy).not.toHaveBeenCalled()
+            expect(afterDuplicateSpy).not.toHaveBeenCalled()
+            // create events are also suppressed when doNotDispatchEvents is set
             expect(beforeCreateSpy).not.toHaveBeenCalled()
             expect(afterCreateSpy).not.toHaveBeenCalled()
         })
@@ -1391,6 +1403,213 @@ describe('ModelService', () => {
                 expect(afterCreateSpy).not.toHaveBeenCalled()
                 expect(beforeUpdateSpy).not.toHaveBeenCalled()
                 expect(afterUpdateSpy).not.toHaveBeenCalled()
+            })
+        })
+    })
+
+    describe('event meta (existing and args)', () => {
+        const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date('2024-01-01') }
+
+        describe('create events', () => {
+            it('beforeCreate event includes args with input and options', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeCreate', (event) => {
+                    capturedEvent = event
+                })
+
+                const options = { doNotDispatchEvents: false }
+                await service.create(input, options)
+
+                expect(capturedEvent.meta.args.input).toEqual(input)
+                expect(capturedEvent.meta.args.options).toEqual(options)
+            })
+
+            it('afterCreate event includes args and result', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.afterCreate', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.create(input)
+
+                expect(capturedEvent.meta.args.input).toEqual(input)
+                expect(capturedEvent.data).toBeDefined()
+                expect(capturedEvent.data.id).toBe(42)
+            })
+        })
+
+        describe('update events', () => {
+            beforeEach(async () => {
+                await repository.create(input)
+            })
+
+            it('beforeUpdate event includes existing record and args', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeUpdate', (event) => {
+                    capturedEvent = event
+                })
+
+                const updateInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
+                await service.update({ id: 42 }, updateInput)
+
+                expect(capturedEvent.meta.existing).toBeDefined()
+                expect(capturedEvent.meta.existing.id).toBe(42)
+                expect(capturedEvent.meta.existing.title).toBe('Test Book')
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.meta.args.input).toEqual(updateInput)
+            })
+
+            it('afterUpdate event includes existing record, args, and result', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.afterUpdate', (event) => {
+                    capturedEvent = event
+                })
+
+                const updateInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
+                await service.update({ id: 42 }, updateInput)
+
+                expect(capturedEvent.meta.existing).toBeDefined()
+                expect(capturedEvent.meta.existing.id).toBe(42)
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.data).toBeDefined()
+                expect(capturedEvent.data.title).toBe('Updated Book')
+            })
+        })
+
+        describe('remove events', () => {
+            beforeEach(async () => {
+                await repository.create(input)
+            })
+
+            it('beforeRemove event includes args with lookup and options', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeRemove', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.remove({ id: 42 })
+
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+            })
+
+            it('afterRemove event includes args and result', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.afterRemove', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.remove({ id: 42 })
+
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.data).toBeDefined()
+                expect(capturedEvent.data.id).toBe(42)
+            })
+        })
+
+        describe('restore events', () => {
+            beforeEach(async () => {
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+            })
+
+            it('beforeRestore event includes args with lookup', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeRestore', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.restore({ id: 42 })
+
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+            })
+
+            it('afterRestore event includes args and result', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.afterRestore', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.restore({ id: 42 })
+
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.data).toBeDefined()
+                expect(capturedEvent.data.id).toBe(42)
+            })
+        })
+
+        describe('duplicate events', () => {
+            beforeEach(async () => {
+                await repository.create(input)
+            })
+
+            it('beforeDuplicate event includes existing record and args', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeDuplicate', (event) => {
+                    capturedEvent = event
+                })
+
+                const overrides = { title: 'Duplicate Title' }
+                await service.duplicate({ id: 42 }, overrides)
+
+                expect(capturedEvent.meta.existing).toBeDefined()
+                expect(capturedEvent.meta.existing.id).toBe(42)
+                expect(capturedEvent.meta.existing.title).toBe('Test Book')
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.meta.args.overrides).toEqual(overrides)
+            })
+
+            it('afterDuplicate event includes existing, args, and the new record as result', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.afterDuplicate', (event) => {
+                    capturedEvent = event
+                })
+
+                const overrides = { title: 'Duplicate Title' }
+                await service.duplicate({ id: 42 }, overrides)
+
+                expect(capturedEvent.meta.existing).toBeDefined()
+                expect(capturedEvent.meta.existing.id).toBe(42)
+                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(capturedEvent.meta.args.overrides).toEqual(overrides)
+                expect(capturedEvent.data).toBeDefined()
+                expect(capturedEvent.data.title).toBe('Duplicate Title')
+                expect(capturedEvent.data.id).not.toBe(42)
+            })
+
+            it('beforeDuplicate input is the finalInput (with overrides applied, without primary key)', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeDuplicate', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.duplicate({ id: 42 }, { title: 'Override Title' })
+
+                expect(capturedEvent.input.title).toBe('Override Title')
+                expect(capturedEvent.input.id).toBeUndefined()
+            })
+
+            it('duplicate without overrides has undefined overrides in args', async () => {
+                let capturedEvent: any
+
+                emitter.on('books::book.beforeDuplicate', (event) => {
+                    capturedEvent = event
+                })
+
+                await service.duplicate({ id: 42 })
+
+                expect(capturedEvent.meta.args.overrides).toBeUndefined()
+                expect(capturedEvent.meta.existing.title).toBe('Test Book')
             })
         })
     })

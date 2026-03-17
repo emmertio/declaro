@@ -1,12 +1,14 @@
 {
-    "permissions": {
-        "allow": [
-            "Bash(bun test*)",
-            "Bash(bun run build*)",
-            "Bash(bun typecheck*)",
-            "Bash(bun dev*)",
-            "Bash(bun install*)",
-            "Bash(bun add*)"
-        ]
-    }
+  "permissions": {
+    "allow": [
+      "Bash(bun test*)",
+      "Bash(bun run build*)",
+      "Bash(bun typecheck*)",
+      "Bash(bun dev*)",
+      "Bash(bun install*)",
+      "Bash(bun add*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
 }

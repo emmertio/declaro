@@ -1061,4 +1061,70 @@ describe('ReadOnlyModelService', () => {
             })
         })
     })
+
+    describe('noCache Option', () => {
+        beforeEach(() => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+            service = new ReadOnlyModelService({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        describe('load', () => {
+            it('should return the correct result when noCache is true', async () => {
+                const input = { id: 1, title: 'Test Book', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const result = await service.load({ id: 1 }, { noCache: true })
+
+                expect(result).toEqual(input)
+            })
+
+            it('should return the correct result when noCache is false', async () => {
+                const input = { id: 2, title: 'Test Book 2', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const result = await service.load({ id: 2 }, { noCache: false })
+
+                expect(result).toEqual(input)
+            })
+
+            it('should forward noCache: true to the repository', async () => {
+                const input = { id: 3, title: 'Test Book 3', author: 'Author', publishedDate: new Date() }
+                await repository.create(input)
+
+                const loadSpy = spyOn(repository, 'load')
+                await service.load({ id: 3 }, { noCache: true })
+
+                expect(loadSpy).toHaveBeenCalledWith({ id: 3 }, expect.objectContaining({ noCache: true }))
+            })
+        })
+
+        describe('loadMany', () => {
+            it('should return the correct results when noCache is true', async () => {
+                const input1 = { id: 1, title: 'Test Book 1', author: 'Author 1', publishedDate: new Date() }
+                const input2 = { id: 2, title: 'Test Book 2', author: 'Author 2', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const result = await service.loadMany([{ id: 1 }, { id: 2 }], { noCache: true })
+
+                expect(result).toEqual([input1, input2])
+            })
+
+            it('should forward noCache: true to the repository', async () => {
+                const input1 = { id: 3, title: 'Test Book 3', author: 'Author 3', publishedDate: new Date() }
+                const input2 = { id: 4, title: 'Test Book 4', author: 'Author 4', publishedDate: new Date() }
+                await repository.create(input1)
+                await repository.create(input2)
+
+                const loadManySpy = spyOn(repository, 'loadMany')
+                await service.loadMany([{ id: 3 }, { id: 4 }], { noCache: true })
+
+                expect(loadManySpy).toHaveBeenCalledWith(
+                    [{ id: 3 }, { id: 4 }],
+                    expect.objectContaining({ noCache: true }),
+                )
+            })
+        })
+    })
 })

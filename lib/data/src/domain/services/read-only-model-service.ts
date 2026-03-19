@@ -29,6 +29,13 @@ export interface ILoadOptions extends IActionOptions {
      * If true, skips dispatching events for this action.
      */
     doNotDispatchEvents?: boolean
+
+    /**
+     * If true, bypasses any caching mechanism and forces fresh data retrieval from the repository.
+     *
+     * Use with caution, as this may have performance implications. This option is typically used in scenarios where data consistency is critical and the latest data must be retrieved, such as after a known update or in real-time applications.
+     */
+    noCache?: boolean
 }
 export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
     pagination?: IPaginationInput

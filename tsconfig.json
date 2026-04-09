@@ -11,7 +11,5 @@
         "verbatimModuleSyntax": true,
         "sourceMap": true,
         "types": ["bun-types"],
-        "experimentalDecorators": true,
-        "emitDecoratorMetadata": true
     }
 }

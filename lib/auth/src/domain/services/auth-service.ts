@@ -11,12 +11,13 @@ export abstract class AuthService {
     constructor(protected readonly authConfig: AuthConfig) {}
 
     async createSession(payload: IAuthSessionInput): Promise<IAuthSession> {
+        const now = DateTime.now()
         const session: IAuthSession = {
             id: this.getSessionId(payload),
             jwt: payload.jwt,
             jwtPayload: this.decodeJWT(payload.jwt),
-            expires: DateTime.now().plus({ seconds: this.authConfig.authTimeout }).toJSDate(),
-            issued: new Date(),
+            issued: now.toJSDate(),
+            expires: now.plus({ seconds: this.authConfig.authTimeout }).toJSDate(),
             roles: payload.roles ?? [],
             claims: payload.claims ?? [],
             memberships: payload.memberships ?? [],

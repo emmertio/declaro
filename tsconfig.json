@@ -9,6 +9,9 @@
         "allowSyntheticDefaultImports": true,
         "noImplicitAny": false,
         "verbatimModuleSyntax": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "types": ["bun-types"],
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
     }
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { ModelService } from './model-service'
 import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
-import { MockBookSchema, type MockBookInput } from '../../test/mock/models/mock-book-models'
+import { MockBookSchema, type MockBookInput, type MockBookSort } from '../../test/mock/models/mock-book-models'
 import { EventManager } from '@declaro/core'
 import { mock } from 'bun:test'
-import type { InferDetail, InferSummary } from '../../shared/utils/schema-inference'
+import type { InferDetail, InferLookup, InferSummary } from '../../shared/utils/schema-inference'
 import { ModelMutationAction } from '../events/event-types'
 
 describe('ModelService - Normalization', () => {
@@ -699,6 +699,103 @@ describe('ModelService - Normalization', () => {
             // Should return the raw string from repository since no normalization is applied
             expect(record.publishedDate as any).toBe('2024-01-01')
             expect(typeof record.publishedDate).toBe('string')
+        })
+    })
+
+    describe('normalizeLookup functionality', () => {
+        // Shifts the id by +100 so that load({ id: 42 }) → repository receives { id: 142 }
+        class TestModelServiceWithLookupNorm extends ModelService<typeof mockSchema> {
+            protected async normalizeLookup(
+                lookup: InferLookup<typeof mockSchema>,
+            ): Promise<InferLookup<typeof mockSchema>> {
+                return { ...lookup, id: lookup.id + 100 }
+            }
+        }
+
+        let lookupService: TestModelServiceWithLookupNorm
+
+        beforeEach(() => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+            service = new ModelService({ repository, emitter, schema: mockSchema, namespace })
+            lookupService = new TestModelServiceWithLookupNorm({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        it('should use default normalizeLookup (no-op) when not overridden', async () => {
+            const input = { id: 1, title: 'Default Book', author: 'Author', publishedDate: new Date() }
+            await repository.create(input)
+
+            const result = await service.load({ id: 1 })
+            expect(result?.id).toBe(1)
+        })
+
+        it('should apply normalizeLookup before passing lookup to repository in .load', async () => {
+            // Create a book with id 142 directly in the repository
+            await repository.create({ id: 142, title: 'Shifted Book', author: 'Author', publishedDate: new Date() })
+
+            // load({ id: 42 }) → normalizeLookup shifts to { id: 142 } → finds the book
+            const result = await lookupService.load({ id: 42 })
+            expect(result?.id).toBe(142)
+            expect(result?.title).toBe('Shifted Book')
+        })
+
+        it('should apply normalizeLookup before passing lookup to repository in .update', async () => {
+            await repository.create({ id: 142, title: 'Original Title', author: 'Author', publishedDate: new Date() })
+
+            const updateInput: MockBookInput = { title: 'Updated Title', author: 'Author', publishedDate: new Date() }
+            // update({ id: 42 }, ...) → normalizeLookup shifts to { id: 142 } → updates the correct book
+            const result = await lookupService.update({ id: 42 }, updateInput)
+            expect(result?.id).toBe(142)
+            expect(result?.title).toBe('Updated Title')
+        })
+    })
+
+    describe('normalizeSort functionality', () => {
+        // Always injects a default sort by title ascending when no sort is provided
+        class TestModelServiceWithSortNorm extends ModelService<typeof mockSchema> {
+            protected async normalizeSort(sort?: MockBookSort): Promise<MockBookSort | undefined> {
+                return sort ?? [{ title: 'asc' }]
+            }
+        }
+
+        let sortService: TestModelServiceWithSortNorm
+
+        beforeEach(() => {
+            repository = new MockMemoryRepository({ schema: mockSchema })
+            emitter = new EventManager()
+            service = new ModelService({ repository, emitter, schema: mockSchema, namespace })
+            sortService = new TestModelServiceWithSortNorm({ repository, emitter, schema: mockSchema, namespace })
+        })
+
+        it('should use default normalizeSort (no-op) when not overridden', async () => {
+            await repository.create({ id: 1, title: 'Zebra', author: 'Author', publishedDate: new Date() })
+            await repository.create({ id: 2, title: 'Apple', author: 'Author', publishedDate: new Date() })
+
+            // No sort specified — default service returns in insertion order
+            const results = await service.search({})
+            expect(results.results[0].title).toBe('Zebra')
+            expect(results.results[1].title).toBe('Apple')
+        })
+
+        it('should apply normalizeSort to inject a default sort when no sort is passed', async () => {
+            await repository.create({ id: 1, title: 'Zebra', author: 'Author', publishedDate: new Date() })
+            await repository.create({ id: 2, title: 'Apple', author: 'Author', publishedDate: new Date() })
+
+            // normalizeSort injects [{ title: 'asc' }] → results sorted alphabetically
+            const results = await sortService.search({})
+            expect(results.results[0].title).toBe('Apple')
+            expect(results.results[1].title).toBe('Zebra')
+        })
+
+        it('should pass explicit sort through normalizeSort unchanged when provided', async () => {
+            await repository.create({ id: 1, title: 'Mango', author: 'Author', publishedDate: new Date() })
+            await repository.create({ id: 2, title: 'Apple', author: 'Author', publishedDate: new Date() })
+            await repository.create({ id: 3, title: 'Zebra', author: 'Author', publishedDate: new Date() })
+
+            // Explicit sort descending — normalizeSort returns it as-is (sort is defined, not undefined)
+            const results = await sortService.search({}, { sort: [{ title: 'desc' }] })
+            expect(results.results[0].title).toBe('Zebra')
+            expect(results.results[2].title).toBe('Apple')
         })
     })
 })

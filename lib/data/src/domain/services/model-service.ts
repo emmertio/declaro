@@ -156,6 +156,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns The removed record.
      */
     async remove(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
         // Emit the before remove event
         const beforeRemoveEvent = new MutationEvent<
             InferSummary<TSchema>,
@@ -163,12 +165,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
         >(
             this.getDescriptor(ModelMutationAction.BeforeRemove),
-            lookup,
-        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } })
+            normalizedLookup,
+        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } })
         await this.emitter.emitAsync(beforeRemoveEvent)
 
         // Perform the removal
-        const result = await this.repository.remove(lookup, options)
+        const result = await this.repository.remove(normalizedLookup, options)
 
         // Emit the after remove event
         const afterRemoveEvent = new MutationEvent<
@@ -177,8 +179,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
         >(
             this.getDescriptor(ModelMutationAction.AfterRemove),
-            lookup,
-        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } }).setResult(result)
+            normalizedLookup,
+        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } }).setResult(result)
         await this.emitter.emitAsync(afterRemoveEvent)
 
         // Return the results of the removal
@@ -192,6 +194,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns
      */
     async restore(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
         // Emit the before restore event
         const beforeRestoreEvent = new MutationEvent<
             InferSummary<TSchema>,
@@ -199,12 +203,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
         >(
             this.getDescriptor(ModelMutationAction.BeforeRestore),
-            lookup,
-        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } })
+            normalizedLookup,
+        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } })
         await this.emitter.emitAsync(beforeRestoreEvent)
 
         // Perform the restore operation
-        const result = await this.repository.restore(lookup, options)
+        const result = await this.repository.restore(normalizedLookup, options)
 
         // Emit the after restore event
         const afterRestoreEvent = new MutationEvent<
@@ -213,8 +217,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
         >(
             this.getDescriptor(ModelMutationAction.AfterRestore),
-            lookup,
-        ).setMeta({ args: { lookup, options: options as Record<string, unknown> } }).setResult(result)
+            normalizedLookup,
+        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } }).setResult(result)
         await this.emitter.emitAsync(afterRestoreEvent)
 
         // Return the results of the restore operation
@@ -265,7 +269,8 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         input: InferInput<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>> {
-        const existing = await this.repository.load(lookup, { ...options, doNotDispatchEvents: true })
+        const normalizedLookup = await this.normalizeLookup(lookup)
+        const existing = await this.repository.load(normalizedLookup, { ...options, doNotDispatchEvents: true })
         // Normalize the input data
         const normalizedInput = await this.normalizeInput(input, {
             existing,
@@ -281,12 +286,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             >(
                 this.getDescriptor(ModelMutationAction.BeforeUpdate),
                 normalizedInput,
-            ).setMeta({ existing, args: { lookup, input, options: options as Record<string, unknown> } })
+            ).setMeta({ existing, args: { lookup: normalizedLookup, input, options: options as Record<string, unknown> } })
             await this.emitter.emitAsync(beforeUpdateEvent)
         }
 
         // Perform the update
-        const result = await this.repository.update(lookup, normalizedInput, options)
+        const result = await this.repository.update(normalizedLookup, normalizedInput, options)
 
         // Emit the after update event
         if (!options?.doNotDispatchEvents) {
@@ -297,7 +302,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             >(
                 this.getDescriptor(ModelMutationAction.AfterUpdate),
                 normalizedInput,
-            ).setMeta({ existing, args: { lookup, input, options: options as Record<string, unknown> } }).setResult(result)
+            ).setMeta({ existing, args: { lookup: normalizedLookup, input, options: options as Record<string, unknown> } }).setResult(result)
             await this.emitter.emitAsync(afterUpdateEvent)
         }
 
@@ -547,20 +552,22 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns The permanently deleted item summary.
      */
     async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
         // Emit the before permanently delete from trash event
         const beforePermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
             this.getDescriptor(ModelMutationAction.BeforePermanentlyDeleteFromTrash),
-            lookup,
+            normalizedLookup,
         )
         await this.emitter.emitAsync(beforePermanentlyDeleteFromTrashEvent)
 
         // Perform the permanent deletion from trash
-        const result = await this.repository.permanentlyDeleteFromTrash(lookup)
+        const result = await this.repository.permanentlyDeleteFromTrash(normalizedLookup)
 
         // Emit the after permanently delete from trash event
         const afterPermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
             this.getDescriptor(ModelMutationAction.AfterPermanentlyDeleteFromTrash),
-            lookup,
+            normalizedLookup,
         ).setResult(result)
         await this.emitter.emitAsync(afterPermanentlyDeleteFromTrashEvent)
 
@@ -574,20 +581,22 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns The permanently deleted item summary.
      */
     async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
         // Emit the before permanently delete event
         const beforePermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
             this.getDescriptor(ModelMutationAction.BeforePermanentlyDelete),
-            lookup,
+            normalizedLookup,
         )
         await this.emitter.emitAsync(beforePermanentlyDeleteEvent)
 
         // Perform the permanent deletion
-        const result = await this.repository.permanentlyDelete(lookup)
+        const result = await this.repository.permanentlyDelete(normalizedLookup)
 
         // Emit the after permanently delete event
         const afterPermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
             this.getDescriptor(ModelMutationAction.AfterPermanentlyDelete),
-            lookup,
+            normalizedLookup,
         ).setResult(result)
         await this.emitter.emitAsync(afterPermanentlyDeleteEvent)
 

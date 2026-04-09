@@ -79,29 +79,55 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
     }
 
     /**
+     * Normalize the lookup criteria before it is passed to the repository.
+     * Can be overridden by subclasses to apply custom lookup transformations
+     * (e.g., injecting tenant context, remapping IDs).
+     * By default, returns the lookup unchanged.
+     * @param lookup The lookup criteria to normalize.
+     * @returns The normalized lookup criteria.
+     */
+    protected async normalizeLookup(lookup: InferLookup<TSchema>): Promise<InferLookup<TSchema>> {
+        return lookup
+    }
+
+    /**
+     * Normalize the sort criteria before it is passed to the repository.
+     * Can be overridden by subclasses to apply default sort behavior or
+     * transform sort criteria.
+     * By default, returns the sort unchanged.
+     * @param sort The sort criteria to normalize.
+     * @returns The normalized sort criteria.
+     */
+    protected async normalizeSort(sort?: InferSort<TSchema>): Promise<InferSort<TSchema> | undefined> {
+        return sort
+    }
+
+    /**
      * Load a single record by its lookup criteria.
      * @param lookup The lookup criteria to find the record.
      * @param options Additional options for the load operation.
      * @returns The loaded record details.
      */
     async load(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferDetail<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
         // Emit the before load event
         if (!options?.doNotDispatchEvents) {
             const beforeLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
                 this.getDescriptor(ModelQueryEvent.BeforeLoad, options?.scope),
-                lookup,
+                normalizedLookup,
             )
             await this.emitter.emitAsync(beforeLoadEvent)
         }
 
         // Load the details from the repository
-        const details = await this.repository.load(lookup, options)
+        const details = await this.repository.load(normalizedLookup, options)
 
         // Emit the after load event
         if (!options?.doNotDispatchEvents) {
             const afterLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
                 this.getDescriptor(ModelQueryEvent.AfterLoad, options?.scope),
-                lookup,
+                normalizedLookup,
             ).setResult(details)
             await this.emitter.emitAsync(afterLoadEvent)
         }
@@ -116,23 +142,25 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
      * @returns An array of loaded record details.
      */
     async loadMany(lookups: InferLookup<TSchema>[], options?: ILoadOptions): Promise<InferDetail<TSchema>[]> {
+        const normalizedLookups = await Promise.all(lookups.map((l) => this.normalizeLookup(l)))
+
         // Emit the before load many event
         if (!options?.doNotDispatchEvents) {
             const beforeLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
                 this.getDescriptor(ModelQueryEvent.BeforeLoadMany, options?.scope),
-                lookups,
+                normalizedLookups,
             )
             await this.emitter.emitAsync(beforeLoadManyEvent)
         }
 
         // Load the details from the repository
-        const details = await this.repository.loadMany(lookups, options)
+        const details = await this.repository.loadMany(normalizedLookups, options)
 
         // Emit the after load many event
         if (!options?.doNotDispatchEvents) {
             const afterLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
                 this.getDescriptor(ModelQueryEvent.AfterLoadMany, options?.scope),
-                lookups,
+                normalizedLookups,
             ).setResult(details)
             await this.emitter.emitAsync(afterLoadManyEvent)
         }
@@ -150,6 +178,8 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         filters: InferFilters<TSchema>,
         options?: ISearchOptions<TSchema>,
     ): Promise<InferSearchResults<TSchema>> {
+        const normalizedOptions = { ...options, sort: await this.normalizeSort(options?.sort) }
+
         // Emit the before search event
         if (!options?.doNotDispatchEvents) {
             const beforeSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
@@ -160,7 +190,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         }
 
         // Search the repository with the provided filters
-        const results = await this.repository.search(filters, options)
+        const results = await this.repository.search(filters, normalizedOptions)
 
         // Emit the after search event
         if (!options?.doNotDispatchEvents) {

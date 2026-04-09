@@ -21,20 +21,33 @@ import { UnauthorizedError } from '@declaro/core'
  * @param validate - A function to define permission validation logic using `PermissionValidator`.
  */
 export function ValidatePermissions(validate: PermissionValidationFn) {
-    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    return function (targetOrFn: any, propertyKeyOrContext: any, descriptor?: PropertyDescriptor) {
+        // Stage 3 decorator: second argument is a context object with a `kind` property
+        if (typeof propertyKeyOrContext === 'object' && propertyKeyOrContext !== null && 'kind' in propertyKeyOrContext) {
+            if (propertyKeyOrContext.kind !== 'method') {
+                throw new Error('ValidatePermissions can only be applied to methods.')
+            }
+            return function (this: IInstanceWithAuthValidator, ...args: any[]) {
+                const validator = AuthValidator.createFromClass(this)
+                if (!validator.validatePermissions(validate, true)) {
+                    throw new UnauthorizedError('Permission validation failed.')
+                }
+                return targetOrFn.apply(this, args)
+            }
+        }
+
+        // Legacy decorator: (target, propertyKey, descriptor)
         if (!descriptor) {
             throw new Error('ValidatePermissions can only be applied to methods.')
         }
 
         const original = descriptor.value
 
-        descriptor.value = function (...args: any[]) {
-            const validator = AuthValidator.createFromClass(this as IInstanceWithAuthValidator)
-
+        descriptor.value = function (this: IInstanceWithAuthValidator, ...args: any[]) {
+            const validator = AuthValidator.createFromClass(this)
             if (!validator.validatePermissions(validate, true)) {
                 throw new UnauthorizedError('Permission validation failed.')
             }
-
             return original.apply(this, args)
         }
 

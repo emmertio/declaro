@@ -1,50 +1,77 @@
-export type Listener = (...args: any[]) => any
+export interface IEvent {
+    type: Readonly<string>
+}
 
-export class EventManager<T> {
+export type Listener<E extends IEvent> = (event: E) => any
+
+export class EventManager<E extends IEvent = IEvent> {
     protected readonly listeners: {
-        [key: string]: Listener[]
+        [key: string]: Listener<E>[]
     } = {}
 
     getListeners(event: string) {
-        this.listeners[event] = Array.isArray(this.listeners[event])
-            ? this.listeners[event]
-            : []
-        return this.listeners[event]
+        const eventListeners = this.getListenerArray(event)
+        const globalListeners = this.listeners['*'] || []
+
+        return [...new Set([...eventListeners, ...globalListeners])]
     }
 
-    on(event: string, listener: Listener) {
-        this.getListeners(event).push(listener)
+    getEvents() {
+        return Object.keys(this.listeners)
+    }
+
+    extend(eventManager: EventManager) {
+        const events = eventManager.getEvents()
+        events.forEach((event) => {
+            this.getListenerArray(event).push(...eventManager.getListeners(event))
+        })
+    }
+
+    forwardTo(eventManager: EventManager) {
+        const cancel = this.on('*', async (event) => {
+            await eventManager.emitAsync(event)
+        })
+
+        return cancel
+    }
+
+    on<Event extends E>(event: Event['type'] | Event['type'][], listener: Listener<Event>) {
+        const events = Array.isArray(event) ? event : [event]
+
+        events.forEach((e) => {
+            this.getListenerArray(e).push(listener as Listener<E>)
+        })
 
         return () => {
-            const index = this.getListeners(event).indexOf(listener)
-            const willRemove = index > -1
-
-            if (willRemove) {
-                this.getListeners(event).splice(index, 1)
-            }
-
-            return willRemove
+            events.forEach((e) => {
+                const index = this.getListeners(e).indexOf(listener as Listener<E>)
+                if (index > -1) {
+                    this.getListenerArray(e).splice(index, 1)
+                }
+            })
         }
     }
 
-    async emitAsync(event: string, ...args: any[]) {
-        await this.getListeners(event)
-            .reduce(async (promise, listener) => {
-                await promise
-                return await listener(...args)
-            }, Promise.resolve())
-            .catch((e) => {
-                console.error('Error in event listener', e)
-            })
+    async emitAsync(event: E) {
+        await this.getListeners(event.type).reduce(async (promise, listener) => {
+            await promise
+            return await listener(event)
+        }, Promise.resolve())
     }
 
-    async emitAll(event: string, ...args: any[]) {
-        await Promise.all(
-            this.getListeners(event).map((listener) => listener(...args)),
-        )
+    async emitAll(event: E) {
+        await Promise.all(this.getListeners(event.type).map((listener) => listener(event)))
     }
 
-    emit(event: string, ...args: any[]) {
-        this.getListeners(event).forEach((listener) => listener(...args))
+    emit(event: E) {
+        this.getListeners(event.type).forEach((listener) => listener(event))
+    }
+
+    protected getListenerArray(event: string) {
+        if (!this.listeners[event]) {
+            this.listeners[event] = []
+        }
+
+        return this.listeners[event]
     }
 }

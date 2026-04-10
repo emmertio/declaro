@@ -1,22 +1,26 @@
-export function merge<T, Source1>(target: T, source1: Source1): T & Source1
+// K extends keyof B ? B[K] : K extends keyof A ? A[K] : never
+
+import type { Merge } from '../typescript'
+
+export function merge<T, Source1>(target: T, source1: Source1): Merge<T, Source1>
 export function merge<T, Source1, Source2>(
     target: T,
     source1: Source1,
     source2: Source2,
-): T & Source1 & Source2
+): Merge<Merge<T, Source1>, Source2>
 export function merge<T, Source1, Source2, Source3>(
     target: T,
     source1: Source1,
     source2: Source2,
     source3: Source3,
-): T & Source1 & Source2 & Source3
+): Merge<Merge<Merge<T, Source1>, Source2>, Source3>
 export function merge<T, Source1, Source2, Source3, Source4>(
     target: T,
     source1: Source1,
     source2: Source2,
     source3: Source3,
     source4: Source4,
-): T & Source1 & Source2 & Source3 & Source4
+): Merge<Merge<Merge<Merge<T, Source1>, Source2>, Source3>, Source4>
 export function merge<T, Source1, Source2, Source3, Source4, Source5>(
     target: T,
     source1: Source1,
@@ -24,7 +28,7 @@ export function merge<T, Source1, Source2, Source3, Source4, Source5>(
     source3: Source3,
     source4: Source4,
     source5: Source5,
-): T & Source1 & Source2 & Source3 & Source4 & Source5
+): Merge<Merge<Merge<Merge<Merge<T, Source1>, Source2>, Source3>, Source4>, Source5>
 export function merge(target: any, ...sources: any[]): any[] {
     const recursions = []
     return sources.reduce((workingCopy, source) => {
@@ -38,10 +42,7 @@ export function merge(target: any, ...sources: any[]): any[] {
                 value = [existingValue, ...value].filter((item) => !!item)
             } else if (Array.isArray(existingValue) && !Array.isArray(value)) {
                 value = [...(existingValue ?? []), value]
-            } else if (
-                typeof value === 'object' &&
-                typeof existingValue === 'object'
-            ) {
+            } else if (typeof value === 'object' && typeof existingValue === 'object') {
                 value = {
                     ...existingValue,
                     ...value,

@@ -1,4 +1,5 @@
 import { Context, type ContextMiddleware, type ContextListener } from '../context/context'
+import type { IEvent } from '../events'
 import { onDestroy, onInit, onStart } from './app-lifecycle'
 
 export type AppConfig = {
@@ -8,8 +9,8 @@ export type AppConfig = {
     destroy?: ContextMiddleware
 }
 
-export class App {
-    constructor(public readonly context: Context) {}
+export class App<C extends Context = Context> {
+    constructor(public readonly context: C) {}
 
     static Events = {
         Init: 'declaro:init',
@@ -18,10 +19,11 @@ export class App {
     }
 
     async init() {
+        await this.context.initializeEagerDependencies()
         await this.context.emit(App.Events.Init)
     }
 
-    onInit(listener: ContextListener) {
+    onInit(listener: ContextListener<C, IEvent>) {
         onInit(this.context, listener)
         return this
     }
@@ -30,7 +32,7 @@ export class App {
         await this.context.emit(App.Events.Start)
     }
 
-    onStart(listener: ContextListener) {
+    onStart(listener: ContextListener<C, IEvent>) {
         onStart(this.context, listener)
         return
     }
@@ -39,7 +41,7 @@ export class App {
         await this.context.emit(App.Events.Start)
     }
 
-    onDestroy(listener: ContextListener) {
+    onDestroy(listener: ContextListener<C, IEvent>) {
         onDestroy(this.context, listener)
     }
 }

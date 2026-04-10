@@ -7,11 +7,13 @@
     "author": "Robby Emmert <robby@emmert.io>",
     "license": "MIT",
     "scripts": {
-        "dev": "yarn lerna run dev --parallel",
-        "typecheck": "yarn lerna run typecheck --parallel",
-        "test": "yarn lerna run test -- run",
-        "build": "yarn lerna run --scope \"@declaro/*\" build",
-        "release": "yarn typecheck && yarn test && yarn build && yarn lerna publish --force-publish",
+        "dev": "bun lerna run dev --parallel",
+        "typecheck": "bun lerna run typecheck --parallel",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
+        "build": "bun lerna run --scope \"@declaro/*\" build",
+        "clean": "bun rimraf node_modules **/node_modules **/dist",
+        "release": "bun typecheck && bun test && bun run build && bun lerna publish --force-publish",
         "prepare": "husky"
     },
     "workspaces": {
@@ -23,7 +25,8 @@
     "devDependencies": {
         "@tsconfig/node20": "^20.1.4",
         "husky": "^9.1.5",
-        "lerna": "^7.0.2"
+        "lerna": "^7.0.2",
+        "rimraf": "^6.0.1"
     },
-    "packageManager": "yarn@4.3.1"
+    "packageManager": "bun@1.3.11"
 }

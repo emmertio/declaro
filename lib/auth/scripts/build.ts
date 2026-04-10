@@ -1,0 +1,72 @@
+import { build } from 'bun'
+import { resolve } from 'path'
+import packageJson from '../package.json'
+
+/**
+ * Get all packages that should be external from dependencies, peerDependencies, and optionalDependencies
+ * Packages in devDependencies will be bundled
+ */
+const getExternalPackages = (): string[] => {
+    const pkg = packageJson as any
+    const dependencyKeys: string[] = []
+
+    // Add dependencies if they exist
+    if (pkg.dependencies && typeof pkg.dependencies === 'object') {
+        dependencyKeys.push(...Object.keys(pkg.dependencies))
+    }
+
+    // Add peerDependencies if they exist
+    if (pkg.peerDependencies && typeof pkg.peerDependencies === 'object') {
+        dependencyKeys.push(...Object.keys(pkg.peerDependencies))
+    }
+
+    // Add optionalDependencies if they exist
+    if (pkg.optionalDependencies && typeof pkg.optionalDependencies === 'object') {
+        dependencyKeys.push(...Object.keys(pkg.optionalDependencies))
+    }
+
+    // Remove duplicates and return
+    return [...new Set(dependencyKeys)]
+}
+
+const externalPackages = getExternalPackages()
+
+const nodeDefaults = {
+    entrypoints: [resolve(__dirname, '../src/index.ts')],
+}
+
+const browserDefaults = {
+    entrypoints: [resolve(__dirname, '../src/index.browser.ts')],
+}
+
+await Promise.all([
+    // CommonJS build for Node.js - externalize all dependencies and peerDependencies
+    build({
+        ...nodeDefaults,
+        target: 'node',
+        format: 'cjs',
+        outdir: 'dist/node',
+        sourcemap: 'linked',
+        naming: '[dir]/[name].cjs',
+        external: externalPackages,
+    }),
+    // ES modules build for Node.js - same externals as CommonJS
+    build({
+        ...nodeDefaults,
+        target: 'node',
+        format: 'esm',
+        outdir: 'dist/node',
+        sourcemap: 'linked',
+        naming: '[dir]/[name].js',
+        external: externalPackages,
+    }),
+    // Browser build - uses browser-specific entry point
+    build({
+        ...browserDefaults,
+        target: 'browser',
+        outdir: 'dist/browser',
+        sourcemap: 'linked',
+        minify: true,
+        external: externalPackages,
+    }),
+])

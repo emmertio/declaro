@@ -1,38 +1,45 @@
 {
     "name": "@declaro/core",
-    "version": "2.0.0-beta.26",
+    "version": "2.1.0",
     "description": "Declarative Business Module Definition",
-    "main": "dist/pkg.cjs",
-    "module": "dist/pkg.mjs",
-    "types": "dist/index.d.ts",
+    "main": "dist/node/index.js",
+    "module": "dist/node/index.js",
     "author": "Emmert Technology LLC",
+    "types": "dist/ts/index.d.ts",
     "type": "module",
     "license": "MIT",
     "publishConfig": {
         "access": "public"
     },
     "scripts": {
-        "dev": "vite build --watch",
-        "build": "vite build",
-        "preview": "vite preview",
-        "test": "vitest"
+        "dev": "bun run scripts/build.ts --watch",
+        "clean": "bun rimraf dist",
+        "build:typedefs": "bun tsc --emitDeclarationOnly --outDir dist/ts -p tsconfig.json",
+        "build:js": "bun run scripts/build.ts",
+        "build": "bun run clean && bun run build:js && bun run build:typedefs",
+        "test": "bun test",
+        "test:watch": "bun test --watch",
+        "typecheck": "bun tsc --noEmit"
     },
     "devDependencies": {
+        "@standard-schema/spec": "^1.0.0",
+        "@types/bun": "^1.2.12",
+        "@types/json-schema": "^7.0.15",
         "@types/whatwg-url": "^13.0.0",
         "@vitest/coverage-v8": "^2.0.5",
+        "change-case": "^5.4.4",
         "json-schema-library": "^7.4.8",
+        "lodash": "^4.17.21",
         "minimatch": "^10.0.1",
         "node-mocks-http": "^1.16.2",
         "openapi-types": "^12.1.3",
+        "pluralize": "^8.0.0",
         "typescript": "^5.5.4",
+        "uuid": "^11.1.0",
         "vite": "^5.4.1",
         "vite-plugin-dts": "^4.0.3",
         "vitest": "^2.0.5",
         "whatwg-url": "^14.1.1"
-    },
-    "dependencies": {
-        "change-case": "^4.1.2",
-        "pluralize": "^8.0.0"
     },
     "repository": {
         "type": "git",
@@ -42,5 +49,32 @@
         "url": "https://github.com/emmertio/declaro/issues"
     },
     "homepage": "https://github.com/emmertio/declaro/tree/main#readme",
-    "gitHead": "0d68491dd4b645a598046293aca36531d7f9191f"
+    "gitHead": "c4e8895041c00ec51f891ef1400870e363343845",
+    "files": [
+        "dist/**/*",
+        "src/**/*"
+    ],
+    "exports": {
+        "import": {
+            "bun": "./dist/bun/index.js",
+            "browser": "./dist/browser/index.js",
+            "types": "./dist/ts/index.d.ts",
+            "default": "./dist/node/index.js"
+        },
+        "require": "./dist/node/index.cjs",
+        "types": "./dist/ts/index.d.ts",
+        "default": "./dist/node/index.js"
+    },
+    "imports": {
+        "#scope": {
+            "import": {
+                "bun": "./dist/bun/scope/index.js",
+                "browser": "./dist/browser/scope/index.js",
+                "types": "./dist/ts/scope/index.d.ts",
+                "default": "./dist/node/scope/index.js"
+            },
+            "require": "./dist/node/scope/index.cjs",
+            "types": "./dist/ts/scope/index.d.ts"
+        }
+    }
 }

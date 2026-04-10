@@ -1,0 +1,154 @@
+name: Stable Release
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            packages: write
+            id-token: write
+            pull-requests: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.11
+
+            - name: Cache Bun dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+                  restore-keys: |
+                      ${{ runner.os }}-bun-
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Configure Git
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Setup NPM registry authentication
+              run: |
+                  echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+
+            - name: Detect release type and version
+              id: release-info
+              run: |
+                  MERGE_MSG=$(git log -1 --pretty=%s)
+                  echo "Merge commit message: $MERGE_MSG"
+
+                  # Check if this was a merge from a release/* branch
+                  # Handles both merge commits ("Merge pull request #N from .../release/X.Y.Z")
+                  # and squash merges with PR title ("Release X.Y.Z")
+                  if echo "$MERGE_MSG" | grep -qP 'release/\d+\.\d+\.\d+|Release \d+\.\d+\.\d+'; then
+                    RELEASE_TYPE="minor"
+                    # Version is already set in the package files from the release branch
+                    RELEASE_VERSION=$(node -p "require('./lerna.json').version")
+                    echo "Detected release branch merge. Version: $RELEASE_VERSION"
+                  else
+                    RELEASE_TYPE="patch"
+                    echo "Detected non-release merge. Applying patch bump..."
+
+                    # Patch bump all packages in lock-step
+                    bun lerna version patch --no-git-tag-version --no-push --yes --force-publish
+                    RELEASE_VERSION=$(node -p "require('./lerna.json').version")
+
+                    # Regenerate lockfile after version change
+                    bun install
+
+                    git add -A
+                    git commit -m "chore: patch release $RELEASE_VERSION"
+                    echo "Patch bumped to version: $RELEASE_VERSION"
+                  fi
+
+                  echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+                  echo "type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+            - name: Build
+              run: bun run build
+
+            - name: Typecheck
+              run: bun run typecheck
+
+            - name: Test
+              run: bun run test
+
+            - name: Publish to npm
+              run: |
+                  bun lerna publish from-package --yes --no-verify-access
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Create git tag and push
+              run: |
+                  VERSION="${{ steps.release-info.outputs.version }}"
+                  git tag "v$VERSION"
+                  git push origin "v$VERSION"
+                  git push origin main
+
+            - name: Finalize GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ steps.release-info.outputs.version }}"
+
+                  # Check if a draft release exists for this version
+                  DRAFT_EXISTS=$(gh release view "v$VERSION" --json isDraft -q '.isDraft' 2>/dev/null || echo "not_found")
+
+                  if [ "$DRAFT_EXISTS" = "true" ]; then
+                    echo "Finalizing draft release v$VERSION..."
+                    gh release edit "v$VERSION" --draft=false --latest
+                  elif [ "$DRAFT_EXISTS" = "not_found" ]; then
+                    echo "No draft release found. Creating release v$VERSION..."
+                    gh release create "v$VERSION" \
+                      --title "v$VERSION" \
+                      --generate-notes \
+                      --latest
+                  else
+                    echo "Release v$VERSION already published."
+                  fi
+
+            - name: Create backport branch and PR
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ steps.release-info.outputs.version }}"
+
+                  # Check if a backport PR already exists
+                  EXISTING_PR=$(gh pr list --base develop --head "backport/$VERSION" --state open --json number -q '.[0].number' 2>/dev/null || true)
+
+                  if [ -n "$EXISTING_PR" ]; then
+                    echo "Backport PR #$EXISTING_PR already exists. Skipping."
+                    exit 0
+                  fi
+
+                  echo "Creating backport branch and PR for v$VERSION..."
+                  git checkout -b "backport/$VERSION" main
+                  git push origin "backport/$VERSION"
+
+                  gh pr create \
+                    --base develop \
+                    --head "backport/$VERSION" \
+                    --title "Backport v$VERSION to develop" \
+                    --body "## Backport v$VERSION
+
+                  This PR backports changes from the v$VERSION stable release to \`develop\`.
+
+                  **Automated:** Version bump commits from \`develop\` will be cherry-picked onto this branch automatically to prevent version conflicts.
+
+                  **Manual action may be required** if there are non-version merge conflicts."

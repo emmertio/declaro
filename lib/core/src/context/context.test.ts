@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { Context } from './context'
+import { describe, expect, it, vi } from 'vitest'
+import { Context, type DeclaroScope, type ExtractScope } from './context'
+import type { IEvent } from '../events'
 
 describe('Context', () => {
     it('Should allow value dependency injection', async () => {
@@ -238,7 +239,7 @@ describe('Context', () => {
 
         expect(factoryInstances).toBe(0)
 
-        await context.emit('declaro:init')
+        await context.initializeEagerDependencies()
 
         expect(factoryInstances).toBe(1)
 
@@ -291,20 +292,26 @@ describe('Context', () => {
         type ScopeA = {
             bar: number
             name: string
+            foo: string
         }
         const context = new Context<ScopeA>()
 
+        let factoryInstances = 0
+
         context.registerValue('bar', 42)
         context.registerValue('name', 'Person')
+        context.registerFactory('foo', () => {
+            factoryInstances = factoryInstances + 1
+            return 'This should never run'
+        })
 
         type ScopeB = ScopeA & {
             foo: string
+            baz: number
         }
 
         const context2 = new Context<ScopeB>()
         context2.extend(context)
-
-        let factoryInstances = 0
 
         context2.registerFactory(
             'foo',
@@ -314,7 +321,9 @@ describe('Context', () => {
             },
             ['name', 'bar'],
         )
+        context2.registerValue('baz', 100)
 
+        // Ensure that merging doesn't actually run any factories
         expect(factoryInstances).toBe(0)
 
         const foo = context2.scope.foo
@@ -342,5 +351,702 @@ describe('Context', () => {
         const foo = context.resolve('foo')
 
         expect(foo).toBe('Hello')
+    })
+
+    it('should get nested dependencies', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `${foo}, two turtle doves`, ['foo'])
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `${bar}, three French hens`, ['bar'])
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `${baz}, four calling birds`, ['baz'])
+
+        const qux = contextC.resolve('qux')
+
+        const allDependencies = contextC.getAllDependencies('qux')
+
+        expect(allDependencies[0].key).toBe('baz')
+        expect(allDependencies[1].key).toBe('bar')
+        expect(allDependencies[2].key).toBe('foo')
+
+        expect(allDependencies[0].inject).toEqual(['bar'])
+        expect(allDependencies[1].inject).toEqual(['foo'])
+        expect(allDependencies[2].inject).toEqual([])
+
+        expect(qux).toBe('A partridge in a pear tree, two turtle doves, three French hens, four calling birds')
+    })
+
+    it('should get nested dependent values', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `${foo}, two turtle doves`, ['foo'])
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `${bar}, three French hens`, ['bar'])
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `${baz}, four calling birds`, ['baz'])
+
+        const dependents = contextC.getAllDependents('foo')
+
+        expect(dependents[0].key).toBe('bar')
+        expect(dependents[1].key).toBe('baz')
+        expect(dependents[2].key).toBe('qux')
+
+        expect(dependents[0].inject).toEqual(['foo'])
+        expect(dependents[1].inject).toEqual(['bar'])
+        expect(dependents[2].inject).toEqual(['baz'])
+    })
+
+    it('should protect against scope leakage', async () => {
+        type BaseScope = {
+            foo: string
+            bar: string
+            base: string
+            validSingleton: string
+            validCachedSingleton: string
+        }
+
+        type ScopeA = BaseScope & {
+            baz: string
+        }
+
+        type ScopeB = BaseScope & {
+            qux: string
+        }
+
+        const baseContext = new Context<BaseScope>()
+
+        baseContext.registerFactory('foo', () => 'Hello', [], {
+            singleton: true,
+        })
+        baseContext.registerFactory('bar', () => 'World', [])
+        baseContext.registerFactory('base', (foo: string, bar: string) => `Base: ${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+        let validSingletonInstances = 0
+        baseContext.registerFactory(
+            'validSingleton',
+            () => {
+                validSingletonInstances = validSingletonInstances + 1
+                return 'Singleton'
+            },
+            [],
+            {
+                singleton: true,
+            },
+        )
+        let validCachedSingletonInstances = 0
+        baseContext.registerFactory(
+            'validCachedSingleton',
+            () => {
+                validCachedSingletonInstances = validCachedSingletonInstances + 1
+                return 'Cached Singleton'
+            },
+            [],
+            {
+                singleton: true,
+            },
+        )
+
+        // Resolve this before forking context to ensure that the cached value gets passed on.
+        const base = baseContext.resolve('base')
+        const validCachedSingleton = baseContext.resolve('validCachedSingleton')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(baseContext)
+        // Override a value that the singleton is going to depend on, but is not a singleton
+        contextA.registerFactory('bar', () => 'Robby', [])
+        // Add another property that dependes on the overridden value
+        contextA.registerFactory('baz', (foo: string, bar: string) => `${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(baseContext)
+        // Override a value that the singleton is going to depend on, and is also a singleton
+        contextB.registerFactory('foo', () => 'Goodbye', [], {
+            singleton: true,
+        })
+        // Add another property that dependes on the overridden value
+        contextB.registerFactory('qux', (foo: string, bar: string) => `${foo} ${bar}`, ['foo', 'bar'], {
+            singleton: true,
+        })
+
+        const baseA = contextA.resolve('base')
+        const baseB = contextB.resolve('base')
+
+        const baz = contextA.resolve('baz')
+        const qux = contextB.resolve('qux')
+        const foo = baseContext.resolve('foo')
+        const bar = baseContext.resolve('bar')
+
+        const validSingleton = baseContext.resolve('validSingleton')
+        const validSingletonA = contextA.resolve('validSingleton')
+        const validSingletonB = contextB.resolve('validSingleton')
+
+        const validCachedSingletonA = contextA.resolve('validCachedSingleton')
+        const validCachedSingletonB = contextB.resolve('validCachedSingleton')
+
+        // resolve them all again
+        baseContext.resolve('validSingleton')
+        contextA.resolve('validSingleton')
+        contextB.resolve('validSingleton')
+        baseContext.resolve('validCachedSingleton')
+        contextA.resolve('validCachedSingleton')
+        contextB.resolve('validCachedSingleton')
+
+        expect(baz).toBe('Hello Robby')
+        expect(qux).toBe('Goodbye World')
+        expect(foo).toBe('Hello')
+        expect(bar).toBe('World')
+
+        expect(baseA).toBe('Base: Hello Robby')
+        expect(baseB).toBe('Base: Goodbye World')
+        expect(base).toBe('Base: Hello World')
+
+        expect(validSingleton).toBe('Singleton')
+        expect(validSingletonA).toBe('Singleton')
+        expect(validSingletonB).toBe('Singleton')
+
+        expect(validCachedSingleton).toBe('Cached Singleton')
+        expect(validCachedSingletonA).toBe('Cached Singleton')
+        expect(validCachedSingletonB).toBe('Cached Singleton')
+
+        expect(validSingletonInstances).toBe(3)
+        expect(validCachedSingletonInstances).toBe(1)
+    })
+
+    it('should invalid nested dependency caches when overriding a value', async () => {
+        type Scope = {
+            foo: string
+        }
+
+        type ScopeA = Scope & {
+            bar: string
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type ScopeC = ScopeB & {
+            qux: string
+        }
+
+        const context = new Context<Scope>()
+        context.registerFactory('foo', () => 'A partridge in a pear tree', [], {
+            singleton: true,
+        })
+        context.resolve('foo')
+
+        const contextA = new Context<ScopeA>()
+        contextA.extend(context)
+        contextA.registerFactory('bar', (foo: string) => `two turtle doves, ${foo}`, ['foo'], {
+            singleton: true,
+        })
+        contextA.resolve('bar')
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerFactory('baz', (bar: string) => `three French hens, ${bar}`, ['bar'], {
+            singleton: true,
+        })
+        contextB.resolve('baz')
+
+        const contextC = new Context<ScopeC>()
+        contextC.extend(contextB)
+        contextC.registerFactory('qux', (baz: string) => `four calling birds, ${baz}`, ['baz'], {
+            singleton: true,
+        })
+        contextC.resolve('qux')
+        contextC.registerFactory('foo', () => 'and a partridge in a pear tree', [], {
+            singleton: true,
+        })
+
+        const fooCache = contextC.introspect('foo').cachedValue
+        const barCache = contextC.introspect('bar').cachedValue
+        const bazCache = contextC.introspect('baz').cachedValue
+        const quxCache = contextC.introspect('qux').cachedValue
+
+        expect(fooCache).toBeUndefined()
+        expect(barCache).toBeUndefined()
+        expect(bazCache).toBeUndefined()
+        expect(quxCache).toBeUndefined()
+
+        contextC.resolve('qux')
+
+        const fooCache2 = contextC.introspect('foo').cachedValue
+        const barCache2 = contextC.introspect('bar').cachedValue
+        const bazCache2 = contextC.introspect('baz').cachedValue
+        const quxCache2 = contextC.introspect('qux').cachedValue
+
+        expect(fooCache2).toBe('and a partridge in a pear tree')
+        expect(barCache2).toBe('two turtle doves, and a partridge in a pear tree')
+        expect(bazCache2).toBe('three French hens, two turtle doves, and a partridge in a pear tree')
+        expect(quxCache2).toBe(
+            'four calling birds, three French hens, two turtle doves, and a partridge in a pear tree',
+        )
+    })
+
+    it('should override an async factory with a new value', async () => {
+        type ScopeA = {
+            foo: Promise<string>
+            bar: Promise<number>
+        }
+
+        const contextA = new Context<ScopeA>()
+
+        contextA.registerAsyncFactory('foo', async () => 'Hello', [], {
+            singleton: true,
+        })
+        contextA.registerAsyncFactory('bar', async () => 42, [], {
+            singleton: true,
+        })
+
+        const contextB = new Context<ScopeA>()
+
+        contextB.extend(contextA)
+        contextB.registerAsyncFactory('foo', async () => 'Goodbye', [], {
+            singleton: true,
+        })
+        contextB.registerAsyncFactory('bar', async () => 100, [], {
+            singleton: true,
+        })
+
+        const foo = await contextB.resolve('foo')
+        const bar = await contextB.resolve('bar')
+
+        expect(foo).toBe('Goodbye')
+        expect(bar).toBe(100)
+    })
+
+    it('should inherit emitter listeners, passing in the new context, when extending', async () => {
+        const contextACallback = vi.fn()
+        const contextBCallback = vi.fn()
+
+        type ScopeA = {
+            foo: string
+            bar: number
+        }
+
+        type ScopeB = ScopeA & {
+            baz: string
+        }
+
+        type TestEvent = IEvent & {
+            message: string
+        }
+
+        const contextA = new Context<ScopeA>()
+        contextA.registerValue('foo', 'Hello')
+        contextA.registerValue('bar', 42)
+        contextA.on<TestEvent>('test', contextACallback)
+
+        const contextB = new Context<ScopeB>()
+        contextB.extend(contextA)
+        contextB.registerValue('baz', 'World')
+        contextB.on<TestEvent>('test', contextBCallback)
+
+        const eventA: TestEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        await contextB.emit('test')
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextBCallback).toHaveBeenCalledTimes(1)
+    })
+
+    it('should cancel eager initialization when a depedency is overridden', async () => {
+        type Scope = {
+            foo: string
+            bar: Promise<number>
+        }
+
+        const context = new Context<Scope>()
+
+        const context1Factory = vi.fn(() => 'Hello')
+        const context2Factory = vi.fn(() => 'Goodbye')
+        const context1AsyncFactory = vi.fn(async () => 42)
+        const context2AsyncFactory = vi.fn(async () => 100)
+
+        context.registerFactory('foo', context1Factory, [], {
+            eager: true,
+        })
+        context.registerAsyncFactory('bar', context1AsyncFactory, [], {
+            eager: true,
+        })
+
+        const context2 = new Context<Scope>()
+        context2.extend(context)
+        context2.registerFactory('foo', context2Factory, [], {
+            eager: true,
+        })
+        context2.registerAsyncFactory('bar', context2AsyncFactory, [], {
+            eager: true,
+        })
+
+        context.registerValue('foo', 'Goodbye')
+
+        await context2.initializeEagerDependencies()
+
+        expect(context1Factory).toHaveBeenCalledTimes(0)
+        expect(context2Factory).toHaveBeenCalledTimes(1)
+        expect(context1AsyncFactory).toHaveBeenCalledTimes(0)
+        expect(context2AsyncFactory).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not override singletons when extending, without an explicit override', async () => {
+        type Scope = {
+            foo: {
+                message: string
+                _id?: number
+            }
+            bar: {
+                message: string
+                _id?: number
+            }
+        }
+
+        const context1 = new Context<Scope>()
+        context1.registerFactory('foo', () => ({ message: 'Hello' }), [], {
+            singleton: true,
+        })
+
+        const foo1 = context1.resolve('foo')
+        foo1._id = 1
+
+        const context2 = new Context<Scope>()
+        context2.extend(context1)
+
+        const context3 = new Context<Scope>()
+        context3.extend(context1)
+
+        const foo2 = context2.resolve('foo')
+
+        const foo3 = context3.resolve('foo')
+
+        expect(foo2).toBe(foo3)
+        expect(foo2._id).toBe(1)
+    })
+
+    it('should dispatch event objects and event strings', async () => {
+        interface CustomEvent extends IEvent {
+            type: 'test'
+            message: string
+        }
+        const event: CustomEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        const contextACallback = vi.fn()
+
+        const contextA = new Context<DeclaroScope>()
+
+        contextA.on<CustomEvent>('test', contextACallback)
+
+        await contextA.emit(event)
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextACallback.mock.calls[0][1]).toEqual(event)
+        expect(contextACallback.mock.calls[0][0]).toBe(contextA)
+    })
+
+    it('should be able to emit events directly through the emitter', async () => {
+        interface CustomEvent extends IEvent {
+            type: 'test'
+            message: string
+        }
+        const event: CustomEvent = {
+            type: 'test',
+            message: 'Hello World',
+        }
+
+        const contextACallback = vi.fn()
+
+        const contextA = new Context<DeclaroScope>()
+
+        contextA.events.on('test', contextACallback)
+
+        await contextA.events.emitAsync(event)
+
+        expect(contextACallback).toHaveBeenCalledTimes(1)
+        expect(contextACallback.mock.calls[0][0]).toEqual(event)
+    })
+
+    it('should not squash errors in event handlers', async () => {
+        const context = new Context<DeclaroScope>()
+        const callback = vi.fn()
+
+        context.on('test', () => {
+            callback()
+            throw new Error('Test error')
+        })
+
+        expect(callback).not.toHaveBeenCalled()
+        await expect(context.emit('test')).rejects.toThrow('Test error')
+    })
+
+    it('should be able to define an extracted scope type', () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        const context = new Context<Scope>()
+
+        type ExtractedScope = ExtractScope<typeof context>
+
+        const extractedScope: ExtractedScope = {
+            foo: 'Hello',
+            bar: 42,
+        }
+
+        const _: Context<Scope> = new Context<ExtractedScope>()
+
+        expect(extractedScope.foo).toBe('Hello')
+        expect(extractedScope.bar).toBe(42)
+    })
+
+    it('should be able to use middleware that requires a subset of the context scope', () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        type ModuleScope = {
+            bar: number
+        }
+
+        const middleware = (context: Context<ModuleScope>) => {
+            // This middleware only needs 'bar', not 'foo'
+            expect(context.resolve('bar')).toBe(42)
+        }
+
+        const context = new Context<Scope>()
+        context.registerValue('foo', 'test')
+        context.registerValue('bar', 42)
+
+        // This should work - the context has more than what the middleware needs
+        return context.use(middleware)
+    })
+
+    it('should be able to apply a full context to a partial', () => {
+        type Scope = {
+            foo: string
+            bar: number
+        }
+
+        type ModuleScope = {
+            bar: number
+        }
+
+        const context = new Context<Scope>()
+
+        // Using the type-safe narrow method - this provides the proper covariance
+        const partialContext: Context<ModuleScope> = context.narrow<ModuleScope>()
+
+        expect(context).toBeInstanceOf(Context)
+        expect(partialContext).toBeInstanceOf(Context)
+        // Both references point to the same instance
+        expect(partialContext).toBe(context)
+    })
+
+    it('should cache singleton dependencies of dependencies correctly', async () => {
+        interface ServiceA {
+            id: string
+            message: string
+        }
+
+        interface ServiceB {
+            id: string
+            serviceA: ServiceA
+        }
+
+        interface ServiceC {
+            id: string
+            serviceA: ServiceA
+            serviceB: ServiceB
+        }
+
+        interface ServiceD {
+            id: string
+            serviceA: ServiceA
+            serviceB: ServiceB
+            serviceC: ServiceC
+        }
+
+        type Scope = {
+            serviceA: Promise<ServiceA>
+            serviceB: Promise<ServiceB>
+            serviceC: Promise<ServiceC>
+            serviceD: Promise<ServiceD>
+        }
+
+        const context = new Context<Scope>()
+
+        let serviceAInstances = 0
+        let serviceBInstances = 0
+        let serviceCInstances = 0
+        let serviceDInstances = 0
+
+        // ServiceA - async factory - singleton
+        context.registerAsyncFactory(
+            'serviceA',
+            async (): Promise<ServiceA> => {
+                serviceAInstances++
+                return {
+                    id: `serviceA-${serviceAInstances}`,
+                    message: 'I am Service A',
+                }
+            },
+            [],
+            { singleton: true },
+        )
+
+        // ServiceB - async factory depends on ServiceA - singleton
+        context.registerAsyncFactory(
+            'serviceB',
+            async (serviceA: ServiceA): Promise<ServiceB> => {
+                serviceBInstances++
+                return {
+                    id: `serviceB-${serviceBInstances}`,
+                    serviceA,
+                }
+            },
+            ['serviceA'],
+            { singleton: true },
+        )
+
+        // ServiceC - async factory depends on ServiceB and ServiceA - singleton
+        context.registerAsyncFactory(
+            'serviceC',
+            async (serviceA: ServiceA, serviceB: ServiceB): Promise<ServiceC> => {
+                serviceCInstances++
+                return {
+                    id: `serviceC-${serviceCInstances}`,
+                    serviceA,
+                    serviceB,
+                }
+            },
+            ['serviceA', 'serviceB'],
+            { singleton: true },
+        )
+
+        // ServiceD - async factory depends on ServiceA, ServiceB, and ServiceC - NOT a singleton
+        context.registerAsyncFactory(
+            'serviceD',
+            async (serviceA: ServiceA, serviceB: ServiceB, serviceC: ServiceC): Promise<ServiceD> => {
+                serviceDInstances++
+                return {
+                    id: `serviceD-${serviceDInstances}`,
+                    serviceA,
+                    serviceB,
+                    serviceC,
+                }
+            },
+            ['serviceA', 'serviceB', 'serviceC'],
+        )
+
+        // First resolution - all should be created
+        const serviceD1 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should only be created once
+        expect(serviceBInstances).toBe(1) // ServiceB should only be created once
+        expect(serviceCInstances).toBe(1) // ServiceC should only be created once
+        expect(serviceDInstances).toBe(1) // ServiceD should be created
+
+        // Second resolution - only ServiceD should be recreated
+        const serviceD2 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should still be only created once
+        expect(serviceBInstances).toBe(1) // ServiceB should still be only created once
+        expect(serviceCInstances).toBe(1) // ServiceC should still be only created once
+        expect(serviceDInstances).toBe(2) // ServiceD should be created again
+
+        // Third resolution - again only ServiceD should be recreated
+        const serviceD3 = await context.resolve('serviceD')
+
+        expect(serviceAInstances).toBe(1) // ServiceA should still be only created once
+        expect(serviceBInstances).toBe(1) // ServiceB should still be only created once
+        expect(serviceCInstances).toBe(1) // ServiceC should still be only created once
+        expect(serviceDInstances).toBe(3) // ServiceD should be created again
+
+        // Verify that singleton dependencies are the same instances (use toEqual since we have proxy objects)
+        expect(serviceD1.serviceA).toEqual(serviceD2.serviceA)
+        expect(serviceD1.serviceA).toEqual(serviceD3.serviceA)
+        expect(serviceD1.serviceB).toEqual(serviceD2.serviceB)
+        expect(serviceD1.serviceB).toEqual(serviceD3.serviceB)
+        expect(serviceD1.serviceC).toEqual(serviceD2.serviceC)
+        expect(serviceD1.serviceC).toEqual(serviceD3.serviceC)
+
+        // Verify nested dependencies are also the same
+        expect(serviceD1.serviceB.serviceA).toEqual(serviceD2.serviceB.serviceA)
+        expect(serviceD1.serviceC.serviceA).toEqual(serviceD2.serviceC.serviceA)
+        expect(serviceD1.serviceC.serviceB).toEqual(serviceD2.serviceC.serviceB)
+
+        // Verify the IDs to confirm singletons were reused
+        expect(serviceD1.serviceA.id).toBe('serviceA-1')
+        expect(serviceD1.serviceB.id).toBe('serviceB-1')
+        expect(serviceD1.serviceC.id).toBe('serviceC-1')
+        expect(serviceD1.id).toBe('serviceD-1')
+
+        expect(serviceD2.serviceA.id).toBe('serviceA-1') // Same instance
+        expect(serviceD2.serviceB.id).toBe('serviceB-1') // Same instance
+        expect(serviceD2.serviceC.id).toBe('serviceC-1') // Same instance
+        expect(serviceD2.id).toBe('serviceD-2') // New instance
+
+        expect(serviceD3.serviceA.id).toBe('serviceA-1') // Same instance
+        expect(serviceD3.serviceB.id).toBe('serviceB-1') // Same instance
+        expect(serviceD3.serviceC.id).toBe('serviceC-1') // Same instance
+        expect(serviceD3.id).toBe('serviceD-3') // New instance
     })
 })

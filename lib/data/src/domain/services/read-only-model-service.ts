@@ -1,0 +1,241 @@
+import type { AnyModelSchema, Model } from '@declaro/core'
+import type {
+    InferDetail,
+    InferFilters,
+    InferLookup,
+    InferSearchResults,
+    InferSort,
+    InferSummary,
+} from '../../shared/utils/schema-inference'
+import { ModelQueryEvent } from '../events/event-types'
+import { QueryEvent } from '../events/query-event'
+import { BaseModelService, type IActionOptions } from './base-model-service'
+import type { IPaginationInput } from '../models/pagination'
+
+/**
+ * Options for loading records.
+ */
+export interface ILoadOptions extends IActionOptions {
+    /**
+     * If true, only removed (soft-deleted) records will be returned.
+     */
+    removedOnly?: boolean
+    /**
+     * If true, both removed and non-removed records will be returned.
+     */
+    includeRemoved?: boolean
+
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
+
+    /**
+     * If true, bypasses any caching mechanism and forces fresh data retrieval from the repository.
+     *
+     * Use with caution, as this may have performance implications. This option is typically used in scenarios where data consistency is critical and the latest data must be retrieved, such as after a known update or in real-time applications.
+     */
+    noCache?: boolean
+}
+export interface ISearchOptions<TSchema extends AnyModelSchema> extends IActionOptions {
+    pagination?: IPaginationInput
+    sort?: InferSort<TSchema>
+    /**
+     * If true, only removed (soft-deleted) records will be returned.
+     */
+    removedOnly?: boolean
+    /**
+     * If true, both removed and non-removed records will be returned.
+     */
+    includeRemoved?: boolean
+    /**
+     * If true, skips dispatching events for this action.
+     */
+    doNotDispatchEvents?: boolean
+}
+
+export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseModelService<TSchema> {
+    /**
+     * Normalize the detail data to match the expected schema.
+     * WARNING: This method is called once per detail in load operations.
+     * Any intensive operations or queries should be avoided here, and done via bulk operations in the respective methods such as `loadMany` instead.
+     * @param detail The detail data to normalize.
+     * @returns The normalized detail data.
+     */
+    async normalizeDetail(detail: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
+        return detail
+    }
+
+    /**
+     * Normalize the summary data to match the expected schema.
+     * WARNING: This method is called once per summary in search results, often in parallel.
+     * Any intensive operations or queries should be avoided here, and done via bulk operations in the respective methods such as `search` instead.
+     *
+     * @param summary The summary data to normalize.
+     * @returns The normalized summary data.
+     */
+    async normalizeSummary(summary: InferSummary<TSchema>): Promise<InferSummary<TSchema>> {
+        return summary
+    }
+
+    /**
+     * Normalize the lookup criteria before it is passed to the repository.
+     * Can be overridden by subclasses to apply custom lookup transformations
+     * (e.g., injecting tenant context, remapping IDs).
+     * By default, returns the lookup unchanged.
+     * @param lookup The lookup criteria to normalize.
+     * @returns The normalized lookup criteria.
+     */
+    protected async normalizeLookup(lookup: InferLookup<TSchema>): Promise<InferLookup<TSchema>> {
+        return lookup
+    }
+
+    /**
+     * Normalize the sort criteria before it is passed to the repository.
+     * Can be overridden by subclasses to apply default sort behavior or
+     * transform sort criteria.
+     * By default, returns the sort unchanged.
+     * @param sort The sort criteria to normalize.
+     * @returns The normalized sort criteria.
+     */
+    protected async normalizeSort(sort?: InferSort<TSchema>): Promise<InferSort<TSchema> | undefined> {
+        return sort
+    }
+
+    /**
+     * Load a single record by its lookup criteria.
+     * @param lookup The lookup criteria to find the record.
+     * @param options Additional options for the load operation.
+     * @returns The loaded record details.
+     */
+    async load(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferDetail<TSchema>> {
+        const normalizedLookup = await this.normalizeLookup(lookup)
+
+        // Emit the before load event
+        if (!options?.doNotDispatchEvents) {
+            const beforeLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeLoad, options?.scope),
+                normalizedLookup,
+            )
+            await this.emitter.emitAsync(beforeLoadEvent)
+        }
+
+        // Load the details from the repository
+        const details = await this.repository.load(normalizedLookup, options)
+
+        // Emit the after load event
+        if (!options?.doNotDispatchEvents) {
+            const afterLoadEvent = new QueryEvent<InferDetail<TSchema>, InferLookup<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterLoad, options?.scope),
+                normalizedLookup,
+            ).setResult(details)
+            await this.emitter.emitAsync(afterLoadEvent)
+        }
+
+        return await this.normalizeDetail(details)
+    }
+
+    /**
+     * Load multiple records by their lookup criteria.
+     * @param lookups The lookup criteria to find the records.
+     * @param options Additional options for the load operation.
+     * @returns An array of loaded record details.
+     */
+    async loadMany(lookups: InferLookup<TSchema>[], options?: ILoadOptions): Promise<InferDetail<TSchema>[]> {
+        const normalizedLookups = await Promise.all(lookups.map((l) => this.normalizeLookup(l)))
+
+        // Emit the before load many event
+        if (!options?.doNotDispatchEvents) {
+            const beforeLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
+                this.getDescriptor(ModelQueryEvent.BeforeLoadMany, options?.scope),
+                normalizedLookups,
+            )
+            await this.emitter.emitAsync(beforeLoadManyEvent)
+        }
+
+        // Load the details from the repository
+        const details = await this.repository.loadMany(normalizedLookups, options)
+
+        // Emit the after load many event
+        if (!options?.doNotDispatchEvents) {
+            const afterLoadManyEvent = new QueryEvent<InferDetail<TSchema>[], InferLookup<TSchema>[]>(
+                this.getDescriptor(ModelQueryEvent.AfterLoadMany, options?.scope),
+                normalizedLookups,
+            ).setResult(details)
+            await this.emitter.emitAsync(afterLoadManyEvent)
+        }
+
+        return await Promise.all(details.map((detail) => this.normalizeDetail(detail)))
+    }
+
+    /**
+     * Search for records matching the given filters.
+     * @param filters The filters to apply to the search.
+     * @param options Additional options for the search operation.
+     * @returns The search results.
+     */
+    async search(
+        filters: InferFilters<TSchema>,
+        options?: ISearchOptions<TSchema>,
+    ): Promise<InferSearchResults<TSchema>> {
+        const normalizedOptions = { ...options, sort: await this.normalizeSort(options?.sort) }
+
+        // Emit the before search event
+        if (!options?.doNotDispatchEvents) {
+            const beforeSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeSearch, options?.scope),
+                filters,
+            )
+            await this.emitter.emitAsync(beforeSearchEvent)
+        }
+
+        // Search the repository with the provided filters
+        const results = await this.repository.search(filters, normalizedOptions)
+
+        // Emit the after search event
+        if (!options?.doNotDispatchEvents) {
+            const afterSearchEvent = new QueryEvent<InferSearchResults<TSchema>, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterSearch, options?.scope),
+                filters,
+            ).setResult(results)
+            await this.emitter.emitAsync(afterSearchEvent)
+        }
+
+        // Return the search results
+        return {
+            ...results,
+            results: await Promise.all(results.results.map((summary) => this.normalizeSummary(summary))),
+        }
+    }
+
+    /**
+     * Count the number of records matching the given filters.
+     * @param filters The filters to apply to the count operation.
+     * @returns The count of matching records.
+     */
+    async count(filters: InferFilters<TSchema>, options?: ISearchOptions<TSchema>): Promise<number> {
+        // Emit the before count event
+        if (!options?.doNotDispatchEvents) {
+            const beforeCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.BeforeCount, options?.scope),
+                filters,
+            )
+            await this.emitter.emitAsync(beforeCountEvent)
+        }
+
+        // Count the records in the repository
+        const count = await this.repository.count(filters, options)
+
+        // Emit the after count event
+        if (!options?.doNotDispatchEvents) {
+            const afterCountEvent = new QueryEvent<number, InferFilters<TSchema>>(
+                this.getDescriptor(ModelQueryEvent.AfterCount, options?.scope),
+                filters,
+            ).setResult(count)
+            await this.emitter.emitAsync(afterCountEvent)
+        }
+
+        // Return the count
+        return count
+    }
+}

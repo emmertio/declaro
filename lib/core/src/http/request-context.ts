@@ -1,43 +1,52 @@
-import { Context, type ContextMiddleware } from '../context/context'
 import type { IncomingMessage, ServerResponse } from 'http'
+import { Context, type ContextMiddleware, type DeclaroScope } from '../context/context'
 
-export const REQUEST_CONTEXT_MIDDLEWARE = Symbol('declaro:request-context-middleware')
-
-export function useRequestMiddleware(context: Context) {
-    const middleware = context.inject<ContextMiddleware[]>(REQUEST_CONTEXT_MIDDLEWARE)
+/**
+ * Get the request middleware for the current context.
+ * @param context The context to retrieve middleware from.
+ * @returns An array of request middleware functions.
+ * @deprecated Use `context.scope.requestMiddleware` instead.
+ */
+export function useRequestMiddleware<S extends DeclaroScope>(context: Context<S>) {
+    const middleware = context.resolve('requestMiddleware', {
+        strict: false,
+    })
 
     return middleware ?? []
 }
 
-export function provideRequestMiddleware(context: Context, ...middleware: ContextMiddleware[]) {
-    const existingMiddleware = useRequestMiddleware(context)
+export function provideRequestMiddleware<S extends DeclaroScope>(
+    context: Context<S>,
+    ...middleware: ContextMiddleware<Context>[]
+) {
+    const existingMiddleware = context.scope.requestMiddleware ?? []
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
 
-    context.provide(REQUEST_CONTEXT_MIDDLEWARE, extendedMiddleware)
+    context.registerValue('requestMiddleware', extendedMiddleware as any)
 
     return extendedMiddleware
 }
-
-export const REQUEST_NODE_MIDDLEWARE = Symbol('declaro:request-node-middleware')
 
 export type NodeListener = (req: IncomingMessage, res: ServerResponse) => void
 export type NodePromisifiedHandler = (req: IncomingMessage, res: ServerResponse) => Promise<any>
 export type NodeMiddleware = (req: IncomingMessage, res: ServerResponse, next: (err?: Error) => any) => any
 export type AllNodeMiddleware = NodeListener | NodePromisifiedHandler | NodeMiddleware
 
-export function useNodeMiddleware(context: Context) {
-    const middleware = context.inject<AllNodeMiddleware[]>(REQUEST_NODE_MIDDLEWARE)
+export function useNodeMiddleware<S extends DeclaroScope>(context: Context<S>) {
+    const middleware = context.resolve('nodeMiddleware', {
+        strict: false,
+    })
 
     return middleware ?? []
 }
 
-export function provideNodeMiddleware(context: Context, ...middleware: AllNodeMiddleware[]) {
+export function provideNodeMiddleware<S extends DeclaroScope>(context: Context<S>, ...middleware: AllNodeMiddleware[]) {
     const existingMiddleware = useNodeMiddleware(context)
 
     const extendedMiddleware = [...existingMiddleware, ...middleware]
 
-    context.provide(REQUEST_NODE_MIDDLEWARE, extendedMiddleware)
+    context.registerValue('nodeMiddleware', extendedMiddleware)
 
     return extendedMiddleware
 }

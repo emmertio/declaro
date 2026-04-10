@@ -1,0 +1,14 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "skipLibCheck": true,
+        "outDir": "dist/ts-browser"
+    },
+    "include": ["src/index.browser.ts"],
+    "exclude": ["src/infrastructure/impl/redis-auth-service.ts"]
+}

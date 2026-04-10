@@ -1,10 +1,10 @@
-import { Context } from '.'
+import { Context } from './context'
 import { sleep } from '../timing'
 import { ContextConsumer } from './context-consumer'
-import { describe, it, vi } from 'vitest'
+import { describe, it, vi, expect } from 'vitest'
 
 describe('Context', () => {
-    it('Should allow simple value dependency injection', async ({ expect }) => {
+    it('Should allow simple value dependency injection', async () => {
         const context = new Context()
 
         context.provide('test', 'Hello World')
@@ -20,28 +20,25 @@ describe('Context', () => {
         expect(number).toBe(42)
     })
 
-    it('Should allow subscription to arbitrary events', async ({ expect }) => {
+    it('Should allow subscription to arbitrary events', async () => {
         const customEventCall = vi.fn()
 
         const context = new Context()
         context.provide('test', 'Hello World')
         expect(customEventCall.mock.calls.length).toBe(0)
 
-        context.on('customEvent', async (ctx, arg1, arg2, arg3) => {
+        context.on('customEvent', async (ctx) => {
             customEventCall()
             const message = await ctx.inject('test')
             expect(message).toBe('Hello World')
-            expect(arg1).toBe(1)
-            expect(arg2).toBe(2)
-            expect(arg3).toBe(3)
         })
 
-        await context.emit('customEvent', 1, 2, 3)
+        await context.emit('customEvent')
 
         expect(customEventCall.mock.calls.length).toBe(1)
     })
 
-    it('Should extend other contexts', async ({ expect }) => {
+    it('Should extend other contexts', async () => {
         const context1 = new Context()
         const context2 = new Context()
         const context3 = new Context()
@@ -68,7 +65,7 @@ describe('Context', () => {
         expect(symbolValue).toBe(42)
     })
 
-    it('Should nest contexts', async ({ expect }) => {
+    it('Should nest contexts', async () => {
         const context1 = new Context()
         const context2 = new Context()
 
@@ -84,7 +81,7 @@ describe('Context', () => {
         expect(a2).toBe(2)
     })
 
-    it('Should allow async middleware', async ({ expect }) => {
+    it('Should allow async middleware', async () => {
         const context = new Context()
 
         await context.use(async (context) => {
@@ -99,7 +96,7 @@ describe('Context', () => {
         expect(test2).toBe('Hello Test')
     })
 
-    it('Should allow singletons', ({ expect }) => {
+    it('Should allow singletons', () => {
         const context = new Context()
 
         const KEY = Symbol()
@@ -110,7 +107,7 @@ describe('Context', () => {
         expect(instance).toBe(1)
     })
 
-    it('Should allow hydration', ({ expect }) => {
+    it('Should allow hydration', () => {
         const context = new Context()
 
         class Test extends ContextConsumer {
@@ -126,7 +123,7 @@ describe('Context', () => {
         expect(context.hydrate(Test).test()).toBe('Yes')
     })
 
-    it('Should allow hydration with args', ({ expect }) => {
+    it('Should allow hydration with args', () => {
         const context = new Context()
 
         class Test extends ContextConsumer {

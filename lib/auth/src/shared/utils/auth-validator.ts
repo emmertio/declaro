@@ -1,0 +1,118 @@
+import { PermissionValidator, UnauthorizedError } from '@declaro/core'
+import type { IAuthMembershipSummary, IAuthSession, IAuthTeamSummary } from '../../domain/models/auth-session'
+import type { AuthService } from '../../domain/services/auth-service'
+
+export type Permission = string | PermissionValidator
+
+export type PermissionValidationFn = (v: PermissionValidator) => any
+
+export interface IInstanceWithAuthValidator {
+    authValidator: AuthValidator
+}
+
+export class AuthValidator {
+    constructor(
+        protected readonly authSession: IAuthSession | null,
+        protected readonly authMembership: IAuthTeamSummary | null,
+        protected readonly authService: AuthService,
+    ) {}
+
+    static createFromClass(classInstance: IInstanceWithAuthValidator) {
+        if (!(classInstance?.authValidator instanceof AuthValidator)) {
+            throw new Error(
+                'The provided class instance does not have a valid AuthValidator instance. The class must have a property called `authValidator` of type `AuthValidator`.',
+            )
+        }
+        return classInstance.authValidator
+    }
+
+    getAuthSession(): IAuthSession | null {
+        if (!this.authSession) {
+            return null
+        }
+
+        return this.authSession
+    }
+
+    validateSession(strict: boolean = true) {
+        if (this.authSession) {
+            const token = this.authSession.jwt
+
+            if (token) {
+                const authPayload = this.authService.validateJWT(token)
+
+                if (JSON.stringify(authPayload) === JSON.stringify(this.authSession.jwtPayload)) {
+                    return true
+                }
+            }
+        }
+
+        if (strict) {
+            throw new UnauthorizedError('You must be logged in to perform this action.')
+        } else {
+            return false
+        }
+    }
+
+    getActiveClaims() {
+        const membership = this.authSession?.memberships.find((m) => m.team.id === this.authMembership?.id)
+
+        if (this.authMembership && !membership) {
+            throw new UnauthorizedError('You do not have permission to perform this action.')
+        }
+
+        const claims: string[] = [...(this.authSession?.claims ?? [])]
+
+        if (membership) {
+            claims.push(...(membership.claims ?? []))
+        }
+
+        return claims
+    }
+
+    validatePermissions(validate: PermissionValidationFn, strict: boolean = true) {
+        const isSessionValid = this.validateSession(strict)
+
+        if (!isSessionValid) {
+            return false
+        }
+
+        const claims = this.getActiveClaims()
+
+        const validator = PermissionValidator.create()
+        validate(validator)
+        if (strict) {
+            validator.validate(claims)
+        } else {
+            const results = validator.safeValidate(claims)
+            return results.valid
+        }
+
+        return true
+    }
+
+    validateTeamPermissions(teamId: string, validate: PermissionValidationFn, strict: boolean = true) {
+        const isSessionValid = this.validateSession(strict)
+
+        if (!isSessionValid) {
+            return false
+        }
+
+        const membership = this.authSession?.memberships.find((m) => m.team.id === teamId)
+        const membershipClaims = membership?.claims ?? []
+
+        const validator = PermissionValidator.create()
+        validate(validator)
+        if (strict) {
+            if (!membership) {
+                throw new UnauthorizedError('You do not have permission to perform this action.')
+            }
+            validator.validate(membershipClaims)
+        } else {
+            const results = validator.safeValidate(membershipClaims)
+            return results.valid
+        }
+
+        return true
+    }
+}

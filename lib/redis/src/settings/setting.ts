@@ -27,7 +27,7 @@ export class Config<T = any> {
         const redis = useRedis(context)
 
         const existingValues = await this.get(context)
-        const merged = merge.all([this.defaultValue, existingValues, value])
+        const merged = merge.all([this.defaultValue ?? {}, existingValues ?? {}, value])
         const body = JSON.stringify(merged)
         await redis.set(this.namespaceKey, body)
     }

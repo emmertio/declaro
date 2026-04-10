@@ -1,0 +1,50 @@
+{
+    "name": "@declaro/zod",
+    "version": "2.1.0",
+    "description": "A library for Zod-based models in the Declaro ecosystem.",
+    "main": "dist/node/index.js",
+    "module": "dist/node/index.js",
+    "types": "dist/ts/index.d.ts",
+    "author": "Emmert Technology LLC",
+    "type": "module",
+    "license": "MIT",
+    "files": [
+        "dist",
+        "src",
+        "README.md",
+        "LICENSE.md"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "dev": "bun run scripts/build.ts --watch",
+        "clean": "bun rimraf dist",
+        "build:typedefs": "bun tsc --emitDeclarationOnly --outDir dist/ts -p tsconfig.json",
+        "build:js": "bun run scripts/build.ts",
+        "build": "bun run clean && bun run build:js && bun run build:typedefs",
+        "test": "bun test",
+        "test:integration": "bun run build && bun run scripts/integration-test.ts && bun run scripts/integration-test-cjs.ts",
+        "test:watch": "bun test --watch",
+        "typecheck": "bun tsc --noEmit"
+    },
+    "devDependencies": {
+        "@declaro/core": "^2.1.0",
+        "@types/bun": "^1.2.12",
+        "typescript": "^5.5.4",
+        "zod": "^4.1.11"
+    },
+    "peerDependencies": {
+        "@declaro/core": "^2.0.0-beta.133",
+        "zod": "^4.1.11"
+    },
+    "exports": {
+        "bun": "./src/index.ts",
+        "types": "./dist/ts/index.d.ts",
+        "import": "./dist/node/index.js",
+        "require": "./dist/node/index.cjs",
+        "browser": "./dist/browser/index.js",
+        "default": "./dist/node/index.js"
+    },
+    "gitHead": "c4e8895041c00ec51f891ef1400870e363343845"
+}

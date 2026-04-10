@@ -44,7 +44,7 @@ export class PermissionValidator {
         return this
     }
 
-    allOf(permissions: RulePermission[], errorMessage?: string) {
+    allOf(permissions: RulePermission[], errorMessage: string = 'You do not have the required permissions') {
         this.addRule({
             type: PermissionRuleType.ALL_OF,
             permissions,
@@ -53,7 +53,7 @@ export class PermissionValidator {
         return this
     }
 
-    noneOf(permissions: RulePermission[], errorMessage?: string) {
+    noneOf(permissions: RulePermission[], errorMessage: string = 'You have forbidden permissions') {
         this.addRule({
             type: PermissionRuleType.NONE_OF,
             permissions,
@@ -62,7 +62,7 @@ export class PermissionValidator {
         return this
     }
 
-    someOf(permissions: RulePermission[], errorMessage?: string) {
+    someOf(permissions: RulePermission[], errorMessage: string = 'You do not have any of the required permissions') {
         this.addRule({
             type: PermissionRuleType.SOME_OF,
             permissions,

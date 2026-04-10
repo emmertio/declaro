@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis'
+import type { Redis } from 'ioredis'
 import { serialize, unserialize } from './utils'
 
 export enum RedisRepositoryEvent {
@@ -26,12 +26,18 @@ export class RedisRepository<T> {
         return result
     }
 
-    async get(id: string): Promise<T> {
+    async get(id: string): Promise<T | null | undefined> {
         const payload = await this.redis.get(id)
+
+        if (!payload) {
+            return null
+        }
 
         const item = unserialize<T>(payload)
 
-        await Promise.all(this.handlers.GET.map((handler) => handler(RedisRepositoryEvent.GET, id, item)))
+        if (item) {
+            await Promise.all(this.handlers.GET.map((handler) => handler(RedisRepositoryEvent.GET, id, item)))
+        }
 
         return item
     }

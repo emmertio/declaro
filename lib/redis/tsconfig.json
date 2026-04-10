@@ -1,6 +1,12 @@
 {
     "extends": ["../../tsconfig.json"],
-    "compilerOptions": {},
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true
+    },
     "include": ["src/*.ts", "src/**/*.ts", "src/**/*.d.ts"],
     "buildOptions": {
         "outDir": "dist"

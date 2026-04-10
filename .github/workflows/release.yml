@@ -1,0 +1,66 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - develop
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            packages: write
+            id-token: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.11
+
+            - name: Cache Bun dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+                  restore-keys: |
+                      ${{ runner.os }}-bun-
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Configure Git
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Setup NPM registry authentication
+              run: |
+                  echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+
+            - name: Run release
+              run: |
+                  # Clean and build packages
+                  bun run build
+
+                  # Typecheck
+                  bun run typecheck
+
+                  # Run tests
+                  bun run test
+
+                  # Run lerna publish with prerelease increments (beta.X)
+                  bun lerna publish prerelease \
+                    --preid=beta \
+                    --force-publish \
+                    --yes \
+                    --no-verify-access
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

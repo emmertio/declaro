@@ -1,0 +1,127 @@
+name: Backport Sync
+
+on:
+    push:
+        branches:
+            - develop
+
+concurrency:
+    group: backport
+    cancel-in-progress: false
+
+jobs:
+    backport:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+
+        steps:
+            - name: Check for open backport PRs
+              id: check
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # List open PRs with head branch starting with backport/
+                  BACKPORT_PRS=$(gh pr list \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --base develop \
+                    --state open \
+                    --json number,headRefName \
+                    --jq '.[] | select(.headRefName | startswith("backport/"))' 2>/dev/null || true)
+
+                  if [ -z "$BACKPORT_PRS" ]; then
+                    echo "No open backport PRs found. Skipping."
+                    echo "skip=true" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  echo "Found open backport PRs:"
+                  echo "$BACKPORT_PRS"
+                  echo "skip=false" >> $GITHUB_OUTPUT
+
+                  # Store PR data for later steps
+                  echo "$BACKPORT_PRS" > /tmp/backport-prs.json
+
+            - name: Checkout code
+              if: steps.check.outputs.skip != 'true'
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Configure Git
+              if: steps.check.outputs.skip != 'true'
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Cherry-pick version bumps onto backport branches
+              if: steps.check.outputs.skip != 'true'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # Fetch all remote branches
+                  git fetch origin
+
+                  # Process each open backport PR
+                  while IFS= read -r PR_DATA; do
+                    PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+                    BRANCH_NAME=$(echo "$PR_DATA" | jq -r '.headRefName')
+
+                    echo "================================================"
+                    echo "Processing backport PR #$PR_NUMBER (branch: $BRANCH_NAME)"
+                    echo "================================================"
+
+                    # Checkout the backport branch
+                    git checkout "$BRANCH_NAME"
+                    git pull origin "$BRANCH_NAME"
+
+                    # Find version bump commits on develop that are not on this branch
+                    # These are commits authored by github-actions[bot] with message matching vX.Y.Z-beta.N
+                    VERSION_COMMITS=$(git log "$BRANCH_NAME..origin/develop" \
+                      --author="github-actions\[bot\]" \
+                      --grep="^v[0-9]\+\.[0-9]\+\.[0-9]\+-beta\." \
+                      --format="%H" \
+                      --reverse 2>/dev/null || true)
+
+                    if [ -z "$VERSION_COMMITS" ]; then
+                      echo "No new version bump commits to cherry-pick for PR #$PR_NUMBER."
+                      continue
+                    fi
+
+                    PICKED_VERSIONS=""
+                    PICK_COUNT=0
+
+                    for COMMIT in $VERSION_COMMITS; do
+                      MSG=$(git log -1 --format="%s" "$COMMIT")
+                      echo "Cherry-picking: $MSG ($COMMIT)"
+
+                      if git cherry-pick "$COMMIT" -X theirs --no-edit; then
+                        PICKED_VERSIONS="$PICKED_VERSIONS- \`$MSG\`\n"
+                        PICK_COUNT=$((PICK_COUNT + 1))
+                      else
+                        # If cherry-pick fails, abort and report
+                        git cherry-pick --abort 2>/dev/null || true
+                        echo "::warning::Failed to cherry-pick $MSG ($COMMIT)"
+                        PICKED_VERSIONS="$PICKED_VERSIONS- \`$MSG\` (FAILED - manual resolution needed)\n"
+                      fi
+                    done
+
+                    if [ "$PICK_COUNT" -gt 0 ]; then
+                      # Push updated backport branch
+                      git push origin "$BRANCH_NAME"
+
+                      # Get the latest version that was picked
+                      LATEST_MSG=$(echo "$VERSION_COMMITS" | tail -1 | xargs git log -1 --format="%s" 2>/dev/null || echo "unknown")
+
+                      # Post comment on the backport PR
+                      COMMENT_BODY=$(printf "## Backport Updated\n\nCherry-picked version bump commits from \`develop\`:\n\n%b\nLatest version on develop: **%s**" "$PICKED_VERSIONS" "$LATEST_MSG")
+                      gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
+
+                      echo "Successfully cherry-picked $PICK_COUNT commit(s) onto $BRANCH_NAME"
+                    fi
+
+                  done < <(jq -c '.' /tmp/backport-prs.json)
+
+                  echo "Backport sync complete."

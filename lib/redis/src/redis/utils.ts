@@ -12,8 +12,11 @@ export function serialize<T = string>(message: T) {
  * @param message A JSON string to unserialize
  * @returns
  */
-export function unserialize<T = string>(message: string): T {
+export function unserialize<T = string>(message?: string | null): T | null | undefined {
+    if (!message) {
+        return null as any
+    }
     return JSON.parse(message)
 }
 
-export type MessageHandler<T = string> = (message: T) => any
+export type MessageHandler<T = string> = (message?: T) => any

@@ -1,0 +1,153 @@
+name: Create Release Branch
+
+on:
+    workflow_dispatch:
+
+jobs:
+    create-release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+
+        steps:
+            - name: Checkout develop
+              uses: actions/checkout@v4
+              with:
+                  ref: develop
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.11
+
+            - name: Cache Bun dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+                  restore-keys: |
+                      ${{ runner.os }}-bun-
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Configure Git
+              run: |
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Bootstrap main branch
+              run: |
+                  if ! git ls-remote --heads origin main | grep -q main; then
+                    echo "Main branch does not exist. Creating from develop..."
+                    git push origin develop:refs/heads/main
+                  else
+                    echo "Main branch already exists."
+                  fi
+
+            - name: Compute next release version
+              id: version
+              run: |
+                  # Read current version from lerna.json and strip prerelease suffix
+                  CURRENT_VERSION=$(node -p "require('./lerna.json').version")
+                  BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-.*//')
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "Base version: $BASE_VERSION"
+
+                  # Collect all candidate versions
+                  VERSIONS=("$BASE_VERSION")
+
+                  # Parse versions from existing release/* branches
+                  for BRANCH in $(git branch -r --list 'origin/release/*' 2>/dev/null); do
+                    V=$(echo "$BRANCH" | sed 's|origin/release/||')
+                    if echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      VERSIONS+=("$V")
+                      echo "Found release branch version: $V"
+                    fi
+                  done
+
+                  # Parse versions from existing git tags
+                  for TAG in $(git tag -l 'v*' 2>/dev/null); do
+                    V=$(echo "$TAG" | sed 's/^v//' | sed 's/-.*//')
+                    if echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      VERSIONS+=("$V")
+                      echo "Found tag version: $V"
+                    fi
+                  done
+
+                  # Find the highest version using semver sort
+                  HIGHEST=$(printf '%s\n' "${VERSIONS[@]}" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+                  echo "Highest version found: $HIGHEST"
+
+                  # Increment minor version
+                  MAJOR=$(echo "$HIGHEST" | cut -d. -f1)
+                  MINOR=$(echo "$HIGHEST" | cut -d. -f2)
+                  NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
+                  echo "Next release version: $NEXT_VERSION"
+
+                  # Validate that the release branch doesn't already exist
+                  if git ls-remote --heads origin "release/$NEXT_VERSION" | grep -q "release/$NEXT_VERSION"; then
+                    echo "::error::Release branch release/$NEXT_VERSION already exists!"
+                    exit 1
+                  fi
+
+                  echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+            - name: Create release branch
+              run: git checkout -b "release/${{ steps.version.outputs.version }}"
+
+            - name: Update package versions
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  bun lerna version "$VERSION" --no-git-tag-version --no-push --yes --force-publish
+
+            - name: Regenerate lockfile
+              run: bun install
+
+            - name: Commit version bump
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  git add -A
+                  git commit -m "chore: release $VERSION"
+
+            - name: Push release branch
+              run: git push origin "release/${{ steps.version.outputs.version }}"
+
+            - name: Create pull request
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  gh pr create \
+                    --base main \
+                    --head "release/$VERSION" \
+                    --title "Release $VERSION" \
+                    --body "## Release $VERSION
+
+                  This PR was automatically created by the release workflow.
+
+                  Merging this PR into \`main\` will:
+                  - Publish all @declaro/* packages to npm with the \`latest\` dist-tag
+                  - Create git tag \`v$VERSION\`
+                  - Finalize the draft GitHub Release
+
+                  ### Packages
+                  - @declaro/core@$VERSION
+                  - @declaro/auth@$VERSION
+                  - @declaro/data@$VERSION
+                  - @declaro/redis@$VERSION
+                  - @declaro/zod@$VERSION"
+
+            - name: Create draft GitHub Release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  gh release create "v$VERSION" \
+                    --draft \
+                    --title "v$VERSION" \
+                    --generate-notes \
+                    --target "release/$VERSION"

@@ -168,12 +168,33 @@ jobs:
                   NEXT_DEV_VERSION="$MAJOR.$((MINOR + 1)).0-beta.0"
                   echo "Bumping develop to $NEXT_DEV_VERSION"
 
-                  git checkout develop
-                  bun lerna version "$NEXT_DEV_VERSION" --no-git-tag-version --no-push --yes --force-publish
-                  bun install
-                  git add -A
-                  git commit -m "v$NEXT_DEV_VERSION"
-                  git push origin develop
+                  # Fetch latest develop (may have new commits from concurrent beta release)
+                  # then apply the version bump on top of whatever develop currently is
+                  MAX_RETRIES=4
+                  for i in $(seq 1 $MAX_RETRIES); do
+                    git fetch origin develop
+                    git checkout develop
+                    git reset --hard origin/develop
+
+                    bun lerna version "$NEXT_DEV_VERSION" --no-git-tag-version --no-push --yes --force-publish
+                    bun install
+                    git add -A
+                    git commit -m "v$NEXT_DEV_VERSION"
+
+                    if git push origin develop; then
+                      echo "Successfully pushed develop bump on attempt $i"
+                      break
+                    fi
+
+                    if [ "$i" -eq "$MAX_RETRIES" ]; then
+                      echo "::error::Failed to push develop bump after $MAX_RETRIES attempts"
+                      exit 1
+                    fi
+
+                    WAIT=$((2 ** i))
+                    echo "Push failed (attempt $i/$MAX_RETRIES). Retrying in ${WAIT}s..."
+                    sleep "$WAIT"
+                  done
 
             - name: Create pull request
               env:

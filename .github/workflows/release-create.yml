@@ -3,21 +3,14 @@ name: Create Release Branch
 on:
     workflow_dispatch:
         inputs:
-            version_type:
+            release_type:
                 description: 'Release type'
                 type: choice
                 options:
-                    - minor
-                    - patch
-                    - major
-                default: minor
-            target:
-                description: 'Source branch to create release from'
-                type: choice
-                options:
-                    - develop
-                    - main
-                default: develop
+                    - 'Minor Release (from develop)'
+                    - 'Patch Release (from main)'
+                    - 'Major Release (from develop)'
+                default: 'Minor Release (from develop)'
 
 jobs:
     create-release:
@@ -27,10 +20,29 @@ jobs:
             pull-requests: write
 
         steps:
+            - name: Parse release type
+              id: config
+              run: |
+                  RELEASE_TYPE="${{ inputs.release_type }}"
+                  case "$RELEASE_TYPE" in
+                    "Minor Release (from develop)")
+                      echo "version_type=minor" >> $GITHUB_OUTPUT
+                      echo "target=develop" >> $GITHUB_OUTPUT
+                      ;;
+                    "Patch Release (from main)")
+                      echo "version_type=patch" >> $GITHUB_OUTPUT
+                      echo "target=main" >> $GITHUB_OUTPUT
+                      ;;
+                    "Major Release (from develop)")
+                      echo "version_type=major" >> $GITHUB_OUTPUT
+                      echo "target=develop" >> $GITHUB_OUTPUT
+                      ;;
+                  esac
+
             - name: Checkout source branch
               uses: actions/checkout@v4
               with:
-                  ref: ${{ inputs.target }}
+                  ref: ${{ steps.config.outputs.target }}
                   fetch-depth: 0
                   token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,7 +68,7 @@ jobs:
                   git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
             - name: Bootstrap main branch
-              if: inputs.target == 'develop'
+              if: steps.config.outputs.target == 'develop'
               run: |
                   if ! git ls-remote --heads origin main | grep -q main; then
                     echo "Main branch does not exist. Creating from develop..."
@@ -68,8 +80,8 @@ jobs:
             - name: Compute next release version
               id: version
               run: |
-                  VERSION_TYPE="${{ inputs.version_type }}"
-                  TARGET="${{ inputs.target }}"
+                  VERSION_TYPE="${{ steps.config.outputs.version_type }}"
+                  TARGET="${{ steps.config.outputs.target }}"
 
                   # Read current version from lerna.json and strip prerelease suffix
                   CURRENT_VERSION=$(node -p "require('./lerna.json').version")
@@ -160,7 +172,7 @@ jobs:
               run: git push origin "release/${{ steps.version.outputs.version }}"
 
             - name: Bump develop to next development version
-              if: inputs.target == 'develop'
+              if: steps.config.outputs.target == 'develop'
               run: |
                   VERSION="${{ steps.version.outputs.version }}"
                   MAJOR=$(echo "$VERSION" | cut -d. -f1)
@@ -201,8 +213,8 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   VERSION="${{ steps.version.outputs.version }}"
-                  VERSION_TYPE="${{ inputs.version_type }}"
-                  TARGET="${{ inputs.target }}"
+                  VERSION_TYPE="${{ steps.config.outputs.version_type }}"
+                  TARGET="${{ steps.config.outputs.target }}"
 
                   if [ "$TARGET" = "main" ]; then
                     DESCRIPTION="This is a **${VERSION_TYPE}** release created from \`main\` (hotfix)."

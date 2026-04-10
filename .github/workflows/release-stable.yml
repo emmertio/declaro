@@ -138,7 +138,32 @@ jobs:
                   fi
 
                   echo "Creating backport branch and PR for v$VERSION..."
+                  git fetch origin develop
                   git checkout -b "backport/$VERSION" main
+
+                  # Cherry-pick version bump commits from develop to prevent version conflicts
+                  VERSION_COMMITS=$(git log "backport/$VERSION..origin/develop" \
+                    --author="github-actions\[bot\]" \
+                    --grep="^v[0-9]\+\.[0-9]\+\.[0-9]\+-beta\." \
+                    --format="%H" \
+                    --reverse 2>/dev/null || true)
+
+                  if [ -n "$VERSION_COMMITS" ]; then
+                    echo "Cherry-picking version bump commits from develop..."
+                    for COMMIT in $VERSION_COMMITS; do
+                      MSG=$(git log -1 --format="%s" "$COMMIT")
+                      echo "Cherry-picking: $MSG"
+                      if git cherry-pick "$COMMIT" -X theirs --no-edit; then
+                        echo "  Success"
+                      else
+                        git cherry-pick --abort 2>/dev/null || true
+                        echo "::warning::Failed to cherry-pick $MSG"
+                      fi
+                    done
+                  else
+                    echo "No version bump commits to cherry-pick."
+                  fi
+
                   git push origin "backport/$VERSION"
 
                   gh pr create \

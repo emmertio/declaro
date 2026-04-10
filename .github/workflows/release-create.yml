@@ -2,6 +2,22 @@ name: Create Release Branch
 
 on:
     workflow_dispatch:
+        inputs:
+            version_type:
+                description: 'Release type'
+                type: choice
+                options:
+                    - minor
+                    - patch
+                    - major
+                default: minor
+            target:
+                description: 'Source branch to create release from'
+                type: choice
+                options:
+                    - develop
+                    - main
+                default: develop
 
 jobs:
     create-release:
@@ -11,10 +27,10 @@ jobs:
             pull-requests: write
 
         steps:
-            - name: Checkout develop
+            - name: Checkout source branch
               uses: actions/checkout@v4
               with:
-                  ref: develop
+                  ref: ${{ inputs.target }}
                   fetch-depth: 0
                   token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,6 +56,7 @@ jobs:
                   git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
             - name: Bootstrap main branch
+              if: inputs.target == 'develop'
               run: |
                   if ! git ls-remote --heads origin main | grep -q main; then
                     echo "Main branch does not exist. Creating from develop..."
@@ -51,13 +68,16 @@ jobs:
             - name: Compute next release version
               id: version
               run: |
+                  VERSION_TYPE="${{ inputs.version_type }}"
+                  TARGET="${{ inputs.target }}"
+
                   # Read current version from lerna.json and strip prerelease suffix
                   CURRENT_VERSION=$(node -p "require('./lerna.json').version")
                   BASE_VERSION=$(echo "$CURRENT_VERSION" | sed 's/-.*//')
                   echo "Current version: $CURRENT_VERSION"
                   echo "Base version: $BASE_VERSION"
 
-                  # Collect all candidate versions
+                  # Collect all candidate versions for collision detection
                   VERSIONS=("$BASE_VERSION")
 
                   # Parse versions from existing release/* branches
@@ -82,10 +102,33 @@ jobs:
                   HIGHEST=$(printf '%s\n' "${VERSIONS[@]}" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
                   echo "Highest version found: $HIGHEST"
 
-                  # Increment minor version
-                  MAJOR=$(echo "$HIGHEST" | cut -d. -f1)
-                  MINOR=$(echo "$HIGHEST" | cut -d. -f2)
-                  NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
+                  # Use the target branch's base version for incrementing
+                  # For main (hotfixes): increment from main's version to avoid skipping ahead
+                  # For develop (standard releases): increment from the highest across all sources
+                  if [ "$TARGET" = "main" ]; then
+                    INCREMENT_BASE="$BASE_VERSION"
+                  else
+                    INCREMENT_BASE="$HIGHEST"
+                  fi
+
+                  MAJOR=$(echo "$INCREMENT_BASE" | cut -d. -f1)
+                  MINOR=$(echo "$INCREMENT_BASE" | cut -d. -f2)
+                  PATCH=$(echo "$INCREMENT_BASE" | cut -d. -f3)
+
+                  # Compute next version based on version type
+                  case "$VERSION_TYPE" in
+                    patch)
+                      NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+                      ;;
+                    minor)
+                      NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
+                      ;;
+                    major)
+                      NEXT_VERSION="$((MAJOR + 1)).0.0"
+                      ;;
+                  esac
+
+                  echo "Version type: $VERSION_TYPE"
                   echo "Next release version: $NEXT_VERSION"
 
                   # Validate that the release branch doesn't already exist
@@ -116,18 +159,64 @@ jobs:
             - name: Push release branch
               run: git push origin "release/${{ steps.version.outputs.version }}"
 
+            - name: Bump develop to next development version
+              if: inputs.target == 'develop'
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  MAJOR=$(echo "$VERSION" | cut -d. -f1)
+                  MINOR=$(echo "$VERSION" | cut -d. -f2)
+                  NEXT_DEV_VERSION="$MAJOR.$((MINOR + 1)).0-beta.0"
+                  echo "Bumping develop to $NEXT_DEV_VERSION"
+
+                  # Fetch latest develop (may have new commits from concurrent beta release)
+                  # then apply the version bump on top of whatever develop currently is
+                  MAX_RETRIES=4
+                  for i in $(seq 1 $MAX_RETRIES); do
+                    git fetch origin develop
+                    git checkout develop
+                    git reset --hard origin/develop
+
+                    bun lerna version "$NEXT_DEV_VERSION" --no-git-tag-version --no-push --yes --force-publish
+                    bun install
+                    git add -A
+                    git commit -m "v$NEXT_DEV_VERSION"
+
+                    if git push origin develop; then
+                      echo "Successfully pushed develop bump on attempt $i"
+                      break
+                    fi
+
+                    if [ "$i" -eq "$MAX_RETRIES" ]; then
+                      echo "::error::Failed to push develop bump after $MAX_RETRIES attempts"
+                      exit 1
+                    fi
+
+                    WAIT=$((2 ** i))
+                    echo "Push failed (attempt $i/$MAX_RETRIES). Retrying in ${WAIT}s..."
+                    sleep "$WAIT"
+                  done
+
             - name: Create pull request
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   VERSION="${{ steps.version.outputs.version }}"
+                  VERSION_TYPE="${{ inputs.version_type }}"
+                  TARGET="${{ inputs.target }}"
+
+                  if [ "$TARGET" = "main" ]; then
+                    DESCRIPTION="This is a **${VERSION_TYPE}** release created from \`main\` (hotfix)."
+                  else
+                    DESCRIPTION="This is a **${VERSION_TYPE}** release created from \`develop\`."
+                  fi
+
                   gh pr create \
                     --base main \
                     --head "release/$VERSION" \
                     --title "Release $VERSION" \
                     --body "## Release $VERSION
 
-                  This PR was automatically created by the release workflow.
+                  ${DESCRIPTION}
 
                   Merging this PR into \`main\` will:
                   - Publish all @declaro/* packages to npm with the \`latest\` dist-tag

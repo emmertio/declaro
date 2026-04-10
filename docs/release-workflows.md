@@ -9,7 +9,9 @@ develop ──push──> Beta Release (automatic)
    │                 publishes X.Y.Z-beta.N with `beta` dist-tag
    │
    │  workflow_dispatch
-   ├──────────────> release/X.Y.Z branch created
+   ├──────────────> release/X.Y.Z branch created (version set to X.Y.0)
+   │                 │
+   │  (develop bumped to X.(Y+1).0-beta.0)
    │                 │
    │                 │  PR merged
    │                 └──────────> main ──push──> Stable Release (automatic)
@@ -67,8 +69,9 @@ The beta number auto-increments on each push. All packages are published in lock
 2. It checks existing `release/*` branches and git tags to prevent version collisions
 3. A `release/X.Y.Z` branch is created from `develop`
 4. All package versions are updated to `X.Y.Z` (clean, no prerelease suffix) using `lerna version --force-publish` to keep all packages in lock-step
-5. A PR is opened from `release/X.Y.Z` into `main`
-6. A **draft** GitHub Release is created for `vX.Y.Z`
+5. **`develop` is bumped to the next minor beta** (e.g., if releasing `2.1.0`, develop becomes `2.2.0-beta.0`). This ensures develop is always one minor version ahead of the latest release. The push to develop triggers a beta release (`2.2.0-beta.1`).
+6. A PR is opened from `release/X.Y.Z` into `main`
+7. A **draft** GitHub Release is created for `vX.Y.Z`
 
 ### Version resolution logic
 
@@ -110,7 +113,8 @@ When the merge comes from a `release/*` branch:
 4. A git tag `vX.Y.Z` is created
 5. The draft GitHub Release is finalized and published
 6. A `backport/X.Y.Z` branch is created from `main`
-7. A PR is opened from `backport/X.Y.Z` into `develop`
+7. Version bump commits from `develop` are immediately cherry-picked onto the backport branch, so the PR carries develop's current beta version instead of main's stable version
+8. A PR is opened from `backport/X.Y.Z` into `develop`
 
 ### For other merges (patch releases)
 

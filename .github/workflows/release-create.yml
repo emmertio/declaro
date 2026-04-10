@@ -116,6 +116,21 @@ jobs:
             - name: Push release branch
               run: git push origin "release/${{ steps.version.outputs.version }}"
 
+            - name: Bump develop to next development version
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  MAJOR=$(echo "$VERSION" | cut -d. -f1)
+                  MINOR=$(echo "$VERSION" | cut -d. -f2)
+                  NEXT_DEV_VERSION="$MAJOR.$((MINOR + 1)).0-beta.0"
+                  echo "Bumping develop to $NEXT_DEV_VERSION"
+
+                  git checkout develop
+                  bun lerna version "$NEXT_DEV_VERSION" --no-git-tag-version --no-push --yes --force-publish
+                  bun install
+                  git add -A
+                  git commit -m "v$NEXT_DEV_VERSION"
+                  git push origin develop
+
             - name: Create pull request
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 {
     "name": "@declaro/data",
-    "version": "2.1.1",
+    "version": "2.1.2",
     "description": "A data-mapper framework for managing application data across integrated systems.",
     "main": "dist/node/index.cjs",
     "module": "dist/node/index.js",
@@ -22,9 +22,9 @@
         "@declaro/zod": "^2.0.0-beta.51"
     },
     "devDependencies": {
-        "@declaro/auth": "^2.1.1",
-        "@declaro/core": "^2.1.1",
-        "@declaro/zod": "^2.1.1",
+        "@declaro/auth": "^2.1.2",
+        "@declaro/core": "^2.1.2",
+        "@declaro/zod": "^2.1.2",
         "crypto-browserify": "^3.12.1",
         "typescript": "^5.8.3",
         "uuid": "^11.1.0",

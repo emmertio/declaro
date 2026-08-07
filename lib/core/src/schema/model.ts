@@ -4,6 +4,9 @@ import { SystemError, ValidationError } from '../errors/errors'
 import { getLabels, type ModelLabels } from './labels'
 import { stripPrivateValues } from '../shared/utils/schema-utils'
 
+/**
+ * Options controlling how a payload is validated.
+ */
 export interface ModelValidationOptions {
     /**
      * When false, validation issues are returned instead of thrown. Defaults to true.
@@ -20,6 +23,9 @@ export interface ModelValidationOptions {
     includePrivateFields?: boolean
 }
 
+/**
+ * Options controlling how a model's JSON Schema is generated.
+ */
 export interface ModelSchemaOptions {
     /**
      * When true, fields marked `private: true` are present in the generated JSON Schema.

@@ -74,10 +74,15 @@ export const MockUserSchema = ModelSchema.create('User')
         primaryKey: 'id',
     })
 
+/** A complete user record, including the fields that never reach a client. */
 export type MockUserDetail = InferDetail<typeof MockUserSchema>
+/** A user record as it appears in a list. */
 export type MockUserSummary = InferSummary<typeof MockUserSchema>
+/** The criteria used to find a single user. */
 export type MockUserLookup = InferLookup<typeof MockUserSchema>
+/** The criteria used to search for users. */
 export type MockUserFilters = InferFilters<typeof MockUserSchema>
+/** A writable user payload. */
 export type MockUserInput = InferInput<typeof MockUserSchema>
 
 /**

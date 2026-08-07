@@ -16,6 +16,14 @@ import type {
     InferSummary,
 } from '../shared/utils/schema-inference'
 
+/**
+ * Exposes a read only service over a permission checked boundary.
+ *
+ * The `serialize*` methods do not produce a string. They attach a `toJSON` implementation to the
+ * record, so that whatever eventually serializes it removes the fields marked `private: true`.
+ * Nothing is removed until that happens, which for an HTTP handler is the framework calling
+ * `JSON.stringify` on whatever the route returned.
+ */
 export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     constructor(
         protected readonly service: ReadOnlyModelService<TSchema>,
@@ -23,10 +31,10 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     ) {}
 
     /**
-     * The settings applied when this controller serializes a response.
+     * The settings attached to a response, controlling how it will serialize.
      *
-     * Override to change how responses serialize, for example to skip validation. Responses are
-     * stripped of their private fields by default.
+     * Override to change that behaviour, for example to skip validation. Private fields are
+     * removed by default.
      *
      * @returns The wrap settings for this controller.
      */
@@ -56,14 +64,28 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     }
 
     /**
-     * Serializes a detail record for the response.
+     * Prepares a detail record for the response.
      *
-     * The service already wraps the records it returns, so this re-applies the wrapping in case a
-     * custom service or normalize hook rebuilt the record and lost it. Override to add custom
-     * serialization on top of private field stripping.
+     * This does not serialize the record. It attaches a `toJSON` implementation, so the private
+     * fields are removed later, when the record is actually serialized:
      *
-     * @param value The record to serialize.
-     * @returns The serialized record.
+     * ```ts
+     * const user = await controller.load({ id: 1 })
+     *
+     * user.passwordHash                      // still readable here
+     * JSON.stringify(user)                   // '{"id":1,"name":"Ada"}'
+     * ```
+     *
+     * Most HTTP frameworks serialize the value a route returns, so a handler does not need to do
+     * anything further. A handler that reshapes the record by hand, or a transport that does not
+     * use `JSON.stringify`, will not get this treatment.
+     *
+     * The service already prepares the records it returns. This applies it again in case a custom
+     * service or normalize hook rebuilt the record and dropped it. Override to add custom
+     * behaviour on top of private field removal.
+     *
+     * @param value The record to prepare.
+     * @returns The record, ready to serialize.
      */
     protected async serializeDetail(value: InferDetail<TSchema>): Promise<InferDetail<TSchema>> {
         if (!value || !this.detailModel) {
@@ -74,18 +96,19 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     }
 
     /**
-     * Serializes a list of detail records for the response.
-     * @param values The records to serialize.
-     * @returns The serialized records.
+     * Prepares a list of detail records for the response.
+     * @param values The records to prepare.
+     * @returns The records, ready to serialize.
      */
     protected async serializeDetails(values: InferDetail<TSchema>[]): Promise<InferDetail<TSchema>[]> {
         return Promise.all((values ?? []).map((value) => this.serializeDetail(value)))
     }
 
     /**
-     * Serializes a summary record for the response.
-     * @param value The record to serialize.
-     * @returns The serialized record.
+     * Prepares a summary record for the response, using the summary model rather than the detail
+     * model. See `serializeDetail` for when the private fields are actually removed.
+     * @param value The record to prepare.
+     * @returns The record, ready to serialize.
      */
     protected async serializeSummary(value: InferSummary<TSchema>): Promise<InferSummary<TSchema>> {
         if (!value || !this.summaryModel) {
@@ -96,18 +119,18 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     }
 
     /**
-     * Serializes a list of summary records for the response.
-     * @param values The records to serialize.
-     * @returns The serialized records.
+     * Prepares a list of summary records for the response.
+     * @param values The records to prepare.
+     * @returns The records, ready to serialize.
      */
     protected async serializeSummaries(values: InferSummary<TSchema>[]): Promise<InferSummary<TSchema>[]> {
         return Promise.all((values ?? []).map((value) => this.serializeSummary(value)))
     }
 
     /**
-     * Serializes a page of search results, leaving the pagination untouched.
-     * @param results The search results to serialize.
-     * @returns The serialized search results.
+     * Prepares a page of search results, leaving the pagination untouched.
+     * @param results The search results to prepare.
+     * @returns The search results, ready to serialize.
      */
     protected async serializeSearchResults(results: InferSearchResults<TSchema>): Promise<InferSearchResults<TSchema>> {
         if (!results) {

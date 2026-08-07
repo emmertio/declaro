@@ -56,37 +56,34 @@ The beta number auto-increments on each push. All packages are published in lock
 **Workflow:** `release-create.yml`
 **Trigger:** Manual (`workflow_dispatch`)
 
-### Workflow Inputs
+### Workflow Input
 
-| Input | Options | Default | Description |
+A single dropdown with three options:
+
+| Option | Source branch | Version bump | Example |
 |---|---|---|---|
-| **Version type** | `minor`, `patch`, `major` | `minor` | How to increment the version |
-| **Target** | `develop`, `main` | `develop` | Branch to create the release from |
+| **Minor Release (from develop)** | `develop` | Increment minor | `2.1.0` -> `2.2.0` |
+| **Patch Release (from main)** | `main` | Increment patch | `2.1.0` -> `2.1.1` |
+| **Major Release (from develop)** | `main` | Increment major | `2.1.0` -> `3.0.0` |
+
+The source branch is automatically determined — no way to pick an invalid combination.
 
 ### Steps
 
 1. Go to the **Actions** tab in GitHub
 2. Select **"Create Release Branch"** from the left sidebar
 3. Click **"Run workflow"**
-4. Choose the **version type** and **target branch**
+4. Choose the **release type** from the dropdown
 5. Click **"Run workflow"**
-
-### Common scenarios
-
-| Scenario | Version type | Target | Example |
-|---|---|---|---|
-| Standard release | `minor` | `develop` | `2.1.0` -> `2.2.0` |
-| Hotfix | `patch` | `main` | `2.1.0` -> `2.1.1` |
-| Major release | `major` | `develop` | `2.1.0` -> `3.0.0` |
 
 ### What happens automatically
 
-1. The workflow reads the current version from `lerna.json` on the target branch
+1. The workflow reads the current version from `lerna.json` on the source branch
 2. It checks existing `release/*` branches and git tags to prevent version collisions
 3. The version is incremented based on the chosen type (patch/minor/major)
-4. A `release/X.Y.Z` branch is created from the target branch
+4. A `release/X.Y.Z` branch is created from the source branch
 5. All package versions are updated to `X.Y.Z` (clean, no prerelease suffix) using `lerna version --force-publish` to keep all packages in lock-step
-6. **If targeting `develop`:** develop is bumped to the next minor beta (e.g., if releasing `2.1.0`, develop becomes `2.2.0-beta.0`). This ensures develop is always one minor version ahead of the latest release. The push to develop triggers a beta release (`2.2.0-beta.1`).
+6. **For minor/major releases (from develop):** develop is bumped to the next minor beta (e.g., if releasing `2.2.0`, develop becomes `2.3.0-beta.0`). This ensures develop is always one minor version ahead of the latest release. The push to develop triggers a beta release.
 7. A PR is opened from `release/X.Y.Z` into `main`
 8. A **draft** GitHub Release is created for `vX.Y.Z`
 
@@ -94,11 +91,11 @@ The beta number auto-increments on each push. All packages are published in lock
 
 The next version is computed by:
 
-1. Reading the base version from `lerna.json` on the target branch (stripping any `-beta.N` suffix)
+1. Reading the base version from `lerna.json` on the source branch (stripping any `-beta.N` suffix)
 2. Scanning all existing `release/*` branches for their version numbers
 3. Scanning all git tags for published versions
-4. For `develop` target: using the highest version across all sources as the base for incrementing
-5. For `main` target: using main's own version as the base (to avoid skipping ahead past develop)
+4. For releases from `develop`: using the highest version across all sources as the base for incrementing
+5. For releases from `main`: using main's own version as the base (to avoid skipping ahead past develop)
 6. Applying the chosen increment type (patch/minor/major)
 
 This means:
@@ -183,18 +180,19 @@ After reviewing the backport PR:
 
 ## Hotfixes / Patch Releases
 
-To ship a hotfix to production using the release workflow:
+To ship a hotfix to production:
 
 1. Go to **Actions** -> **Create Release Branch**
-2. Set **Version type** to `patch` and **Target** to `main`
+2. Select **"Patch Release (from main)"**
 3. Click **"Run workflow"**
-4. This creates a `release/X.Y.Z` branch from `main` (e.g., `release/2.1.1`)
-5. Cherry-pick or commit the fix onto the release branch
-6. Review and merge the PR into `main`
+4. This creates a `release/X.Y.Z` branch from `main` (e.g., `release/2.1.1`) and opens a PR
+5. Create your fix on a `fix/*` branch and **PR it into `release/X.Y.Z`** (not into `main` directly)
+6. Review and merge the fix PR into the release branch
+7. Merge `release/X.Y.Z` into `main`
 
-The stable release workflow then publishes the patch and creates a backport PR to flow the fix back to `develop`. Develop is **not** bumped forward for patches from `main` since it's already ahead.
+The stable release workflow then publishes the patch and creates a backport PR to flow the fix back to `develop`. Develop is **not** bumped forward for patches since it's already ahead.
 
-**Alternative (quick hotfix):** Merge a fix branch directly into `main` without using the release workflow. The stable release workflow will auto-bump patch and publish. This skips the PR review step for the version bump.
+**Alternative (quick hotfix):** Merge a fix branch directly into `main` without using the release workflow. The stable release workflow will auto-bump patch and publish. This skips the controlled release branch flow, so use it only for emergencies.
 
 ---
 
@@ -203,7 +201,7 @@ The stable release workflow then publishes the patch and creates a backport PR t
 To create a major release:
 
 1. Go to **Actions** -> **Create Release Branch**
-2. Set **Version type** to `major` and **Target** to `develop`
+2. Select **"Major Release (from develop)"**
 3. Click **"Run workflow"**
 4. This creates a `release/X.0.0` branch (e.g., `release/3.0.0`)
 5. Develop is bumped to `X.1.0-beta.0` (e.g., `3.1.0-beta.0`)

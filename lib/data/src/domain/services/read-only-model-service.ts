@@ -132,7 +132,8 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
             await this.emitter.emitAsync(afterLoadEvent)
         }
 
-        return await this.normalizeDetail(details)
+        // Wrapping last means a normalize hook that spreads the record cannot undo it.
+        return this.wrapDetail(await this.normalizeDetail(details))
     }
 
     /**
@@ -165,7 +166,7 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
             await this.emitter.emitAsync(afterLoadManyEvent)
         }
 
-        return await Promise.all(details.map((detail) => this.normalizeDetail(detail)))
+        return this.wrapDetails(await Promise.all(details.map((detail) => this.normalizeDetail(detail))))
     }
 
     /**
@@ -204,7 +205,9 @@ export class ReadOnlyModelService<TSchema extends AnyModelSchema> extends BaseMo
         // Return the search results
         return {
             ...results,
-            results: await Promise.all(results.results.map((summary) => this.normalizeSummary(summary))),
+            results: this.wrapSummaries(
+                await Promise.all(results.results.map((summary) => this.normalizeSummary(summary))),
+            ),
         }
     }
 

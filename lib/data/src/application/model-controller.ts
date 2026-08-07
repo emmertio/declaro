@@ -13,6 +13,38 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
         super(service, authValidator)
     }
 
+    /**
+     * Validates and sanitizes a payload arriving from outside the service.
+     *
+     * Fields marked `private: true` on the input model are removed, so a client cannot write to a
+     * field the service owns, such as a computed value. Values are also coerced to the types the
+     * model declares.
+     *
+     * Override to add custom input handling.
+     *
+     * @param input The payload to parse.
+     * @returns The parsed payload.
+     * @throws ValidationError When the payload does not satisfy the input model.
+     */
+    protected async parseInput(input: InferInput<TSchema>): Promise<InferInput<TSchema>> {
+        if (!input || !this.inputModel) {
+            return input
+        }
+
+        const result = await this.inputModel.validate(input)
+
+        return 'value' in result ? (result.value as InferInput<TSchema>) : input
+    }
+
+    /**
+     * Validates and sanitizes a list of payloads arriving from outside the service.
+     * @param inputs The payloads to parse.
+     * @returns The parsed payloads.
+     */
+    protected async parseInputs(inputs: InferInput<TSchema>[]): Promise<InferInput<TSchema>[]> {
+        return Promise.all((inputs ?? []).map((input) => this.parseInput(input)))
+    }
+
     async createPermissions(input: InferInput<TSchema>, options?: ICreateOptions): Promise<PermissionValidator> {
         return PermissionValidator.create().someOf([
             this.service.getDescriptor('create', '*').toString(),
@@ -23,7 +55,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
         const permissions = await this.createPermissions(input, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.create(input, options)
+
+        return this.serializeDetail(await this.service.create(await this.parseInput(input), options))
     }
 
     async updatePermissions(
@@ -44,7 +77,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     ): Promise<InferDetail<TSchema>> {
         const permissions = await this.updatePermissions(lookup, input, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.update(lookup, input, options)
+
+        return this.serializeDetail(await this.service.update(lookup, await this.parseInput(input), options))
     }
 
     async removePermissions(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<PermissionValidator> {
@@ -57,7 +91,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async remove(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         const permissions = await this.removePermissions(lookup, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.remove(lookup, options)
+
+        return this.serializeSummary(await this.service.remove(lookup, options))
     }
 
     async restorePermissions(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<PermissionValidator> {
@@ -70,7 +105,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async restore(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         const permissions = await this.restorePermissions(lookup, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.restore(lookup, options)
+
+        return this.serializeSummary(await this.service.restore(lookup, options))
     }
 
     async upsertPermissions(
@@ -98,7 +134,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
         const permissions = await this.upsertPermissions(input, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.upsert(input, options)
+
+        return this.serializeDetail(await this.service.upsert(await this.parseInput(input), options))
     }
 
     async bulkUpsertPermissions(
@@ -129,7 +166,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     ): Promise<InferDetail<TSchema>[]> {
         const permissions = await this.bulkUpsertPermissions(inputs, options)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.bulkUpsert(inputs, options)
+
+        return this.serializeDetails(await this.service.bulkUpsert(await this.parseInputs(inputs), options))
     }
 
     async permanentlyDeleteFromTrashPermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
@@ -149,7 +187,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
         const permissions = await this.permanentlyDeleteFromTrashPermissions(lookup)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.permanentlyDeleteFromTrash(lookup)
+
+        return this.serializeSummary(await this.service.permanentlyDeleteFromTrash(lookup))
     }
 
     async permanentlyDeletePermissions(lookup: InferLookup<TSchema>): Promise<PermissionValidator> {
@@ -165,7 +204,8 @@ export class ModelController<TSchema extends AnyModelSchema> extends ReadOnlyMod
     async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
         const permissions = await this.permanentlyDeletePermissions(lookup)
         this.authValidator.validatePermissions((v) => v.extend(permissions))
-        return this.service.permanentlyDelete(lookup)
+
+        return this.serializeSummary(await this.service.permanentlyDelete(lookup))
     }
 
     async emptyTrashPermissions(filters?: InferFilters<TSchema>): Promise<PermissionValidator> {

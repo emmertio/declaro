@@ -69,10 +69,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         const inputJsonSchema = inputModel.toJSONSchema()
         const inputFields = Object.keys(inputJsonSchema.properties ?? {})
 
-        // Pick only fields that exist in the input model
+        // Pick only fields that exist in the input model.
+        // Own properties only: a detail loaded from a service is wrapped for serialization, and
+        // `in` would also match the methods that wrapping adds.
         const picked: Record<string, unknown> = {}
         for (const field of inputFields) {
-            if (field in detail) {
+            if (Object.prototype.hasOwnProperty.call(detail, field)) {
                 picked[field] = detail[field]
             }
         }
@@ -184,7 +186,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterRemoveEvent)
 
         // Return the results of the removal
-        return await this.normalizeSummary(result)
+        return this.wrapSummary(await this.normalizeSummary(result))
     }
 
     /**
@@ -222,7 +224,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterRestoreEvent)
 
         // Return the results of the restore operation
-        return await this.normalizeSummary(result)
+        return this.wrapSummary(await this.normalizeSummary(result))
     }
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
@@ -261,7 +263,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         }
 
         // Return the results of the creation
-        return await this.normalizeDetail(result)
+        return this.wrapDetail(await this.normalizeDetail(result))
     }
 
     async update(
@@ -307,7 +309,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         }
 
         // Return the results of the update
-        return await this.normalizeDetail(result)
+        return this.wrapDetail(await this.normalizeDetail(result))
     }
 
     /**
@@ -378,7 +380,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         }
 
         // Return the results of the upsert operation
-        return await this.normalizeDetail(result)
+        return this.wrapDetail(await this.normalizeDetail(result))
     }
 
     /**
@@ -516,7 +518,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         }
 
         // Return normalized results
-        return await Promise.all(results.map((result) => this.normalizeDetail(result)))
+        return this.wrapDetails(await Promise.all(results.map((result) => this.normalizeDetail(result))))
     }
 
     /**
@@ -572,7 +574,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterPermanentlyDeleteFromTrashEvent)
 
         // Return the results of the permanent deletion
-        return await this.normalizeSummary(result)
+        return this.wrapSummary(await this.normalizeSummary(result))
     }
 
     /**
@@ -601,6 +603,6 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         await this.emitter.emitAsync(afterPermanentlyDeleteEvent)
 
         // Return the results of the permanent deletion
-        return await this.normalizeSummary(result)
+        return this.wrapSummary(await this.normalizeSummary(result))
     }
 }

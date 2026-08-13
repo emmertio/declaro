@@ -23,14 +23,19 @@ function asResponse<T>(value: T): any {
 
 /**
  * A service that owns the `slug` field, which is why the input model marks it private.
- * Clients cannot set it, and the service derives it on every write.
+ * Clients cannot set it, and the service derives it whenever a write carries a name. A fragment
+ * that does not change the name does not change the slug either.
  */
 class MockUserService extends ModelService<typeof MockUserSchema> {
     protected async normalizeInput(
-        input: MockUserInput,
+        input: Partial<MockUserInput>,
         args: INormalizeInputArgs<typeof MockUserSchema>,
-    ): Promise<MockUserInput> {
+    ): Promise<Partial<MockUserInput>> {
         const normalized = await super.normalizeInput(input, args)
+
+        if (normalized.name === undefined) {
+            return normalized
+        }
 
         return {
             ...normalized,

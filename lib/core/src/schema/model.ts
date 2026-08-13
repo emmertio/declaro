@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { JSONSchema } from './json-schema'
 import { SystemError, ValidationError } from '../errors/errors'
 import { getLabels, type ModelLabels } from './labels'
-import { stripPrivateValues } from '../shared/utils/schema-utils'
+import { stripToSchema } from '../shared/utils/schema-utils'
 
 /**
  * Options controlling how a payload is validated.
@@ -19,6 +19,19 @@ export interface ModelValidationOptions {
      * Private fields are removed by default so that a client cannot write to a field the service
      * owns, such as a computed value. Set this from the service layer when it legitimately needs
      * to set those fields.
+     */
+    includePrivateFields?: boolean
+}
+
+/**
+ * Options controlling which fields a model removes from a payload.
+ */
+export interface StripExcludedFieldsOptions {
+    /**
+     * When true, fields marked `private: true` are kept. Defaults to false.
+     *
+     * Fields the model does not declare are removed either way, because a field the model never
+     * described is not a field a trusted consumer asked for.
      */
     includePrivateFields?: boolean
 }
@@ -96,17 +109,28 @@ export abstract class Model<
     }
 
     /**
-     * Removes every field marked `private: true` from a payload, including fields nested in
-     * objects and arrays.
+     * Reduces a payload to the fields this model describes, removing both the fields marked
+     * `private: true` and the fields the model does not declare at all. Fields nested in objects
+     * and arrays are stripped too.
+     *
+     * This is the part of validation a boundary always needs, without the parts it does not:
+     * nothing is coerced, nothing is thrown, and it runs synchronously. A payload a service
+     * legitimately built is therefore safe to send without being validated first.
      *
      * The input is not modified. When nothing needs to be removed the original value is returned
      * by reference.
      *
      * @param value The payload to strip.
-     * @returns The payload without its private fields.
+     * @param options Options controlling whether private fields are kept.
+     * @returns The payload, reduced to the fields this model describes.
      */
-    stripExcludedFields(value: StandardSchemaV1.InferInput<TSchema>): StandardSchemaV1.InferInput<TSchema> {
-        return stripPrivateValues(value, this.getInternalJSONSchema(true))
+    stripExcludedFields(
+        value: StandardSchemaV1.InferInput<TSchema>,
+        options?: StripExcludedFieldsOptions,
+    ): StandardSchemaV1.InferInput<TSchema> {
+        return stripToSchema(value, this.getInternalJSONSchema(true), {
+            includePrivateFields: options?.includePrivateFields === true,
+        })
     }
 
     /**
@@ -151,7 +175,7 @@ export abstract class Model<
         value: StandardSchemaV1.InferInput<TSchema>,
         options?: ModelValidationOptions,
     ): StandardSchemaV1.InferInput<TSchema> {
-        return options?.includePrivateFields === true ? value : this.stripExcludedFields(value)
+        return this.stripExcludedFields(value, { includePrivateFields: options?.includePrivateFields === true })
     }
 
     /**
@@ -215,7 +239,7 @@ export abstract class Model<
         if (result instanceof Promise) {
             throw new SystemError(
                 `Model "${this.name}" requires asynchronous validation and cannot be validated synchronously. ` +
-                    `Serialize it with { validate: false } to skip validation.`,
+                    `Drop { validate: true } to serialize it without validating, or await validate() instead.`,
             )
         }
 

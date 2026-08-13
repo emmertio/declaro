@@ -17,16 +17,28 @@ const WRAP_META = Symbol('declaro.wrapMeta')
  */
 export interface WrapModelOptions {
     /**
-     * Whether the payload is validated when it is serialized. Defaults to true.
+     * Whether a payload the model rejects fails to serialize. Defaults to false.
      *
-     * Validation also coerces values, so a validated payload serializes in its canonical form.
-     * Set false to skip both on hot paths, or for models that validate asynchronously.
+     * Serializing always does two things regardless of this setting. The payload is run through
+     * the model, so its defaults, coercions and transforms decide the form a client sees, and it
+     * is reduced to the fields the model describes, so no private field and no undeclared field
+     * goes out.
+     *
+     * What this setting controls is the model's constraints. Left false, a payload the model
+     * rejects is serialized as it stands: it is built by the service that owns the model rather
+     * than sent by a client, so trimming it beats failing the response. Set it true to assert that
+     * a payload really does satisfy its model, and to get a `ValidationError` when it does not.
+     *
+     * Models that validate asynchronously cannot be run by `toJSON`, which cannot await. Their
+     * payloads are stripped but never normalized, and setting this true throws a `SystemError`.
      */
     validate?: boolean
 
     /**
      * Whether fields marked `private: true` are included in the serialized output.
      * Defaults to false. Set true for trusted consumers such as an internal cache or queue.
+     *
+     * Fields the model does not declare are removed either way.
      */
     includePrivateFields?: boolean
 }
@@ -79,6 +91,48 @@ function getOptionsKey(options: Required<WrapModelOptions>): string {
 }
 
 /**
+ * Runs a payload through its model, keeping whatever the model makes of it.
+ *
+ * A model is more than a set of constraints: defaults, coercions and transforms are normalizers
+ * that decide what a field's canonical form is. Running them on the way out means a client sees
+ * that form rather than whatever the service happened to be holding.
+ *
+ * Constraints are the part that does not apply here. A payload the model rejects is passed through
+ * as it stands, because it was built by the service that owns the model rather than sent by a
+ * client, and a response nobody can serialize helps nobody. Models that validate asynchronously
+ * cannot be run at all, since `toJSON` cannot await, so their payloads pass through too.
+ *
+ * @param model The model describing the payload.
+ * @param raw The payload to normalize.
+ * @returns The normalized payload, or the original when the model could not produce one.
+ */
+function washPayload(model: IAnyModel, raw: unknown): unknown {
+    try {
+        // Private fields are kept, because the model owns them and stripping them first would fail
+        // any model that requires them. They are removed afterwards.
+        const result = model.validateSync(raw, { strict: false, includePrivateFields: true })
+
+        return 'value' in result ? result.value : raw
+    } catch {
+        return raw
+    }
+}
+
+/**
+ * Runs a payload through its model, rejecting one the model does not accept.
+ * @param model The model describing the payload.
+ * @param raw The payload to validate.
+ * @returns The validated payload.
+ * @throws ValidationError When the payload does not satisfy the model.
+ * @throws SystemError When the model requires asynchronous validation.
+ */
+function validatePayload(model: IAnyModel, raw: unknown): unknown {
+    const result = model.validateSync(raw, { includePrivateFields: true })
+
+    return 'value' in result ? result.value : raw
+}
+
+/**
  * Builds the prototype shared by every value wrapped with the same model and settings.
  * @param model The model describing the wrapped values.
  * @param options The resolved options.
@@ -97,15 +151,11 @@ function createWrapperPrototype(
             // Unwrapping first gives a plain object, so the serialized result can never carry the
             // wrapper's own toJSON back into JSON.stringify.
             const raw = unwrapModel(this)
+            const source = options.validate ? validatePayload(model, raw) : washPayload(model, raw)
 
-            if (!options.validate) {
-                return options.includePrivateFields ? raw : model.stripExcludedFields(raw)
-            }
-
-            const result = model.validateSync(raw, { includePrivateFields: true })
-            const validated = 'value' in result ? result.value : raw
-
-            return options.includePrivateFields ? validated : model.stripExcludedFields(validated)
+            // Stripping happens whether or not the payload satisfied its model. It is what keeps a
+            // private field, or a field the model never declared, from reaching a client.
+            return model.stripExcludedFields(source, { includePrivateFields: options.includePrivateFields })
         },
 
         getModel(): IAnyModel {
@@ -189,6 +239,12 @@ export function getWrapOptions(value: unknown): Required<WrapModelOptions> | und
 /**
  * Wraps a value so that serializing it applies its model's rules.
  *
+ * Serializing runs the value through its model, so the model's defaults, coercions and transforms
+ * decide the form a client sees, and reduces it to the fields the model describes, so fields
+ * marked `private: true` and fields the model does not declare are removed. The model's
+ * constraints are not enforced unless asked, so a payload the model would reject is quietly
+ * trimmed rather than failing to serialize.
+ *
  * Wrapping only configures serialization, it does not perform it, so it is cheap enough to apply
  * at every layer that returns a payload. Re-wrapping replaces the previous settings rather than
  * nesting.
@@ -206,7 +262,7 @@ export function wrapModel<T>(model: IAnyModel, value: T, options?: WrapModelOpti
     }
 
     const resolved: Required<WrapModelOptions> = {
-        validate: options?.validate ?? true,
+        validate: options?.validate ?? false,
         includePrivateFields: options?.includePrivateFields ?? false,
     }
 

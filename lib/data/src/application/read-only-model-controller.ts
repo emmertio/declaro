@@ -20,9 +20,10 @@ import type {
  * Exposes a read only service over a permission checked boundary.
  *
  * The `serialize*` methods do not produce a string. They attach a `toJSON` implementation to the
- * record, so that whatever eventually serializes it removes the fields marked `private: true`.
- * Nothing is removed until that happens, which for an HTTP handler is the framework calling
- * `JSON.stringify` on whatever the route returned.
+ * record, so that whatever eventually serializes it reduces the record to the fields its model
+ * describes: fields marked `private: true` are removed, and so are fields the model does not
+ * declare. Nothing is removed until that happens, which for an HTTP handler is the framework
+ * calling `JSON.stringify` on whatever the route returned.
  */
 export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     constructor(
@@ -33,8 +34,13 @@ export class ReadOnlyModelController<TSchema extends AnyModelSchema> {
     /**
      * The settings attached to a response, controlling how it will serialize.
      *
-     * Override to change that behaviour, for example to skip validation. Private fields are
-     * removed by default.
+     * A response is reduced to the fields its model describes: private fields go, and so do fields
+     * the model does not declare. It is not validated, because a response is built by the service
+     * rather than sent by a client, so a mismatch is better trimmed than turned into a failed
+     * request.
+     *
+     * Override to change that, for example `{ validate: true }` to assert that every response
+     * satisfies its model.
      *
      * @returns The wrap settings for this controller.
      */

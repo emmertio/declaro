@@ -132,20 +132,80 @@ function collectApplicableSchemas(schema: JSONSchema, root?: JSONSchema): JSONSc
 interface ISchemaFields {
     privateKeys: Set<string>
     propertySchemas: Map<string, JSONSchema>
+    /**
+     * Every name the schema lists under `properties`, including those whose definition is a
+     * boolean and so carries no shape of its own.
+     */
+    namedKeys: Set<string>
+    /**
+     * Patterns matching property names the schema describes, with the shape each one follows.
+     */
+    patternSchemas: { pattern: RegExp; schema: JSONSchema | undefined }[]
+    /**
+     * The schema every unnamed property follows, when the schema allows them with a shape.
+     */
+    additionalSchema: JSONSchema | undefined
+    /**
+     * Whether a property the schema does not describe is removed rather than kept.
+     */
+    isClosed: boolean
 }
 
 /**
- * Reads the private field names and per-field schemas from every applicable schema branch.
+ * Compiles a `patternProperties` key, ignoring patterns a JavaScript engine cannot parse.
+ * @param pattern The regular expression source from the schema.
+ * @returns The compiled expression, or undefined if it is not valid.
+ */
+function compilePattern(pattern: string): RegExp | undefined {
+    try {
+        return new RegExp(pattern, 'u')
+    } catch {
+        return undefined
+    }
+}
+
+/**
+ * Reads the private field names and per-field schemas from every applicable schema branch, along
+ * with whether the schema closes the object to properties it does not describe.
+ *
+ * A schema is closed when it describes its fields and no applicable branch allows extras. A branch
+ * that allows extras therefore opens the whole union, so a payload is never stripped on the
+ * strength of a branch it does not match.
+ *
  * @param schema The schema to read.
  * @param root The schema references are relative to.
- * @returns The private field names and the schema for each field.
+ * @returns The private field names, the schema for each field, and whether extras are removed.
  */
 function readSchemaFields(schema: JSONSchema, root?: JSONSchema): ISchemaFields {
     const privateKeys = new Set<string>()
     const propertySchemas = new Map<string, JSONSchema>()
+    const namedKeys = new Set<string>()
+    const patternSchemas: { pattern: RegExp; schema: JSONSchema | undefined }[] = []
+
+    let additionalSchema: JSONSchema | undefined = undefined
+    let describesFields = false
+    let allowsAdditional = false
+    let forbidsAdditional = false
 
     for (const applicable of collectApplicableSchemas(schema, root)) {
+        if (applicable.properties || applicable.patternProperties) {
+            describesFields = true
+        }
+
+        if (applicable.additionalProperties === false) {
+            forbidsAdditional = true
+        } else if (applicable.additionalProperties !== undefined) {
+            allowsAdditional = true
+            additionalSchema ??= asSchemaObject(applicable.additionalProperties)
+        }
+
         for (const [key, definition] of Object.entries(applicable.properties ?? {})) {
+            // A property listed as `false` describes a field the schema forbids, so it is not one
+            // of the names a payload may keep.
+            if (definition !== false) {
+                namedKeys.add(key)
+            }
+
             const property = asSchemaObject(definition)
             if (!property) {
                 continue
@@ -159,9 +219,56 @@ function readSchemaFields(schema: JSONSchema, root?: JSONSchema): ISchemaFields 
                 propertySchemas.set(key, property)
             }
         }
+
+        for (const [source, definition] of Object.entries(applicable.patternProperties ?? {})) {
+            const pattern = definition === false ? undefined : compilePattern(source)
+            if (pattern) {
+                patternSchemas.push({ pattern, schema: asSchemaObject(definition) })
+            }
+        }
     }
 
-    return { privateKeys, propertySchemas }
+    return {
+        privateKeys,
+        propertySchemas,
+        namedKeys,
+        patternSchemas,
+        additionalSchema,
+        isClosed: !allowsAdditional && (describesFields || forbidsAdditional),
+    }
+}
+
+/**
+ * Finds the schema describing a property the schema does not list under `properties`.
+ * @param key The property name.
+ * @param fields The fields read from the schema.
+ * @returns Whether the schema describes the property, and the shape it follows if it has one.
+ */
+function readUnnamedField(key: string, fields: ISchemaFields): { isDescribed: boolean; schema?: JSONSchema } {
+    for (const { pattern, schema } of fields.patternSchemas) {
+        if (pattern.test(key)) {
+            return { isDescribed: true, schema }
+        }
+    }
+
+    return { isDescribed: !fields.isClosed, schema: fields.additionalSchema }
+}
+
+/**
+ * Determines whether a value's own keys can be treated as schema described fields.
+ *
+ * Values with their own prototype, such as a `Buffer` or a database driver's id type, are opaque:
+ * their keys are implementation detail rather than fields, and rebuilding them as plain objects
+ * would destroy them. They are walked for private fields, as they always have been, but never
+ * stripped down to a schema.
+ *
+ * @param value The value to inspect.
+ * @returns True for plain objects.
+ */
+function isPlainObject(value: object): boolean {
+    const prototype = Object.getPrototypeOf(value)
+
+    return prototype === Object.prototype || prototype === null
 }
 
 /**
@@ -183,12 +290,80 @@ function readItemSchema(schema: JSONSchema, root?: JSONSchema): JSONSchema | und
 }
 
 /**
- * Recursively removes values whose schema marks them `private: true`.
+ * Options controlling which fields are removed from a payload.
+ */
+export interface StripToSchemaOptions {
+    /**
+     * When true, fields marked `private: true` are kept. Defaults to false.
+     */
+    includePrivateFields?: boolean
+
+    /**
+     * When false, fields the schema does not describe are kept. Defaults to true.
+     */
+    stripUnknownFields?: boolean
+
+    /**
+     * The schema `$ref` pointers resolve against. Defaults to the schema being applied.
+     */
+    root?: JSONSchema
+}
+
+/**
+ * The resolved settings a single walk of a payload runs with.
+ */
+interface IStripSettings {
+    includePrivateFields: boolean
+    stripUnknownFields: boolean
+}
+
+/**
+ * Recursively reduces a payload to the fields its schema describes, removing both the fields
+ * marked `private: true` and the fields the schema does not describe at all.
  *
- * The input is never modified. Objects and arrays containing a private field are rebuilt, and
- * anything left untouched is returned by reference so unaffected payloads are not copied.
+ * This is what makes a payload safe to send without validating it first. Validation strips unknown
+ * fields as a side effect of parsing, but it also throws on a payload a service legitimately built,
+ * and it cannot run where serialization cannot await. Stripping is the part a boundary always
+ * needs, so it is available on its own.
+ *
+ * A field is removed when the schema names none of the objects it could be. An object schema that
+ * describes its properties and does not set `additionalProperties` is treated as closed, so a model
+ * whose generator omits the keyword still strips. Set `additionalProperties` to `true` or to a
+ * schema, as `z.looseObject` does, for a payload that carries fields the model does not name.
+ *
+ * The input is never modified. Objects and arrays that lose a field are rebuilt, and anything left
+ * untouched is returned by reference so unaffected payloads are not copied.
  *
  * Nested objects, array items, `$ref` pointers and union branches are all walked.
+ *
+ * @param value The payload to strip.
+ * @param schema The schema describing the payload. Must include private fields, so obtain it with
+ * `toJSONSchema({ includePrivateFields: true })`.
+ * @param options Settings controlling which fields are removed.
+ * @returns The payload, reduced to the fields its schema describes.
+ */
+export function stripToSchema<T>(value: T, schema?: JSONSchema, options?: StripToSchemaOptions): T {
+    if (!schema) {
+        return value
+    }
+
+    const settings: IStripSettings = {
+        includePrivateFields: options?.includePrivateFields ?? false,
+        stripUnknownFields: options?.stripUnknownFields ?? true,
+    }
+
+    if (!settings.stripUnknownFields && settings.includePrivateFields) {
+        return value
+    }
+
+    return stripValue(value, schema, options?.root ?? schema, 0, settings)
+}
+
+/**
+ * Recursively removes values whose schema marks them `private: true`, leaving fields the schema
+ * does not describe in place.
+ *
+ * Use `stripToSchema` to reduce a payload to the fields its schema describes.
  *
  * @param value The payload to strip.
  * @param schema The schema describing the payload. Must include private fields, so obtain it with
@@ -197,11 +372,7 @@ function readItemSchema(schema: JSONSchema, root?: JSONSchema): JSONSchema | und
  * @returns The payload without its private fields.
  */
 export function stripPrivateValues<T>(value: T, schema?: JSONSchema, root?: JSONSchema): T {
-    if (!schema) {
-        return value
-    }
-
-    return stripValue(value, schema, root ?? schema, 0)
+    return stripToSchema(value, schema, { stripUnknownFields: false, root })
 }
 
 /**
@@ -210,9 +381,10 @@ export function stripPrivateValues<T>(value: T, schema?: JSONSchema, root?: JSON
  * @param schema The schema describing the value.
  * @param root The schema references resolve against.
  * @param depth The current recursion depth.
+ * @param settings The settings controlling which fields are removed.
  * @returns The stripped value, or the original if nothing changed.
  */
-function stripValue<T>(value: T, schema: JSONSchema, root: JSONSchema, depth: number): T {
+function stripValue<T>(value: T, schema: JSONSchema, root: JSONSchema, depth: number, settings: IStripSettings): T {
     if (value === null || typeof value !== 'object' || depth >= MAX_SCHEMA_DEPTH) {
         return value
     }
@@ -230,7 +402,7 @@ function stripValue<T>(value: T, schema: JSONSchema, root: JSONSchema, depth: nu
 
         let hasChanges = false
         const items = value.map((item) => {
-            const stripped = stripValue(item, itemSchema, root, depth + 1)
+            const stripped = stripValue(item, itemSchema, root, depth + 1, settings)
             hasChanges ||= stripped !== item
             return stripped
         })
@@ -238,19 +410,32 @@ function stripValue<T>(value: T, schema: JSONSchema, root: JSONSchema, depth: nu
         return (hasChanges ? items : value) as T
     }
 
-    const { privateKeys, propertySchemas } = readSchemaFields(schema, root)
+    const fields = readSchemaFields(schema, root)
+    const isStrippingUnknown = settings.stripUnknownFields && fields.isClosed && isPlainObject(value)
 
     let hasChanges = false
     const result: Record<string, unknown> = {}
 
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-        if (privateKeys.has(key)) {
+        if (!settings.includePrivateFields && fields.privateKeys.has(key)) {
             hasChanges = true
             continue
         }
 
-        const propertySchema = propertySchemas.get(key)
-        const stripped = propertySchema ? stripValue(child, propertySchema, root, depth + 1) : child
+        let propertySchema = fields.propertySchemas.get(key)
+
+        if (!fields.namedKeys.has(key)) {
+            const unnamed = readUnnamedField(key, fields)
+
+            if (isStrippingUnknown && !unnamed.isDescribed) {
+                hasChanges = true
+                continue
+            }
+
+            propertySchema = unnamed.schema
+        }
+
+        const stripped = propertySchema ? stripValue(child, propertySchema, root, depth + 1, settings) : child
 
         hasChanges ||= stripped !== child
         result[key] = stripped

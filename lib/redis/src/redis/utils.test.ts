@@ -30,6 +30,11 @@ const userModel = new StaticSchemaModel('User', buildUserSchema())
 
 const buildUser = () => ({ id: 'u1', passwordHash: 'hashed-secret' })
 
+/**
+ * A record carrying a column no model declares, as a repository selecting whole rows produces.
+ */
+const buildUserRow = () => ({ ...buildUser(), tenantId: 'tenant-42' })
+
 describe('serialize', () => {
     it('should keep private fields so storage holds the complete record', () => {
         const wrapped = wrapModel(userModel, buildUser())
@@ -50,10 +55,22 @@ describe('serialize', () => {
         expect(unserialize<Record<string, unknown>>(serialize({ id: 'u1' }))).toEqual({ id: 'u1' })
     })
 
+    it('should keep fields no model declares so storage holds the complete row', () => {
+        const wrapped = wrapModel(userModel, buildUserRow())
+
+        expect(unserialize<Record<string, unknown>>(serialize(wrapped))).toEqual(buildUserRow())
+    })
+
     it('should leave private fields hidden when a payload is sent over a transport', () => {
         const wrapped = wrapModel(userModel, buildUser())
 
         // publish and enqueue call JSON.stringify directly, which is what strips private fields.
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1' })
+    })
+
+    it('should leave fields no model declares out of a payload sent over a transport', () => {
+        const wrapped = wrapModel(userModel, buildUserRow())
+
         expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1' })
     })
 })

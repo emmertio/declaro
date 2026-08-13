@@ -29,12 +29,37 @@ export interface JSONMeta {
  * allowed everywhere it can appear, not only on a top level property.
  */
 export interface JSONSchema
-    extends Omit<JSONSchema7, 'properties' | 'items' | 'anyOf' | 'oneOf' | 'allOf' | 'definitions'>, JSONMeta {
+    extends Omit<
+            JSONSchema7,
+            | 'properties'
+            | 'patternProperties'
+            | 'additionalProperties'
+            | 'items'
+            | 'anyOf'
+            | 'oneOf'
+            | 'allOf'
+            | 'definitions'
+        >,
+        JSONMeta {
     properties?:
         | {
               [key: string]: JSONSchemaDefinition
           }
         | undefined
+    /**
+     * Schemas for properties whose names match a regular expression.
+     */
+    patternProperties?:
+        | {
+              [key: string]: JSONSchemaDefinition
+          }
+        | undefined
+    /**
+     * Whether properties the schema does not name are allowed, and the schema they follow.
+     *
+     * `false` closes the object, so a payload crossing a boundary keeps only the named properties.
+     */
+    additionalProperties?: JSONSchemaDefinition | undefined
     items?: JSONSchemaDefinition | JSONSchemaDefinition[] | undefined
     anyOf?: JSONSchemaDefinition[] | undefined
     oneOf?: JSONSchemaDefinition[] | undefined

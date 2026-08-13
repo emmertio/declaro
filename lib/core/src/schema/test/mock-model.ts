@@ -10,7 +10,9 @@ export class MockModel<TName extends Readonly<string>, TSchema extends $ZodType<
     }
 
     toJSONSchema(options?: ModelSchemaOptions): JSONSchema {
-        const jsonSchema = z.toJSONSchema(this.schema)
+        // Matching ZodModel, so a schema carrying a transform describes the fields around it
+        // rather than refusing to be described at all.
+        const jsonSchema = z.toJSONSchema(this.schema, { unrepresentable: 'any' })
         if (options?.includePrivateFields !== true) {
             stripPrivateFieldsFromSchema(jsonSchema as JSONSchema)
         }

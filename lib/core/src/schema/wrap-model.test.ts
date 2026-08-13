@@ -22,6 +22,29 @@ const userModel = new MockModel(
 
 const buildUser = () => ({ id: 'u1', name: 'Ada', passwordHash: 'hashed-secret' })
 
+/**
+ * A model whose schema normalizes as well as constrains: it trims, fills in a default, and
+ * coerces.
+ */
+const normalizingModel = new MockModel(
+    'Normalized',
+    z.object({
+        name: z.string().transform((value) => value.trim()),
+        role: z.string().default('member'),
+        id: z.coerce.string(),
+    }),
+)
+
+/**
+ * Builds a model whose schema can only be validated asynchronously.
+ * @returns The model.
+ */
+const buildAsyncModel = () =>
+    new MockModel(
+        'AsyncUser',
+        z.object({ id: z.string() }).refine(async () => true),
+    )
+
 describe('wrapModel', () => {
     it('should strip private fields when serialized', () => {
         const wrapped = wrapModel(userModel, buildUser())
@@ -62,26 +85,113 @@ describe('wrapModel', () => {
         expect(isWrapped(original)).toBe(false)
     })
 
-    it('should validate on serialization by default', () => {
+    it('should not enforce the model constraints by default', () => {
         const wrapped = wrapModel(userModel, { id: 42, name: 'Ada' } as any)
-
-        expect(() => JSON.stringify(wrapped)).toThrow()
-    })
-
-    it('should skip validation when asked to', () => {
-        const wrapped = wrapModel(userModel, { id: 42, name: 'Ada' } as any, { validate: false })
 
         expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 42, name: 'Ada' })
     })
 
-    it('should throw a clear error when the model requires asynchronous validation', () => {
-        const asyncModel = new MockModel(
-            'AsyncUser',
-            z.object({ id: z.string() }).refine(async () => true),
-        )
-        const wrapped = wrapModel(asyncModel, { id: 'u1' })
+    it('should enforce the model constraints when asked to', () => {
+        const wrapped = wrapModel(userModel, { id: 42, name: 'Ada' } as any, { validate: true })
+
+        expect(() => JSON.stringify(wrapped)).toThrow()
+    })
+
+    it('should apply the model normalizers by default', () => {
+        const wrapped = wrapModel(normalizingModel, { name: '  Ada  ', id: 42 } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ name: 'Ada', role: 'member', id: '42' })
+    })
+
+    it('should apply the model normalizers when validating', () => {
+        const wrapped = wrapModel(normalizingModel, { name: '  Ada  ', id: 42 } as any, { validate: true })
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ name: 'Ada', role: 'member', id: '42' })
+    })
+
+    it('should apply the model normalizers to a trusted consumer payload', () => {
+        const wrapped = wrapModel(normalizingModel, { name: '  Ada  ', id: 42 } as any, {
+            includePrivateFields: true,
+        })
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ name: 'Ada', role: 'member', id: '42' })
+    })
+
+    it('should leave a payload the model rejects unnormalized rather than failing', () => {
+        // `name` is missing, so the model cannot produce a normalized payload for this record.
+        const wrapped = wrapModel(normalizingModel, { id: 42, injected: 'junk' } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 42 })
+    })
+
+    it('should serialize a model that validates asynchronously', () => {
+        const wrapped = wrapModel(buildAsyncModel(), { id: 'u1', injected: 'junk' } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1' })
+    })
+
+    it('should throw a clear error when a validating wrapper needs asynchronous validation', () => {
+        const wrapped = wrapModel(buildAsyncModel(), { id: 'u1' }, { validate: true })
 
         expect(() => JSON.stringify(wrapped)).toThrow(/asynchronous validation/)
+    })
+
+    it('should strip fields the model does not declare', () => {
+        const wrapped = wrapModel(userModel, { ...buildUser(), injected: 'junk' } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1', name: 'Ada' })
+    })
+
+    it('should strip fields the model does not declare when validating', () => {
+        const wrapped = wrapModel(userModel, { ...buildUser(), injected: 'junk' } as any, { validate: true })
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1', name: 'Ada' })
+    })
+
+    it('should strip fields the model does not declare even for a trusted consumer', () => {
+        const wrapped = wrapModel(userModel, { ...buildUser(), injected: 'junk' } as any, {
+            includePrivateFields: true,
+        })
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({
+            id: 'u1',
+            name: 'Ada',
+            passwordHash: 'hashed-secret',
+        })
+    })
+
+    it('should strip fields the model does not declare from nested objects and arrays', () => {
+        const teamModel = new MockModel(
+            'Team',
+            z.object({
+                owner: z.object({ name: z.string() }),
+                members: z.array(z.object({ name: z.string() })),
+            }),
+        )
+
+        const wrapped = wrapModel(teamModel, {
+            owner: { name: 'Ada', injected: 'junk' },
+            members: [{ name: 'Grace', injected: 'junk' }],
+        } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({
+            owner: { name: 'Ada' },
+            members: [{ name: 'Grace' }],
+        })
+    })
+
+    it('should still expose fields the model does not declare when properties are read directly', () => {
+        const wrapped = wrapModel(userModel, { ...buildUser(), injected: 'junk' } as any)
+
+        expect((wrapped as any).injected).toBe('junk')
+    })
+
+    it('should keep fields the model allows without declaring', () => {
+        const looseModel = new MockModel('Loose', z.looseObject({ id: z.string() }))
+
+        const wrapped = wrapModel(looseModel, { id: 'u1', extra: 'kept' } as any)
+
+        expect(JSON.parse(JSON.stringify(wrapped))).toEqual({ id: 'u1', extra: 'kept' })
     })
 
     it('should replace rather than nest when a wrapped value is wrapped again', () => {
@@ -90,6 +200,21 @@ describe('wrapModel', () => {
 
         expect(getWrapOptions(twice)?.includePrivateFields).toBe(true)
         expect(JSON.parse(JSON.stringify(twice)).passwordHash).toBe('hashed-secret')
+    })
+
+    it('should default to stripping without validating', () => {
+        expect(getWrapOptions(wrapModel(userModel, buildUser()))).toEqual({
+            validate: false,
+            includePrivateFields: false,
+        })
+    })
+
+    it('should keep a separate prototype for each set of options', () => {
+        const stripping = wrapModel(userModel, buildUser())
+        const validating = wrapModel(userModel, buildUser(), { validate: true })
+
+        expect(Object.getPrototypeOf(stripping)).not.toBe(Object.getPrototypeOf(validating))
+        expect(getWrapOptions(validating)?.validate).toBe(true)
     })
 
     it('should expose the model it was wrapped with', () => {

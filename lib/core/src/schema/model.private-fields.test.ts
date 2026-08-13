@@ -36,6 +36,60 @@ describe('Model.stripExcludedFields', () => {
         })
     })
 
+    it('should remove fields the model does not declare', () => {
+        const stripped = userModel.stripExcludedFields({ id: 'u1', name: 'Ada', injected: 'junk' } as any)
+
+        expect(stripped).toEqual({ id: 'u1', name: 'Ada' })
+    })
+
+    it('should remove fields the model does not declare from nested objects and arrays', () => {
+        const todoModel = new MockModel(
+            'Todo',
+            z.object({
+                title: z.string(),
+                owner: userModel.schema,
+                watchers: z.array(userModel.schema),
+            }),
+        )
+
+        const stripped = todoModel.stripExcludedFields({
+            title: 'Ship it',
+            injected: 'junk',
+            owner: { id: 'u1', name: 'Ada', injected: 'junk' },
+            watchers: [{ id: 'u2', name: 'Grace', injected: 'junk' }],
+        } as any)
+
+        expect(stripped).toEqual({
+            title: 'Ship it',
+            owner: { id: 'u1', name: 'Ada' },
+            watchers: [{ id: 'u2', name: 'Grace' }],
+        })
+    })
+
+    it('should keep private fields when asked, and still remove the fields it does not declare', () => {
+        const stripped = userModel.stripExcludedFields(
+            { id: 'u1', name: 'Ada', passwordHash: 'shh', injected: 'junk' } as any,
+            { includePrivateFields: true },
+        )
+
+        expect(stripped).toEqual({ id: 'u1', name: 'Ada', passwordHash: 'shh' })
+    })
+
+    it('should keep fields a model declares itself open to', () => {
+        const looseModel = new MockModel('Loose', z.looseObject({ id: z.string() }))
+
+        expect(looseModel.stripExcludedFields({ id: 'u1', extra: 'kept' } as any)).toEqual({
+            id: 'u1',
+            extra: 'kept',
+        })
+    })
+
+    it('should not throw for a payload that does not satisfy the model', () => {
+        const stripped: Record<string, unknown> = userModel.stripExcludedFields({ id: 42 } as any)
+
+        expect(stripped).toEqual({ id: 42 })
+    })
+
     it('should not modify the value it is given', () => {
         const original = { id: 'u1', name: 'Ada', passwordHash: 'shh' }
 
@@ -72,6 +126,14 @@ describe('Model.validate', () => {
         expect((result as { value: Record<string, unknown> }).value.passwordHash).toBe('set-by-service')
     })
 
+    it('should strip fields the model does not declare before validating', async () => {
+        const result = await userModel.validate({ id: 'u1', name: 'Ada', injected: 'junk' } as any, {
+            includePrivateFields: true,
+        })
+
+        expect((result as { value: Record<string, unknown> }).value).toEqual({ id: 'u1', name: 'Ada' })
+    })
+
     it('should throw a validation error naming the field that failed', async () => {
         await expect(userModel.validate({ id: 42, name: 'Ada' } as any)).rejects.toThrow(ValidationError)
     })
@@ -86,6 +148,14 @@ describe('Model.validate', () => {
 describe('Model.validateSync', () => {
     it('should validate without awaiting', () => {
         const result = userModel.validateSync({ id: 'u1', name: 'Ada' })
+
+        expect((result as { value: Record<string, unknown> }).value).toEqual({ id: 'u1', name: 'Ada' })
+    })
+
+    it('should strip fields the model does not declare before validating', () => {
+        const result = userModel.validateSync({ id: 'u1', name: 'Ada', injected: 'junk' } as any, {
+            includePrivateFields: true,
+        })
 
         expect((result as { value: Record<string, unknown> }).value).toEqual({ id: 'u1', name: 'Ada' })
     })

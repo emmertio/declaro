@@ -57,8 +57,13 @@ export class BaseModelService<TSchema extends AnyModelSchema> {
     /**
      * The settings applied when this service wraps the records it returns.
      *
-     * Override to change how a service's records serialize, for example to skip validation on a
-     * hot path. Records are stripped of their private fields by default.
+     * A record is reduced to the fields its model describes when it serializes: private fields go,
+     * and so do fields the model does not declare. It is not validated, because a record a service
+     * built is not a payload to be rejected, and a failure here surfaces as a broken response
+     * rather than as a helpful error.
+     *
+     * Override to change that, for example `{ validate: true }` to assert that this service's
+     * records really do satisfy their model.
      *
      * @returns The wrap settings for this service.
      */

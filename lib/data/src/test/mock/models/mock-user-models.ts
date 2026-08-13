@@ -74,6 +74,54 @@ export const MockUserSchema = ModelSchema.create('User')
         primaryKey: 'id',
     })
 
+/**
+ * A schema whose models normalize as well as constrain, so tests can prove that a response is run
+ * through the model rather than sent as the service happened to be holding it.
+ *
+ * - `name` is trimmed by a transform.
+ * - `role` falls back to a default.
+ * - `id` is coerced to a number.
+ */
+export const MockNormalizedUserSchema = ModelSchema.create('NormalizedUser')
+    .read({
+        detail: (h) =>
+            new ZodModel(
+                h.name,
+                z.object({
+                    id: z.coerce.number(),
+                    name: z.string().transform((value) => value.trim()),
+                    role: z.string().default('member'),
+                }),
+            ),
+        lookup: (h) => new ZodModel(h.name, z.object({ id: z.coerce.number() })),
+    })
+    .search({
+        filters: (h) => new ZodModel(h.name, z.object({ text: z.string().optional() })),
+        summary: (h) =>
+            new ZodModel(
+                h.name,
+                z.object({
+                    id: z.coerce.number(),
+                    name: z.string().transform((value) => value.trim()),
+                }),
+            ),
+        sort: (h) => new ZodModel(h.name, sortArray(['name'])),
+    })
+    .write({
+        input: (h) =>
+            new ZodModel(
+                h.name,
+                z.object({
+                    id: z.coerce.number().optional(),
+                    name: z.string(),
+                    role: z.string().optional(),
+                }),
+            ),
+    })
+    .entity({
+        primaryKey: 'id',
+    })
+
 /** A complete user record, including the fields that never reach a client. */
 export type MockUserDetail = InferDetail<typeof MockUserSchema>
 /** A user record as it appears in a list. */

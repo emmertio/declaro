@@ -131,8 +131,13 @@ And if it is not valid, it **stores `undefined` and returns normally**
 
 The failure surfaces much later and somewhere else: `getPrimaryKeyValue` returns
 `undefined` (`base-model-service.ts:47-49`), so `upsert` decides every record is
-a create, and `bulkUpsert` never loads existing rows. Nothing throws; you just
-get duplicates.
+a create, and `bulkUpsert` never loads existing rows.
+
+How that lands depends on the repository. `MockMemoryRepository` refuses to
+construct without a primary key (`mock-memory-repository.ts:31-33`), so tests
+fail loudly. A repository without that guard does not: verified, two
+`upsert({ id: 1, … })` calls write two rows. So the schema is silent either way,
+and whether you find out depends on a check the repository chose to make.
 
 Two things follow, and both are load-bearing:
 

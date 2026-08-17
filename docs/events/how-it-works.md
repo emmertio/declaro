@@ -135,7 +135,7 @@ return [...new Set([...eventListeners, ...globalListeners])]
 
 `'*'` is a genuine catch-all — it is how `forwardTo` bridges two managers
 (`:30-36`) and how `RedisEventAdapter` mirrors every event onto a Redis channel
-(`lib/redis/src/redis/redis-event-adapter.ts:9`). It is also the fastest way to
+(`lib/redis/src/redis/redis-event-adapter.ts:10`). It is also the fastest way to
 find out what an operation actually emits.
 
 The `Set` is not free. Two behaviours fall out of it, and both are verified:

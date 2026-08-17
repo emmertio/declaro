@@ -281,7 +281,7 @@ shutdown logic on it. `onStart` also returns `undefined` rather than `this`
 - **`Context.on` is a different bus** from a service's `EventManager`.
 - **`App.destroy()` emits `declaro:start`** (`app.ts:41`).
 - **`provide`, `inject` and `ContextConsumer` are `@deprecated`**
-  (`context.ts:323`, `:824`, `context-consumer.ts:5`). `singleton()` is built on
+  (`context.ts:323`, `:824`, `context-consumer.ts:4`). `singleton()` is built on
   the deprecated pair (`context.ts:854-862`).
 - **`useRequestMiddleware` is deprecated** in favour of
   `context.scope.requestMiddleware` (`http/request-context.ts:8`).

@@ -29,12 +29,12 @@ const UserDetail = new ZodModel(h.name, z.object({
 ```
 
 `privateField` (`lib/zod/src/fields.ts:15-19`) attaches `{ private: true }`
-metadata and forces the field optional. It must be optional: stripping runs
+metadata and forces the field optional. It must be optional: reduction runs
 *before* validation, so a required private field could never satisfy its own
 model.
 
 **Mark it on every model that carries it.** Read and input models are separate
-and are stripped against their own schemas:
+and are reduced against their own schemas:
 
 | Mark it on | Effect |
 |---|---|
@@ -47,20 +47,53 @@ detail model still lets a client write it.
 
 ---
 
-## Step 2 — nothing else, on the normal path
+## Step 2 — declare every field you want to keep
 
-Once the field is marked, the pipeline handles it:
+Serializing reduces a record to the fields its model **describes**, not merely to
+the non-private ones (`lib/core/src/shared/utils/schema-utils.ts:345`). An
+undeclared field does not survive.
+
+```typescript
+// Model declares id and title only
+const record = { id: 1, title: 'Dune', computedLabel: 'Dune (1965)' }
+
+JSON.stringify(wrapModel(BookDetail, record))
+// '{"id":1,"title":"Dune"}'  — computedLabel is gone
+```
+
+Two ways to keep it:
+
+```typescript
+// Preferred — declare it
+z.object({ id: z.number(), title: z.string(), computedLabel: z.string().optional() })
+
+// Or open the model
+z.looseObject({ id: z.number(), title: z.string() })
+```
+
+`z.object` emits no `additionalProperties`, and a schema that describes its
+properties without that keyword is treated as **closed**. `z.looseObject` sets
+it, and the extras survive.
+
+This is the most common surprise when a `normalize` hook enriches a record: the
+enrichment vanishes at the boundary unless the model names it.
+
+---
+
+## Step 3 — nothing else, on the normal path
+
+Once the fields are declared and marked, the pipeline handles it:
 
 ```
-service.load()      → wrapDetail()      (base-model-service.ts:87-89)
-controller.load()   → serializeDetail() (read-only-model-controller.ts:90-96)
-route returns it    → framework JSON.stringify → field removed
+service.load()      → wrapDetail()      (base-model-service.ts:92)
+controller.load()   → serializeDetail() (read-only-model-controller.ts:96)
+route returns it    → framework JSON.stringify → record reduced
 ```
 
 Same for writes, in reverse: `parseInput` (`model-controller.ts:29-37`) validates
-the payload through the input model, which strips first.
+the payload through the input model, which reduces first.
 
-**Verify by stringifying, not by inspecting**:
+**Verify by stringifying, not by inspecting:**
 
 ```typescript
 const user = await controller.load({ id: 1 })
@@ -69,58 +102,75 @@ user.passwordHash                     // still there — this is correct
 JSON.parse(JSON.stringify(user))      // no passwordHash — assert this
 ```
 
-A test that asserts `expect(user.passwordHash).toBeUndefined()` fails on
-correctly-wrapped output. Assert the serialized form.
+A test asserting `expect(user.passwordHash).toBeUndefined()` fails on correctly
+wrapped output. Assert the serialized form.
 
 ---
 
-## Step 3 (optional) — change how a layer serializes
+## Step 4 (optional) — change how a layer serializes
 
 Both the service and the controller expose an overridable `wrapOptions`:
 
 ```typescript
 export class BookService extends ModelService<typeof BookSchema> {
     protected get wrapOptions(): WrapModelOptions {
-        return { validate: false }      // skip validation + coercion on a hot path
+        return { validate: true }   // assert our records satisfy their model
     }
 }
 ```
 
-`WrapModelOptions` (`lib/core/src/schema/wrap-model.ts:18-32`):
+`WrapModelOptions` (`lib/core/src/schema/wrap-model.ts:18-43`):
 
-| Option | Default | Effect |
+| Option | Default | Controls |
 |---|---|---|
-| `validate` | `true` | validate **and coerce** at serialization time |
-| `includePrivateFields` | `false` | keep private fields in the output |
+| `validate` | **`false`** | whether a payload the model *rejects* throws |
+| `includePrivateFields` | `false` | whether private fields stay in the output |
+
+**`validate` does not control whether the model runs.** Defaults, coercions and
+transforms are applied either way, and the record is reduced to its declared
+fields either way. `validate: true` only turns a rejecting payload from
+"serialize it as it stands" into a `ValidationError`.
 
 Override points:
 
-- `BaseModelService.wrapOptions` (`base-model-service.ts:65-67`) — everything the
+- `BaseModelService.wrapOptions` (`base-model-service.ts:70-72`) — everything the
   service returns
-- `ReadOnlyModelController.wrapOptions` (`read-only-model-controller.ts:41-43`) —
+- `ReadOnlyModelController.wrapOptions` (`read-only-model-controller.ts:47-49`) —
   everything the controller returns
 
-**Turn `validate` off when:**
+**Set `validate: true` when** you want a broken record to fail loudly in a test
+or a staging environment rather than go out trimmed.
 
-- the model validates asynchronously — otherwise `toJSON` throws `SystemError`
-- the path is hot and the records are already canonical
+**Leave it `false` when** the records are service-built — which is the default
+reasoning: a failure here is a broken response, not a helpful error.
 
-Turning it off also skips coercion, so values serialize exactly as stored.
+**`includePrivateFields: true` on a client-facing controller sends private fields
+to clients.** It is for trusted consumers — an internal cache, a queue — not for
+HTTP.
 
-**`includePrivateFields: true` on a controller sends private fields to clients.**
-It exists for trusted consumers — an internal cache, a queue — not for HTTP.
+### Async models
+
+A model with an async `refine` cannot be run by `toJSON`, which cannot await:
+
+| Setting | Result |
+|---|---|
+| `validate: false` (default) | payload is **stripped but not normalized** — defaults and coercions silently skipped |
+| `validate: true` | `SystemError` thrown at `JSON.stringify` time |
+
+Neither is good. Keep serialized models synchronous; do async checks in the
+service.
 
 ---
 
-## Step 4 — getting the full record for a trusted consumer
+## Step 5 — getting the full record for a trusted consumer
 
-Anything that calls `JSON.stringify` on a wrapped record gets the stripped form.
-That includes a Redis `SET`, a queue push, and a `fetch` body. Two ways out:
+Anything calling `JSON.stringify` on a wrapped record gets the reduced form —
+including a Redis `SET`, a queue push, and a `fetch` body. Two ways out:
 
 ```typescript
 import { unwrapDeep, rewrapDeep, unwrapModel } from '@declaro/core'
 
-// plain objects, nested values included — nothing will strip
+// plain objects, nested values included — nothing will reduce
 await redis.set(key, JSON.stringify(unwrapDeep(record)))
 
 // keep each value's model, change the settings
@@ -130,12 +180,14 @@ const forQueue = rewrapDeep(record, { includePrivateFields: true })
 const plain = unwrapModel(record)
 ```
 
-`unwrapDeep` and `rewrapDeep` (`wrap-model.ts:303`, `:317`) walk nested objects
-and arrays, applying each value's **own** model. `unwrapModel` is one level and
-one value.
+`unwrapDeep` and `rewrapDeep` (`wrap-model.ts:359`, `:373`) walk nested objects
+and arrays, applying each value's **own** model.
 
-Inspection helpers, when you need to know what you are holding
-(`wrap-model.ts:167-187`, `:45-65`):
+Note that `rewrapDeep(..., { includePrivateFields: true })` restores private
+fields but **not** undeclared ones — those were never on the model. Use
+`unwrapDeep` when the payload must survive intact.
+
+Inspection helpers:
 
 ```typescript
 isWrapped(value)            // boolean
@@ -147,41 +199,45 @@ record.introspect()         // its JSON Schema, honouring includePrivateFields
 
 ---
 
-## Step 5 — wrapping something the framework did not
+## Step 6 — wrapping something the framework did not
 
 ```typescript
 import { wrapModel } from '@declaro/core'
 
-const wrapped = wrapModel(BookSchema.definition.detail, plainRecord, { validate: false })
+const wrapped = wrapModel(BookSchema.definition.detail, plainRecord)
 ```
 
 Use this when a custom endpoint returns a record the service did not produce.
-Re-wrapping is safe — `wrapModel` unwraps its input first (`wrap-model.ts:217`),
-so settings are replaced rather than nested.
-
-It is a no-op for primitives, `null` and `Date` (`wrap-model.ts:204-206`).
+Re-wrapping is safe — `wrapModel` unwraps its input first, so settings are
+replaced rather than nested. It is a no-op for primitives, `null` and `Date`
+(`wrap-model.ts:259-262`).
 
 ---
 
 ## Writing normalize hooks that do not break it
 
 The service wraps **last**, after `normalizeDetail`
-(`read-only-model-service.ts:135-136`). A hook that rebuilds the record is
-therefore fine — it runs before wrapping.
+(`read-only-model-service.ts:135-136`), so a hook that rebuilds the record is
+fine — it runs before wrapping.
 
-The hazard is anything that rebuilds a record **after** it was wrapped:
+Two hazards remain:
 
 ```typescript
-// ✗ drops the prototype — private fields will serialize
+// ✗ drops the prototype — the record will serialize unreduced
 return { ...wrappedRecord, extra: 'x' }
 
 // ✓ re-wrap after reshaping
 return wrapModel(this.schema.definition.detail, { ...unwrapModel(wrappedRecord), extra: 'x' })
 ```
 
-The controller's second `serializeDetail` is the safety net for exactly this
-case (`read-only-model-controller.ts:83-85`) — but it only covers the controller
-path.
+```typescript
+// ✗ `extra` is not on the model — it will not serialize at all
+return { ...record, extra: computeExtra(record) }
+// ✓ declare `extra` on the detail model first
+```
+
+The controller's second `serializeDetail` is the safety net for the first case
+only, and only on the controller path.
 
 ---
 
@@ -198,6 +254,11 @@ it('still exposes them to the service layer', async () => {
     expect(record.passwordHash).toBeDefined()
 })
 
+it('does not serialize undeclared fields', async () => {
+    const wrapped = wrapModel(BookDetail, { id: 1, title: 'Dune', stray: 'x' })
+    expect(JSON.parse(JSON.stringify(wrapped))).not.toHaveProperty('stray')
+})
+
 it('does not accept a private field from a client', async () => {
     const created = await controller.create({ email: 'a@b.c', passwordHash: 'injected' } as any)
     expect(created.passwordHash).not.toBe('injected')
@@ -208,47 +269,51 @@ it('omits private fields from the published schema', () => {
 })
 ```
 
-The first two together are the pair that matters — one alone passes on a broken
-implementation.
+The first two together are the pair that matters — either alone passes on a
+broken implementation.
 
 ---
 
 ## Checklist
 
 - [ ] `privateField` applied on **both** the read model and the input model
+- [ ] Every field that must reach a client is **declared on the model**
+- [ ] `z.looseObject` used deliberately if extras must survive
 - [ ] Tests assert the **serialized** form, not property presence
-- [ ] A test asserting the service layer still sees the field
-- [ ] `{ validate: false }` set if any model validates asynchronously
+- [ ] A test asserting the service layer still sees the private field
+- [ ] Serialized models are synchronous — no async `refine`
 - [ ] `unwrapDeep` before persisting or queueing a payload that must stay whole
 - [ ] Custom endpoints wrap records the service did not produce
 - [ ] `includePrivateFields: true` never set on a client-facing controller
-- [ ] Nested models carry their own marks — stripping walks each value's own
-      schema
 
 ---
 
 ## Gotchas
 
-- **Nothing is stripped until `JSON.stringify` runs.** `wrapModel` and
+- **Nothing is reduced until `JSON.stringify` runs.** `wrapModel` and
   `serialize*` only attach `toJSON`.
 - **Reading the property directly still works** — by design, not a bug.
-- **A direct service call does not strip input.** Only `ModelController.parseInput`
-  does.
-- **An async schema throws `SystemError` at `JSON.stringify` time.** The fix is in
-  the message: `{ validate: false }`.
+- **Undeclared fields are dropped.** `z.object` is closed; use `z.looseObject` or
+  declare the field.
+- **`validate` defaults to `false` and does not gate the model run** — it only
+  decides whether a rejecting payload throws.
+- **An async model skips normalization silently** by default, or throws
+  `SystemError` at `JSON.stringify` time with `validate: true`.
 - **Spreading a wrapped record drops the wrapper.** Re-wrap.
+- **`rewrapDeep` restores private fields, not undeclared ones.**
+- **A direct service call does not reduce input.** Only
+  `ModelController.parseInput` does.
 - **`hiddenField` still sends the value** (`lib/zod/src/fields.ts:30-34`).
 - **A missing `detail`/`summary`/`input` model turns protection off silently**
-  (`base-model-service.ts:75-77`, `model-controller.ts:30-32`).
+  (`base-model-service.ts:80-82`, `model-controller.ts:30-32`).
 - **`toJSONSchema()` builds a fresh copy every call** — memoisation is internal
-  and `protected` (`lib/core/src/schema/model.ts:86-96`). Do not call it per
+  and `protected` (`lib/core/src/schema/model.ts:99-108`). Do not call it per
   record.
-- **Redis, queues and non-JSON transports get the stripped form** unless you
-  `unwrapDeep` first.
 
 ## See also
 
-- [`how-it-works.md`](./how-it-works.md) — why stripping is deferred to `toJSON`
+- [`how-it-works.md`](./how-it-works.md) — why reduction is deferred to `toJSON`,
+  and what `validate` really controls
 - [`docs/schema/wiring-up.md`](../schema/wiring-up.md) — declaring the models
   these marks live on
 - [`docs/data/how-it-works.md`](../data/how-it-works.md) — where wrapping sits in

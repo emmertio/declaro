@@ -89,7 +89,7 @@ detail: (h) => new ZodModel(h.name, …)   // → "BookDetail"
 `ModelSchema.create('Book')` produces `BookDetail`, `BookLookup`, `BookSummary`,
 `BookFilters`, `BookSort`, `BookInput` (verified). Hand-writing a name breaks the
 validation messages, which look the name up to say *which field* failed
-(`lib/core/src/schema/model.ts:117-142`).
+(`lib/core/src/schema/model.ts:141-166`).
 
 ### `sort` needs the zod helpers
 

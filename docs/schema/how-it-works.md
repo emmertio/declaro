@@ -24,7 +24,7 @@ source of "why won't this type-check".
 
 | Object | What it is | Where |
 |---|---|---|
-| `Model` | **One shape**, plus validation and JSON Schema for it | `lib/core/src/schema/model.ts:47` |
+| `Model` | **One shape**, plus validation and JSON Schema for it | `lib/core/src/schema/model.ts:60` |
 | `ModelSchema` | **A named set** of those shapes, keyed by role | `lib/core/src/schema/model-schema.ts:73` |
 
 A `Model` is a single validated shape — `BookDetail`, `BookInput`. A
@@ -35,8 +35,8 @@ against the individual `Model`s inside it.
 ## Why `Model` is abstract, and zod is not in core
 
 `Model` is an abstract class implementing `StandardSchemaV1`
-(`model.ts:47-50`). Its constructor rejects anything that does not carry a
-version-1 `~standard` property (`model.ts:69-71`). Validation always goes through
+(`model.ts:60-63`). Its constructor rejects anything that does not carry a
+version-1 `~standard` property (`model.ts:82-84`). Validation always goes through
 that property:
 
 ```typescript
@@ -99,7 +99,7 @@ than a bare model. The builder owns the name so that a schema called `Book`
 always produces a model called `BookDetail`, no matter who wrote the factory.
 Those names are not decorative: `Model.formatIssues` uses the JSON Schema `title`
 and the field label to turn a raw zod issue into `Validation failed for field
-"Title": …` (`model.ts:117-142`).
+"Title": …` (`model.ts:141-166`).
 
 `.custom()` is the escape hatch, and it does **not** apply the naming convention
 — it hands every slot the schema's own helper (`model-schema.ts:103-107`), so
@@ -176,7 +176,8 @@ metadata's `primaryKey`. When `.entity()` silently failed, this is a lookup into
 
 ## Private fields are a schema concern
 
-A field marked private is removed whenever a payload crosses a boundary. The mark
+A field marked private is removed whenever a payload crosses a boundary — and so,
+at the serialization boundary, is any field the model does not declare. The mark
 itself is one line of zod metadata (`lib/zod/src/fields.ts:15-19`):
 
 ```typescript
@@ -186,46 +187,57 @@ export function privateField<TField extends ZodType>(field: TField) {
 ```
 
 It is forced optional on purpose: the field is stripped *before* validation runs
-(`model.ts:150-155`), so a required private field could never satisfy its own
+(`model.ts:174-179`), so a required private field could never satisfy its own
 model.
 
 From there the mark travels through JSON Schema, not through zod, which is what
 keeps the mechanism generic. `ZodModel.toJSONSchema` emits it and then strips it
 unless asked not to (`zod-model.ts:29-31`), and `Model` keeps two memoised copies
-— one with private fields, one without (`model.ts:66`, `:86-96`) — because
+— one with private fields, one without (`model.ts:79`, `:99-108`) — because
 building a JSON Schema is the expensive part and it would otherwise be repeated
 per record on every response.
 
-`stripPrivateValues` (`shared/utils/schema-utils.ts:199`) walks the payload
-against that schema. Two of its properties matter downstream:
+The walk itself is `stripToSchema` (`shared/utils/schema-utils.ts:345`), and its
+contract is broader than the private mark alone: it **reduces a payload to the
+fields its schema describes**, dropping private fields *and* fields the schema
+never declared. `stripPrivateValues` (`schema-utils.ts:374`) is the narrower
+wrapper that keeps undeclared fields.
 
+Three of its properties matter downstream:
+
+- **Object schemas are closed by default.** A schema that describes its
+  properties without setting `additionalProperties` drops anything else
+  (`schema-utils.ts:195`). `z.object` is closed; `z.looseObject` is not. A field
+  a `normalize` hook adds but the model does not declare will not serialize.
 - **Unions fail closed.** A field marked private in *any* `anyOf`/`oneOf`/`allOf`
-  branch is treated as private (`schema-utils.ts:92-127`, `:154`). A branch that
+  branch is treated as private (`schema-utils.ts:92-127`, `:214`). A branch that
   forgets the mark cannot leak the field.
-- **Nothing is copied unless something changed.** Objects and arrays with no
-  private fields are returned by reference (`schema-utils.ts:238`, `:259`), so
-  the common case costs a walk and no allocation.
+- **Nothing is copied unless something changed.** Objects and arrays that lose no
+  field are returned by reference (`schema-utils.ts:410`, `:444`), so the common
+  case costs a walk and no allocation.
 
-How the stripped payload actually reaches a client is the serialization layer's
+How the reduced payload actually reaches a client is the serialization layer's
 job — see [`docs/serialization/`](../serialization/how-it-works.md).
 
 ## What a validation call actually does
 
-`Model.validate` is three steps, in this order (`model.ts:188-195`):
+`Model.validate` is three steps, in this order (`model.ts:212-218`):
 
-1. **Strip private fields** unless `includePrivateFields: true`.
+1. **Reduce to the fields the model declares**, dropping private ones unless
+   `includePrivateFields: true`.
 2. **Validate** through `~standard`.
 3. **Throw or return** — `ValidationError` by default, issues if
    `strict: false`.
 
 Step 1 before step 2 is the reason a client cannot write to a private field: the
-value is gone before the schema ever sees it. It is also why `strict: false`
+value is gone before the schema ever sees it. It is also why an unexpected field
+in a payload is silently dropped rather than rejected. It is also why `strict: false`
 exists — the `~standard` implementation must *return* issues rather than throw,
 because the spec says so, so it calls itself with `{ strict: false }`
-(`model.ts:243`).
+(`model.ts:267`).
 
 `validateSync` is the same path without the await, and it throws `SystemError` if
-the underlying schema is asynchronous (`model.ts:215-220`). It exists solely
+the underlying schema is asynchronous (`model.ts:230`). It exists solely
 because `toJSON` cannot await — see the serialization docs.
 
 ## Where everything lives

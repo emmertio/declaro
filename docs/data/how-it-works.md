@@ -205,7 +205,7 @@ The permission strings are built from the same descriptor the events use, but
 with `'*'` as the scope — `global::book.create:*`
 (`base-model-service.ts:35-42`). Most operations accept a specific permission
 **or** a coarse one: `load` accepts `load` or `read`; `create` accepts `create`
-or `write` (`read-only-model-controller.ts:146-151`,
+or `write` (`read-only-model-controller.ts:152-157`,
 `model-controller.ts:48-53`). `upsert` is the exception: it requires
 (`create` **and** `update`) **or** `write` (`model-controller.ts:112-126`).
 
@@ -222,7 +222,7 @@ Two absences in the controller are deliberate to notice:
   `ModelController` does not expose it, so it has no permission gate. Exposing it
   over HTTP means writing the method and its `*Permissions` pair yourself.
 - **`serialize*` does not serialize.** The class doc comment is explicit
-  (`read-only-model-controller.ts:19-26`): it attaches a `toJSON` and nothing is
+  (`read-only-model-controller.ts:22`): it attaches a `toJSON` and nothing is
   removed until something calls `JSON.stringify`. See
   [`docs/serialization/`](../serialization/how-it-works.md).
 

@@ -26,7 +26,7 @@ All paths are relative to the repository root. Assumes the schema already exists
 | The repository implements all 13 `IRepository` methods | runtime `TypeError` on the first call to a missing one |
 
 Note the failure mode of the three schema rows: `wrapDetail` and `parseInput`
-both no-op when the model is absent (`base-model-service.ts:75-77`,
+both no-op when the model is absent (`base-model-service.ts:80-82`,
 `model-controller.ts:30-32`). Missing a model does not throw — it turns off
 private-field stripping.
 

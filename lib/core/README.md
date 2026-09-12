@@ -7,6 +7,7 @@ The Core Library is a foundational module designed to provide essential utilitie
 -   **Event Management**: A robust event manager for handling custom events and listeners.
 -   **Validation**: Flexible and extensible validation utilities for synchronous and asynchronous use cases.
 -   **Dependency Injection**: A powerful context-based dependency injection system with support for factories, singletons, and eager initialization.
+-   **Transactions**: An ORM-agnostic transaction framework with functional and manual APIs, nested transactions, request wrapping, and transactional test helpers.
 
 ## Installation
 
@@ -91,6 +92,25 @@ const bar = context.resolve('bar')
 console.log(foo) // Output: Hello
 console.log(bar) // Output: 42
 ```
+
+### Transactions
+
+Transactions are ORM-agnostic: the framework manages the lifecycle and an adapter supplies the ORM specifics.
+
+```javascript
+import { configureTransactions, transaction } from '@declaro/core'
+
+configureTransactions(myOrmAdapter)
+
+// Commits when the callback resolves, rolls back when it throws.
+const order = await transaction(async () => {
+    const order = await orders.create(input)
+    await inventory.reserve(order)
+    return order
+})
+```
+
+See the [transactions guide](../../docs/transactions.md) for the adapter contract, nesting, request wrapping, and test helpers.
 
 ## Setting Up and Resolving Factories, Classes, and Async Factories
 

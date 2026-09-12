@@ -11,6 +11,7 @@ The `@declaro/core` package is the foundation of the Declaro framework. It provi
 -   **Event Management**: A robust event manager for handling custom events and listeners.
 -   **Validation**: Flexible and extensible validation utilities for synchronous and asynchronous use cases.
 -   **Dependency Injection**: A powerful context-based dependency injection system with support for factories, singletons, and eager initialization.
+-   **Transactions**: An ORM-agnostic [transaction framework](./docs/transactions.md) with functional and manual APIs, nested transactions, request wrapping, and transactional test helpers.
 
 For more details, see the [Core Library README](./lib/core/README.md).
 

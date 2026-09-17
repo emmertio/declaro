@@ -6,3 +6,6 @@ node_modules
 
 #OS
 .DS_Store
+
+# Worktrees (see CLAUDE.md → Git workflow)
+worktrees/

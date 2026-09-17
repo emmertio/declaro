@@ -46,6 +46,12 @@ docs/        - Shared AI-agnostic documentation
 - **Schema inference**: Type-safe inference via InferInput, InferDetail, InferLookup, etc.
 - **StandardSchemaV1**: All models implement the standard schema spec for validation
 
+## Git workflow
+
+- `develop` is the **active release branch** the `worktree` skill reads from this section: feature branches branch from `origin/develop` and PR back into `develop`. Every push to `develop` publishes a beta release.
+- `main` and `release/*` are production branches managed by the release workflows — see [docs/release-workflows.md](docs/release-workflows.md). Do not branch feature work from them.
+- Feature work happens on branches checked out as git worktrees under `worktrees/` at the repo root (gitignored, enumerable via `git worktree list`). Keep the parent checkout clean. The `worktree` skill is the lifecycle: new worktrees branch from the latest `origin/develop`, and a worktree whose PR has merged with no local changes is retired.
+
 ## Testing Conventions
 
 - Tests live next to implementation files (e.g., `model-service.test.ts` beside `model-service.ts`)

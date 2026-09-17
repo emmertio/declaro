@@ -21,7 +21,7 @@
         "@pinia/nuxt": "^0.5.4",
         "@sinclair/typebox": "^0.33.15",
         "nuxt": "^3.13.0",
-        "vue": "latest"
+        "vue": "^3.5.43"
     },
     "devDependencies": {
         "@iconify-json/mdi": "^1.2.0",

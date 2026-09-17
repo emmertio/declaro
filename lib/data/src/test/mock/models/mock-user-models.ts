@@ -64,7 +64,7 @@ export const MockUserSchema = ModelSchema.create('User')
                 z.object({
                     id: z.number().int().positive().optional(),
                     name: z.string().min(2).max(100),
-                    email: z.string(),
+                    email: z.email(),
                     passwordHash: z.string(),
                     slug: privateField(z.string()),
                 }),

@@ -78,6 +78,11 @@ export abstract class Model<
      */
     private readonly jsonSchemaCache = new Map<boolean, JSONSchema>()
 
+    /**
+     * The memoized partial companion, boxed so that "cannot build one" is also remembered.
+     */
+    private partialCache?: { model: IAnyModel | undefined }
+
     constructor(name: TName, schema: TSchema) {
         if (!schema || !schema['~standard'] || schema['~standard'].version !== 1) {
             throw new SystemError(`Invalid schema provided for model "${name}". Must implement StandardSchemaV1.`)
@@ -131,6 +136,42 @@ export abstract class Model<
         return stripToSchema(value, this.getInternalJSONSchema(true), {
             includePrivateFields: options?.includePrivateFields === true,
         })
+    }
+
+    /**
+     * Returns a model that accepts any subset of this model's fields.
+     *
+     * A fragment of a payload is valid when every field it carries is valid; fields it leaves out
+     * are simply not being changed. This is what lets an update endpoint accept
+     * `{ email: "new@example.com" }` without demanding the rest of the record, while still
+     * rejecting `{ email: "not-an-email" }` or `{ name: 42 }`.
+     *
+     * The result is memoized, so the partial model's own caches are reused across calls.
+     *
+     * Not every schema can describe a partial of itself. The base implementation returns
+     * undefined; subclasses whose schema library can derive a partial, such as `ZodModel`,
+     * override `buildPartialModel`. Callers should fall back to the full model when this returns
+     * undefined, which restores whole-payload validation rather than skipping validation.
+     *
+     * @returns The partial companion model, or undefined when one cannot be derived.
+     */
+    partial(): IAnyModel | undefined {
+        this.partialCache ??= { model: this.buildPartialModel() }
+
+        return this.partialCache.model
+    }
+
+    /**
+     * Builds the partial companion model for `partial()`.
+     *
+     * Override this in subclasses whose schema library can derive a schema that accepts any
+     * subset of the original's fields. Return undefined when the underlying schema does not
+     * support it, such as for arrays or scalars.
+     *
+     * @returns The partial companion model, or undefined when one cannot be derived.
+     */
+    protected buildPartialModel(): IAnyModel | undefined {
+        return undefined
     }
 
     /**

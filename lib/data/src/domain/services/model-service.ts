@@ -3,6 +3,7 @@ import type {
     InferDetail,
     InferFilters,
     InferInput,
+    InferInputFragment,
     InferLookup,
     InferSummary,
 } from '../../shared/utils/schema-inference'
@@ -46,13 +47,19 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * Normalizes input data before processing. This method can be overridden by subclasses
      * to implement custom input normalization logic (e.g., trimming strings, setting defaults, etc.).
      * By default, this method returns the input unchanged.
-     * @param input The input data to normalize.
+     *
+     * On update and upsert paths the input may be a fragment carrying only the fields being
+     * changed, so an override must not assume every field is present. `args.existing` holds the
+     * record the fragment applies to when there is one.
+     *
+     * @param input The input data to normalize. A whole input on create, possibly a fragment on
+     * update and upsert.
      * @returns The normalized input data.
      */
     protected async normalizeInput(
-        input: InferInput<TSchema>,
+        input: InferInputFragment<TSchema>,
         args: INormalizeInputArgs<TSchema>,
-    ): Promise<InferInput<TSchema>> {
+    ): Promise<InferInputFragment<TSchema>> {
         return input
     }
 
@@ -228,10 +235,11 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
     }
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
-        // Normalize the input data
-        const normalizedInput = await this.normalizeInput(input, {
+        // Normalize the input data. A whole input goes in, so a whole input comes out; the
+        // signature widens to fragments only because update and upsert share the hook.
+        const normalizedInput = (await this.normalizeInput(input, {
             descriptor: this.getDescriptor(ModelMutationAction.Create),
-        })
+        })) as InferInput<TSchema>
 
         // Emit the before create event
         if (!options?.doNotDispatchEvents) {
@@ -266,9 +274,17 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         return this.wrapDetail(await this.normalizeDetail(result))
     }
 
+    /**
+     * Updates a record. The input may be a fragment carrying only the fields being changed;
+     * fields it leaves out keep the value the existing record already holds.
+     * @param lookup The lookup criteria to find the record.
+     * @param input The fields to change.
+     * @param options Optional update options.
+     * @returns The updated record.
+     */
     async update(
         lookup: InferLookup<TSchema>,
-        input: InferInput<TSchema>,
+        input: InferInputFragment<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>> {
         const normalizedLookup = await this.normalizeLookup(lookup)
@@ -314,11 +330,18 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
     /**
      * Upserts a record (creates if it doesn't exist, updates if it does).
+     *
+     * The input may be a fragment when it addresses an existing record. A record being created
+     * needs the whole input, since there is nothing to fill in the rest.
+     *
      * @param input The input data for the upsert operation.
      * @param options Optional create or update options.
      * @returns The upserted record.
      */
-    async upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>> {
+    async upsert(
+        input: InferInputFragment<TSchema>,
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<InferDetail<TSchema>> {
         const primaryKeyValue = this.getPrimaryKeyValue(input)
 
         let operation: ModelMutationAction
@@ -390,7 +413,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      * @returns Array of upserted records.
      */
     async bulkUpsert(
-        inputs: InferInput<TSchema>[],
+        inputs: InferInputFragment<TSchema>[],
         options?: ICreateOptions | IUpdateOptions,
     ): Promise<InferDetail<TSchema>[]> {
         if (inputs.length === 0) {
@@ -399,7 +422,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
 
         // Keep track of input metadata for each position (preserves order and duplicates)
         type InputInfo = {
-            input: InferInput<TSchema>
+            input: InferInputFragment<TSchema>
             index: number
             primaryKeyValue?: string | number
             existingEntity?: InferDetail<TSchema>

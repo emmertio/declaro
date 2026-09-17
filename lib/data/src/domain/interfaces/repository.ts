@@ -3,6 +3,7 @@ import type {
     InferDetail,
     InferFilters,
     InferInput,
+    InferInputFragment,
     InferLookup,
     InferSearchResults,
     InferSummary,
@@ -63,12 +64,15 @@ export interface IRepository<TSchema extends AnyModelSchema> {
     /**
      * Updates elements based on filters.
      *
+     * The input may be a fragment carrying only the fields being changed; fields it leaves out
+     * keep the value the existing record already holds.
+     *
      * @param filters - The filters to apply to the update.
      * @returns A promise resolving to the detailed updated element.
      */
     update(
         lookup: InferLookup<TSchema>,
-        input: InferInput<TSchema>,
+        input: InferInputFragment<TSchema>,
         options?: IUpdateOptions,
     ): Promise<InferDetail<TSchema>>
 
@@ -78,10 +82,16 @@ export interface IRepository<TSchema extends AnyModelSchema> {
      *
      * A load operation will be performed to check if the element exists. create/update related events will be dispatched accordingly.
      *
+     * The input may be a fragment when it addresses an existing element; an element being
+     * created needs the whole input, since there is nothing to fill in the rest.
+     *
      * @param input - The input data for the new or existing element.
      * @returns A promise resolving to the detailed created or updated element.
      */
-    upsert(input: InferInput<TSchema>, options?: ICreateOptions | IUpdateOptions): Promise<InferDetail<TSchema>>
+    upsert(
+        input: InferInputFragment<TSchema>,
+        options?: ICreateOptions | IUpdateOptions,
+    ): Promise<InferDetail<TSchema>>
 
     /**
      * Upserts multiple elements based on the provided inputs.
@@ -93,7 +103,7 @@ export interface IRepository<TSchema extends AnyModelSchema> {
      * @returns A promise resolving to an array of detailed upserted elements.
      */
     bulkUpsert(
-        inputs: InferInput<TSchema>[],
+        inputs: InferInputFragment<TSchema>[],
         options?: ICreateOptions | IUpdateOptions,
     ): Promise<InferDetail<TSchema>[]>
 

@@ -1,54 +1,43 @@
 import { provideRequestMiddleware, type Context, type DeclaroScope } from '@declaro/core'
-import type { TransactionFactory } from '../../domain/transaction/transaction-adapter-interface'
+import type { ITransactionAdapter } from '../../domain/transaction/transaction-interface'
 import type { ITransactionScope } from '../../types/transaction-context'
+import { TransactionStack } from './transaction-stack'
 
 /**
  * Options for {@link transactionModule}.
  */
 export interface TransactionModuleOptions {
     /**
-     * Creates a new top-level transaction adapter. This is where the app plugs in its ORM, for example by forking an
-     * entity manager or checking out a connection.
+     * The app's long-lived transaction adapter, usually one per connection pool or ORM instance. This is where the
+     * app plugs in its ORM.
      */
-    createTransaction: TransactionFactory
+    adapter: ITransactionAdapter
 }
 
 /**
- * Context middleware that sets up transactions for an app.
+ * Context middleware that sets up transactions for an app:
  *
- * - Registers `createTransaction`, so `withTransaction()` can start top-level transactions anywhere in the app.
- * - Adds request middleware that gives each request context its own `transaction`. It is created the first time it
- *   is resolved, and the same instance is returned for the rest of the request. This is what lets code in a request
- *   share one transaction through `useTransaction()` and control it manually.
+ * - Registers the app's transaction adapter as `transactionAdapter`, so `Transaction.run()` and friends can find it
+ *   anywhere in the app, including request contexts derived from the app context.
+ * - Adds request middleware that registers a new {@link TransactionStack} as `transactionStack` on each request
+ *   context, so every request tracks its own transactions and `Transaction.begin()` works inside it.
  *
- * Request middleware runs while the request context is being built, not around the handler, so it can't commit on
- * its own. To wrap each request, run the handler with `wrapWithTransaction()` or `withTransaction()` inside the
- * request's `withContext` block.
+ * It registers no stack on the app context itself, and begins no transaction.
  *
  * @param options - Module configuration.
  * @returns Middleware to pass to `context.use()`.
  *
  * @example
  * ```ts
- * await appContext.use(
- *     useDeclaro(),
- *     transactionModule({
- *         createTransaction: () => new SqlTransactionAdapter(pool.connect()),
- *     }),
- * )
+ * await appContext.use(useDeclaro(), transactionModule({ adapter: new SqlTransactionAdapter(pool) }))
  * ```
  */
 export function transactionModule(options: TransactionModuleOptions) {
     return (context: Context<DeclaroScope & ITransactionScope>) => {
-        context.registerValue('createTransaction', options.createTransaction)
+        context.registerValue('transactionAdapter', options.adapter)
 
-        provideRequestMiddleware(context, (requestContext: Context<ITransactionScope>) => {
-            requestContext.registerAsyncFactory(
-                'transaction',
-                async () => await options.createTransaction(requestContext),
-                [],
-                { singleton: true },
-            )
+        provideRequestMiddleware(context, (requestContext) => {
+            ;(requestContext as Context<ITransactionScope>).registerValue('transactionStack', new TransactionStack())
         })
     }
 }

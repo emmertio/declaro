@@ -1,17 +1,23 @@
-import type { ITransactionAdapter, TransactionFactory } from '../domain/transaction/transaction-adapter-interface'
+import type { TransactionStack } from '../application/transaction/transaction-stack'
+import type { ITransactionAdapter } from '../domain/transaction/transaction-interface'
 
 /**
  * Scope contributed to a Declaro {@link Context} by the transaction layer.
  *
- * Merged into `DataScope` so that data-layer code can reach the active transaction
- * through the ambient context instead of having it passed explicitly.
+ * Merged into `DataScope` so that data-layer code can reach the adapter and the current transaction through the
+ * ambient context instead of having them passed explicitly.
  */
 export interface ITransactionScope {
     /**
-     * The transaction bound to the current context. Request contexts get their own (see `transactionModule`), and
-     * `withTransaction` binds each transaction it runs, including nested ones, to a child context.
+     * The app's long-lived transaction adapter. Registered on the app context by `transactionModule()`, and on the
+     * child context of each `Transaction.run()` and `transaction.run()` as the adapter that run uses.
      */
-    transaction: Promise<ITransactionAdapter>
-    /** Creates new top-level transactions. Registered by `transactionModule`. */
-    createTransaction: TransactionFactory
+    transactionAdapter: ITransactionAdapter
+    /**
+     * The active transactions of the current async flow. Never registered on a shared app-level context:
+     * `transactionModule()` registers a new one on every request context, each `Transaction.run()` and
+     * `transaction.run()` registers its own on the child context its callback runs in, and scripts can register one
+     * themselves.
+     */
+    transactionStack: TransactionStack
 }

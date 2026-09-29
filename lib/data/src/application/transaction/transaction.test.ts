@@ -1,0 +1,1118 @@
+import { Context, withContext } from '@declaro/core'
+import { beforeEach, describe, expect, it } from 'bun:test'
+import { TransactionStatus, type ITransaction } from '../../domain/transaction/transaction-interface'
+import * as transactionExports from '../../index'
+import { useTransaction } from '../../shared/utils/transaction/use-transaction'
+import { useTransactionAdapter } from '../../shared/utils/transaction/use-transaction-adapter'
+import { MockTransactionAdapter } from '../../test/mock/transaction/mock-transaction-adapter'
+import type { ITransactionScope } from '../../types/transaction-context'
+import { Transaction } from './transaction'
+import { TransactionStack } from './transaction-stack'
+
+describe('Transaction', () => {
+    let adapter: MockTransactionAdapter
+    let context: Context<ITransactionScope>
+    let stack: TransactionStack
+
+    /** The adapter log as `operation#id@depth`. */
+    const operations = () =>
+        adapter.operations.map(({ operation, transactionId, depth }) => `${operation}#${transactionId}@${depth}`)
+    const inContext = <T>(fn: () => T) => withContext(context, fn)
+    /** The current transaction, or `undefined` when there is none. */
+    const current = () => {
+        try {
+            return useTransaction()
+        } catch {
+            return undefined
+        }
+    }
+
+    beforeEach(() => {
+        adapter = new MockTransactionAdapter()
+        stack = new TransactionStack()
+        context = new Context<ITransactionScope>()
+        context.registerValue('transactionAdapter', adapter)
+        context.registerValue('transactionStack', stack)
+    })
+
+    describe('the stack', () => {
+        it('follows begin, commit and rollback inside a run (spec example)', async () => {
+            const seen: Record<string, ITransaction | undefined> = {}
+            let tx1: ITransaction | undefined
+            let tx2: Transaction | undefined
+            let tx3: Transaction | undefined
+
+            await inContext(async () => {
+                await Transaction.run(async (transaction) => {
+                    tx1 = transaction
+                    seen.start = current()
+
+                    tx2 = await Transaction.begin()
+                    seen.afterBegin2 = current()
+
+                    tx3 = new Transaction()
+                    seen.afterConstruct3 = current()
+
+                    await tx3.begin()
+                    seen.afterBegin3 = current()
+
+                    await tx3.commit()
+                    seen.afterCommit3 = current()
+
+                    await tx2.rollback()
+                    seen.afterRollback2 = current()
+                })
+
+                seen.afterRun = current()
+            })
+
+            expect(seen.start).toBe(tx1!)
+            expect(seen.afterBegin2).toBe(tx2!)
+            expect(seen.afterConstruct3).toBe(tx2!)
+            expect(seen.afterBegin3).toBe(tx3!)
+            expect(seen.afterCommit3).toBe(tx2!)
+            expect(seen.afterRollback2).toBe(tx1!)
+            expect(seen.afterRun).toBeUndefined()
+
+            expect(tx2!.parent).toBe(tx1!)
+            expect(tx3!.parent).toBe(tx2!)
+            expect(tx1!.status).toBe(TransactionStatus.Committed)
+            expect(tx2!.status).toBe(TransactionStatus.RolledBack)
+            expect(tx3!.status).toBe(TransactionStatus.Committed)
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'rollback#2@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('follows the same steps on a manually registered stack, without a run', async () => {
+            await inContext(async () => {
+                expect(current()).toBeUndefined()
+
+                const tx1 = await Transaction.begin()
+                expect(current()).toBe(tx1)
+
+                const tx2 = await Transaction.begin()
+                expect(current()).toBe(tx2)
+
+                const tx3 = new Transaction()
+                expect(current()).toBe(tx2)
+
+                await tx3.begin()
+                expect(current()).toBe(tx3)
+
+                await tx3.commit()
+                expect(current()).toBe(tx2)
+
+                await tx2.rollback()
+                expect(current()).toBe(tx1)
+
+                await tx1.commit()
+                expect(current()).toBeUndefined()
+            })
+
+            expect(stack.size).toBe(0)
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'rollback#2@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('throws from begin() when there is no stack', async () => {
+            const bare = new Context<ITransactionScope>()
+            bare.registerValue('transactionAdapter', adapter)
+
+            await expect(withContext(bare, () => Transaction.begin())).rejects.toThrow(
+                'No transaction stack was found in the current context. Use Transaction.run(), or begin transactions inside a request context set up by transactionModule().',
+            )
+            await expect(new Transaction({ adapter }).begin()).rejects.toThrow('No transaction stack was found')
+            expect(adapter.operations).toEqual([])
+        })
+
+        it('uses the stack of an explicit context', async () => {
+            const transaction = await Transaction.begin({ context })
+
+            expect(stack.current).toBe(transaction)
+            await transaction.commit()
+            expect(stack.current).toBeUndefined()
+        })
+    })
+
+    describe('lifecycle', () => {
+        it('starts pending at depth 0 with no parent', () => {
+            const transaction = new Transaction({ adapter })
+
+            expect(transaction.status).toBe(TransactionStatus.Pending)
+            expect(transaction.depth).toBe(0)
+            expect(transaction.parent).toBeUndefined()
+        })
+
+        it('moves through begin and commit', async () => {
+            await inContext(async () => {
+                const transaction = new Transaction()
+                await transaction.begin()
+                expect(transaction.status).toBe(TransactionStatus.Active)
+
+                await transaction.commit()
+                expect(transaction.status).toBe(TransactionStatus.Committed)
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
+        })
+
+        it('moves through begin and rollback', async () => {
+            const transaction = await inContext(() => Transaction.begin())
+            await transaction.rollback()
+
+            expect(transaction.status).toBe(TransactionStatus.RolledBack)
+            expect(operations()).toEqual(['begin#1@0', 'rollback#1@0'])
+        })
+
+        it('rejects invalid transitions', async () => {
+            const transaction = new Transaction({ adapter, context })
+
+            await expect(transaction.commit()).rejects.toThrow('Cannot commit a transaction that is pending')
+            await expect(transaction.rollback()).rejects.toThrow('Cannot rollback a transaction that is pending')
+            await expect(transaction.run(async () => {})).rejects.toThrow(
+                'Cannot run a child of a transaction that is pending',
+            )
+
+            await transaction.begin()
+            await expect(transaction.begin()).rejects.toThrow('Cannot begin a transaction that is active')
+
+            await transaction.commit()
+            await expect(transaction.rollback()).rejects.toThrow('Cannot rollback a transaction that is committed')
+            await expect(transaction.run(async () => {})).rejects.toThrow(
+                'Cannot run a child of a transaction that is committed',
+            )
+        })
+
+        it('stays pending and off the stack when the adapter fails to begin', async () => {
+            adapter.failures.begin = true
+            const transaction = new Transaction({ context })
+
+            await expect(transaction.begin()).rejects.toThrow('Mock begin failure')
+            expect(transaction.status).toBe(TransactionStatus.Pending)
+            expect(stack.size).toBe(0)
+        })
+
+        it('stays active and current when the adapter fails to commit', async () => {
+            const transaction = await Transaction.begin({ context })
+            adapter.failures.commit = true
+
+            await expect(transaction.commit()).rejects.toThrow('Mock commit failure')
+            expect(transaction.status).toBe(TransactionStatus.Active)
+            expect(stack.current).toBe(transaction)
+
+            await transaction.rollback()
+            expect(transaction.status).toBe(TransactionStatus.RolledBack)
+            expect(stack.size).toBe(0)
+        })
+
+        it('stays active and current when the adapter fails to roll back', async () => {
+            const transaction = await Transaction.begin({ context })
+            adapter.failures.rollback = true
+
+            await expect(transaction.rollback()).rejects.toThrow('Mock rollback failure')
+            expect(transaction.status).toBe(TransactionStatus.Active)
+            expect(stack.current).toBe(transaction)
+        })
+
+        it('rejects concurrent operations on one transaction', async () => {
+            const transaction = new Transaction({ context })
+
+            const beginning = transaction.begin()
+            await expect(transaction.begin()).rejects.toThrow(
+                'Cannot begin a transaction while another operation on it is in progress',
+            )
+            await beginning
+
+            const committing = transaction.commit()
+            const rollingBack = transaction.rollback()
+            await expect(transaction.commit()).rejects.toThrow(
+                'Cannot commit a transaction while another operation on it is in progress',
+            )
+            await expect(rollingBack).rejects.toThrow(
+                'Cannot rollback a transaction while another operation on it is in progress',
+            )
+            await committing
+
+            expect(transaction.status).toBe(TransactionStatus.Committed)
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
+        })
+
+        it('rejects a rollback while a commit is in flight, even after the adapter was called', async () => {
+            const transaction = await Transaction.begin({ context })
+            let release!: () => void
+            adapter.commit = async (tx) => {
+                await new Promise<void>((resolve) => (release = resolve))
+                return MockTransactionAdapter.prototype.commit.call(adapter, tx)
+            }
+
+            const committing = transaction.commit()
+            await Promise.resolve()
+            await expect(transaction.rollback()).rejects.toThrow('while another operation on it is in progress')
+            release()
+            await committing
+
+            expect(transaction.status).toBe(TransactionStatus.Committed)
+        })
+    })
+
+    describe('construction and parents', () => {
+        it('resolves the adapter in the constructor', () => {
+            expect(() => new Transaction()).toThrow('outside of an active context')
+            expect(() => new Transaction({ context: new Context() })).toThrow('No transaction adapter was found')
+            expect(() => inContext(() => new Transaction())).not.toThrow()
+        })
+
+        it('decides the parent at begin(), not at construction', async () => {
+            await inContext(async () => {
+                const outer = await Transaction.begin()
+                const late = new Transaction()
+                expect(late.parent).toBeUndefined()
+
+                const other = await Transaction.begin()
+                await late.begin()
+
+                expect(late.parent).toBe(other)
+                expect(late.depth).toBe(2)
+                expect(other.parent).toBe(outer)
+
+                await late.commit()
+                await other.commit()
+                await outer.commit()
+            })
+        })
+
+        it('nests automatically only under a transaction with the same adapter', async () => {
+            const otherAdapter = new MockTransactionAdapter()
+
+            await inContext(async () => {
+                const outer = await Transaction.begin()
+                const sameAdapter = await Transaction.begin()
+                expect(sameAdapter.parent).toBe(outer)
+                await sameAdapter.commit()
+
+                const different = await Transaction.begin({ adapter: otherAdapter })
+                expect(different.parent).toBeUndefined()
+                expect(different.depth).toBe(0)
+                expect(current()).toBe(different)
+
+                await different.commit()
+                await outer.commit()
+            })
+
+            expect(otherAdapter.operations.map(({ depth }) => depth)).toEqual([0, 0])
+        })
+
+        it('forces a top-level transaction with parent: null', async () => {
+            await inContext(async () => {
+                const outer = await Transaction.begin()
+                const independent = await Transaction.begin({ parent: null })
+
+                expect(independent.parent).toBeUndefined()
+                expect(current()).toBe(independent)
+                await independent.commit()
+                await outer.commit()
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@0', 'commit#2@0', 'commit#1@0'])
+        })
+
+        it('nests in an explicit parent', async () => {
+            const parent = await Transaction.begin({ context })
+            const child = await Transaction.begin({ context, parent, adapter: new MockTransactionAdapter() })
+
+            expect(child.parent).toBe(parent)
+            expect(child.depth).toBe(1)
+            await child.commit()
+            await parent.commit()
+        })
+
+        it('throws when an explicit parent is not active', async () => {
+            const pending = new Transaction({ context })
+            await expect(Transaction.begin({ context, parent: pending })).rejects.toThrow(
+                'Cannot begin a transaction nested in a parent that is pending',
+            )
+
+            await pending.begin()
+            await pending.commit()
+            const child = new Transaction({ context, parent: pending })
+            await expect(child.begin()).rejects.toThrow(
+                'Cannot begin a transaction nested in a parent that is committed',
+            )
+            expect(child.status).toBe(TransactionStatus.Pending)
+            expect(stack.size).toBe(0)
+        })
+
+        it('has no Transaction.create', () => {
+            expect('create' in Transaction).toBe(false)
+            expect(Object.keys(transactionExports)).not.toContain('create')
+        })
+    })
+
+    describe('completion rules', () => {
+        it('commits everything begun after it first, innermost first, children or not', async () => {
+            const otherAdapter = new MockTransactionAdapter()
+            const order: string[] = []
+            for (const [name, tracked] of [
+                ['a', adapter],
+                ['b', otherAdapter],
+            ] as const) {
+                const commit = tracked.commit.bind(tracked)
+                tracked.commit = async (transaction) => {
+                    order.push(`${name}#${tracked.handle(transaction).id}`)
+                    return commit(transaction)
+                }
+            }
+
+            await inContext(async () => {
+                const tx1 = await Transaction.begin()
+                const tx2 = await Transaction.begin()
+                const independent = await Transaction.begin({ parent: null })
+                const different = await Transaction.begin({ adapter: otherAdapter })
+                const last = await Transaction.begin()
+
+                expect(tx2.parent).toBe(tx1)
+                expect(independent.parent).toBeUndefined()
+                expect(different.parent).toBeUndefined()
+                expect(last.parent).toBeUndefined()
+
+                await tx1.commit()
+
+                for (const transaction of [tx1, tx2, independent, different, last]) {
+                    expect(transaction.status).toBe(TransactionStatus.Committed)
+                }
+                expect(current()).toBeUndefined()
+            })
+
+            expect(order).toEqual(['a#4', 'b#1', 'a#3', 'a#2', 'a#1'])
+            expect(stack.size).toBe(0)
+        })
+
+        it('commits tx3 first when tx2 is committed while tx3 is open (user example)', async () => {
+            const seen: Record<string, ITransaction | undefined> = {}
+            let tx1: ITransaction | undefined
+            let tx2: Transaction | undefined
+            let tx3: Transaction | undefined
+
+            await inContext(() =>
+                Transaction.run(async (transaction) => {
+                    tx1 = transaction
+                    tx2 = await Transaction.begin()
+                    tx3 = new Transaction()
+                    await tx3.begin()
+
+                    await tx2.commit()
+                    seen.afterCommit2 = current()
+                }),
+            )
+
+            expect(seen.afterCommit2).toBe(tx1!)
+            expect([tx1!, tx2!, tx3!].map((tx) => tx.status)).toEqual([
+                TransactionStatus.Committed,
+                TransactionStatus.Committed,
+                TransactionStatus.Committed,
+            ])
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'commit#2@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('stops a cascade at the first failed commit and leaves the target active', async () => {
+            await inContext(async () => {
+                const tx1 = await Transaction.begin()
+                const tx2 = await Transaction.begin()
+                const tx3 = await Transaction.begin()
+
+                const commit = adapter.commit.bind(adapter)
+                adapter.commit = async (transaction) => {
+                    if (transaction === tx2) {
+                        throw new Error('tx2 commit failure')
+                    }
+                    return commit(transaction)
+                }
+
+                await expect(tx1.commit()).rejects.toThrow('tx2 commit failure')
+
+                expect(tx3.status).toBe(TransactionStatus.Committed)
+                expect(tx2.status).toBe(TransactionStatus.Active)
+                expect(tx1.status).toBe(TransactionStatus.Active)
+                expect(current()).toBe(tx2)
+                expect(stack.size).toBe(2)
+
+                await tx1.rollback()
+                expect(tx2.status).toBe(TransactionStatus.RolledBack)
+                expect(tx1.status).toBe(TransactionStatus.RolledBack)
+            })
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'rollback#2@1',
+                'rollback#1@0',
+            ])
+        })
+
+        it('rolls back everything above it first, innermost first', async () => {
+            await inContext(async () => {
+                const tx1 = await Transaction.begin()
+                const tx2 = await Transaction.begin()
+                const tx3 = await Transaction.begin()
+
+                await tx1.rollback()
+
+                expect([tx1, tx2, tx3].map((tx) => tx.status)).toEqual([
+                    TransactionStatus.RolledBack,
+                    TransactionStatus.RolledBack,
+                    TransactionStatus.RolledBack,
+                ])
+                expect(current()).toBeUndefined()
+            })
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'rollback#3@2',
+                'rollback#2@1',
+                'rollback#1@0',
+            ])
+        })
+
+        it('stops a cascade at the first failed rollback and leaves the parent active', async () => {
+            await inContext(async () => {
+                const tx1 = await Transaction.begin()
+                const tx2 = await Transaction.begin()
+                const tx3 = await Transaction.begin()
+
+                const rollback = adapter.rollback.bind(adapter)
+                adapter.rollback = async (transaction) => {
+                    if (transaction === tx2) {
+                        throw new Error('tx2 rollback failure')
+                    }
+                    return rollback(transaction)
+                }
+
+                await expect(tx1.rollback()).rejects.toThrow('tx2 rollback failure')
+
+                expect(tx3.status).toBe(TransactionStatus.RolledBack)
+                expect(tx2.status).toBe(TransactionStatus.Active)
+                expect(tx1.status).toBe(TransactionStatus.Active)
+                expect(current()).toBe(tx2)
+                expect(stack.size).toBe(2)
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'begin#3@2', 'rollback#3@2'])
+        })
+
+        it('refuses to roll back with an open child in another async flow, touching nothing', async () => {
+            await inContext(async () => {
+                const parent = await Transaction.begin()
+                const inner = await Transaction.begin()
+                let release!: () => void
+                let started!: () => void
+                const isStarted = new Promise<void>((resolve) => (started = resolve))
+
+                const running = parent.run(async () => {
+                    started()
+                    await new Promise<void>((resolve) => (release = resolve))
+                })
+                await isStarted
+
+                await expect(parent.rollback()).rejects.toThrow(
+                    'Cannot rollback a transaction with 1 open child transaction(s) in another async flow',
+                )
+                expect(parent.status).toBe(TransactionStatus.Active)
+                expect(inner.status).toBe(TransactionStatus.Active)
+                expect(current()).toBe(inner)
+
+                release()
+                await running
+                await parent.rollback()
+                expect(inner.status).toBe(TransactionStatus.RolledBack)
+            })
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@1',
+                'commit#3@1',
+                'rollback#2@1',
+                'rollback#1@0',
+            ])
+        })
+    })
+
+    describe('static run', () => {
+        it('commits and returns the result when the callback succeeds', async () => {
+            const result = await inContext(() => Transaction.run(async () => 'done'))
+
+            expect(result).toBe('done')
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
+        })
+
+        it('accepts a synchronous callback', async () => {
+            expect(await inContext(() => Transaction.run(() => 42))).toBe(42)
+        })
+
+        it('rolls back and rethrows when the callback throws', async () => {
+            let captured: ITransaction | undefined
+
+            await expect(
+                inContext(() =>
+                    Transaction.run(async (transaction) => {
+                        captured = transaction
+                        throw new Error('boom')
+                    }),
+                ),
+            ).rejects.toThrow('boom')
+
+            expect(captured!.status).toBe(TransactionStatus.RolledBack)
+            expect(operations()).toEqual(['begin#1@0', 'rollback#1@0'])
+        })
+
+        it('reports both errors when the rollback fails too', async () => {
+            adapter.failures.rollback = true
+            const error = new Error('boom')
+
+            const failure = await inContext(() =>
+                Transaction.run(async () => {
+                    throw error
+                }),
+            ).catch((failure) => failure)
+
+            expect(failure).toBeInstanceOf(AggregateError)
+            expect(failure.message).toBe('Transaction failed, and so did its rollback')
+            expect(failure.errors[0]).toBe(error)
+            expect(failure.errors[1].message).toBe('Mock rollback failure')
+        })
+
+        it('rolls back when commit fails', async () => {
+            adapter.failures.commit = true
+            let captured: ITransaction | undefined
+
+            await expect(
+                inContext(() =>
+                    Transaction.run(async (transaction) => {
+                        captured = transaction
+                    }),
+                ),
+            ).rejects.toThrow('Mock commit failure')
+
+            expect(captured!.status).toBe(TransactionStatus.RolledBack)
+            expect(operations()).toEqual(['begin#1@0', 'rollback#1@0'])
+        })
+
+        it('does not commit or roll back a transaction the callback already finished', async () => {
+            await inContext(() =>
+                Transaction.run(async (transaction) => {
+                    await transaction.rollback()
+                }),
+            )
+            await expect(
+                inContext(() =>
+                    Transaction.run(async (transaction) => {
+                        await transaction.commit()
+                        throw new Error('after commit')
+                    }),
+                ),
+            ).rejects.toThrow('after commit')
+
+            expect(operations()).toEqual(['begin#1@0', 'rollback#1@0', 'begin#2@0', 'commit#2@0'])
+        })
+
+        it('commits transactions the callback left open, innermost first', async () => {
+            let leaked: Transaction | undefined
+            let run: ITransaction | undefined
+
+            const result = await inContext(() =>
+                Transaction.run(async (transaction) => {
+                    run = transaction
+                    leaked = await Transaction.begin()
+                    await Transaction.begin()
+                    return 'done'
+                }),
+            )
+
+            expect(result).toBe('done')
+            expect(run!.status).toBe(TransactionStatus.Committed)
+            expect(leaked!.status).toBe(TransactionStatus.Committed)
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'commit#2@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('rolls back transactions the callback left open when it throws', async () => {
+            await expect(
+                inContext(() =>
+                    Transaction.run(async () => {
+                        await Transaction.begin()
+                        throw new Error('boom')
+                    }),
+                ),
+            ).rejects.toThrow('boom')
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'rollback#2@1', 'rollback#1@0'])
+        })
+
+        it('propagates a begin failure without running the callback', async () => {
+            adapter.failures.begin = true
+            let hasRun = false
+
+            await expect(
+                inContext(() =>
+                    Transaction.run(async () => {
+                        hasRun = true
+                    }),
+                ),
+            ).rejects.toThrow('Mock begin failure')
+
+            expect(hasRun).toBe(false)
+        })
+
+        it('works without an ambient context when given an adapter', async () => {
+            await Transaction.run(
+                async (transaction) => {
+                    expect(useTransaction()).toBe(transaction)
+                },
+                { adapter },
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
+        })
+
+        it('exposes a passed adapter to its callback when the context has none', async () => {
+            await withContext(new Context(), () =>
+                Transaction.run(
+                    async (outer) => {
+                        expect(useTransactionAdapter()).toBe(adapter)
+
+                        await Transaction.run(async (nested) => {
+                            expect(nested.parent).toBe(outer)
+                            expect(useTransaction()).toBe(nested)
+                        })
+                    },
+                    { adapter },
+                ),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('exposes the run’s adapter over a different one on the ambient context', async () => {
+            const otherAdapter = new MockTransactionAdapter()
+
+            await inContext(() =>
+                Transaction.run(
+                    async (transaction) => {
+                        expect(useTransactionAdapter()).toBe(otherAdapter)
+
+                        const nested = await Transaction.begin()
+                        expect(nested.parent).toBe(transaction)
+                        await nested.commit()
+                    },
+                    { adapter: otherAdapter },
+                ),
+            )
+
+            expect(adapter.operations).toEqual([])
+            expect(otherAdapter.operations.map(({ operation, depth }) => `${operation}@${depth}`)).toEqual([
+                'begin@0',
+                'begin@1',
+                'commit@1',
+                'commit@0',
+            ])
+        })
+
+        it('runs in an explicit context instead of the ambient one', async () => {
+            await Transaction.run(
+                async (transaction) => {
+                    expect(useTransaction()).toBe(transaction)
+                    expect(useTransactionAdapter()).toBe(adapter)
+                },
+                { context },
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
+        })
+
+        it('gives the run its own stack, leaving the outer one untouched', async () => {
+            await inContext(() =>
+                Transaction.run(async (transaction) => {
+                    expect(stack.size).toBe(0)
+                    expect(useTransaction()).toBe(transaction)
+                }),
+            )
+        })
+
+        it('nests in the outer stack’s current transaction', async () => {
+            await inContext(async () => {
+                const outer = await Transaction.begin()
+
+                await Transaction.run(async (nested) => {
+                    expect(nested.parent).toBe(outer)
+                    expect(useTransaction()).toBe(nested)
+                })
+
+                expect(current()).toBe(outer)
+                await outer.commit()
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('nests runs in runs, and restores the outer transaction after', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    await Transaction.run(async (nested) => {
+                        expect(nested.parent).toBe(outer)
+                        expect(nested.depth).toBe(1)
+                        expect(useTransaction()).toBe(nested)
+                    })
+
+                    expect(useTransaction()).toBe(outer)
+                }),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('does not nest in a transaction with a different adapter', async () => {
+            const otherAdapter = new MockTransactionAdapter()
+
+            await inContext(() =>
+                Transaction.run(async () => {
+                    await Transaction.run(
+                        async (other) => {
+                            expect(other.parent).toBeUndefined()
+                        },
+                        { adapter: otherAdapter },
+                    )
+                }),
+            )
+        })
+
+        it('runs a separate top-level transaction with parent: null', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    await Transaction.run(
+                        async (independent) => {
+                            expect(independent.parent).toBeUndefined()
+                            expect(useTransaction()).toBe(independent)
+                        },
+                        { parent: null },
+                    )
+
+                    expect(useTransaction()).toBe(outer)
+                }),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@0', 'commit#2@0', 'commit#1@0'])
+        })
+
+        it('rolls back only the nested transaction when its error is caught', async () => {
+            await inContext(() =>
+                Transaction.run(async () => {
+                    await Transaction.run(async () => {
+                        throw new Error('nested failure')
+                    }).catch(() => {})
+                }),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'rollback#2@1', 'commit#1@0'])
+        })
+
+        it('rolls back every level when a nested error escapes', async () => {
+            await expect(
+                inContext(() =>
+                    Transaction.run(async () => {
+                        await Transaction.run(async () => {
+                            await Transaction.run(async () => {
+                                throw new Error('deep failure')
+                            })
+                        })
+                    }),
+                ),
+            ).rejects.toThrow('deep failure')
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'rollback#3@2',
+                'rollback#2@1',
+                'rollback#1@0',
+            ])
+        })
+
+        it('keeps concurrent runs isolated', async () => {
+            const seen = await inContext(() =>
+                Promise.all(
+                    [1, 2].map((n) =>
+                        Transaction.run(async (transaction) => {
+                            await new Promise((resolve) => setTimeout(resolve, 5 * n))
+                            const nested = await Transaction.begin()
+                            const isIsolated =
+                                nested.parent === transaction && useTransaction() === nested && transaction.depth === 0
+                            await nested.commit()
+                            return isIsolated && useTransaction() === transaction
+                        }),
+                    ),
+                ),
+            )
+
+            expect(seen).toEqual([true, true])
+            expect(stack.size).toBe(0)
+        })
+
+        it('keeps concurrent nested runs isolated', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    const seen = await Promise.all(
+                        [1, 2].map((n) =>
+                            Transaction.run(async (nested) => {
+                                await new Promise((resolve) => setTimeout(resolve, 5 * n))
+                                return useTransaction() === nested && nested.parent === outer
+                            }),
+                        ),
+                    )
+
+                    expect(seen).toEqual([true, true])
+                }),
+            )
+        })
+
+        it('makes useTransaction() throw in work the callback did not await', async () => {
+            let late: Promise<unknown> | undefined
+
+            await inContext(() =>
+                Transaction.run(async () => {
+                    late = new Promise((resolve) => setTimeout(resolve, 5)).then(() => useTransaction())
+                }),
+            )
+
+            await expect(late!).rejects.toThrow('No transaction is active in the current context')
+        })
+    })
+
+    describe('cascading from inside runs', () => {
+        /** A promise with its resolver, to hold a run open. */
+        const deferred = () => {
+            let resolve!: () => void
+            const promise = new Promise<void>((done) => (resolve = done))
+            return { promise, resolve }
+        }
+
+        for (const operation of ['commit', 'rollback'] as const) {
+            const finished = operation === 'commit' ? TransactionStatus.Committed : TransactionStatus.RolledBack
+
+            it(`${operation}s the nested run's transactions when tx1.${operation}() is called inside tx1.run()`, async () => {
+                let tx1: ITransaction | undefined
+                let child: ITransaction | undefined
+                let inner: Transaction | undefined
+                let afterFinish: ITransaction | undefined
+
+                const result = await inContext(() =>
+                    Transaction.run(async (transaction) => {
+                        tx1 = transaction
+                        return transaction.run(async (nested) => {
+                            child = nested
+                            inner = await Transaction.begin()
+                            await transaction[operation]()
+                            afterFinish = current()
+                            return 'child result'
+                        })
+                    }),
+                )
+
+                expect(result).toBe('child result')
+                expect(afterFinish).toBeUndefined()
+                expect([tx1!, child!, inner!].map((tx) => tx.status)).toEqual([finished, finished, finished])
+                expect(operations()).toEqual([
+                    'begin#1@0',
+                    'begin#2@1',
+                    'begin#3@2',
+                    `${operation}#3@2`,
+                    `${operation}#2@1`,
+                    `${operation}#1@0`,
+                ])
+            })
+
+            it(`${operation}s every run in between when tx1.${operation}() is called inside nested Transaction.run()`, async () => {
+                const transactions: ITransaction[] = []
+                let innerResult: string | undefined
+
+                const result = await inContext(() =>
+                    Transaction.run(async (tx1) => {
+                        transactions.push(tx1)
+                        const started = await Transaction.begin()
+                        transactions.push(started)
+
+                        innerResult = await Transaction.run(async (tx3) => {
+                            transactions.push(tx3)
+                            return Transaction.run(async (tx4) => {
+                                transactions.push(tx4, await Transaction.begin())
+                                await tx1[operation]()
+                                return 'nested result'
+                            })
+                        })
+
+                        expect(current()).toBeUndefined()
+                        return 'outer result'
+                    }),
+                )
+
+                expect(result).toBe('outer result')
+                expect(innerResult).toBe('nested result')
+                expect(transactions.map((tx) => tx.status)).toEqual(transactions.map(() => finished))
+                expect(transactions.map((tx) => tx.depth)).toEqual([0, 1, 2, 3, 4])
+                expect(operations()).toEqual([
+                    'begin#1@0',
+                    'begin#2@1',
+                    'begin#3@2',
+                    'begin#4@3',
+                    'begin#5@4',
+                    `${operation}#5@4`,
+                    `${operation}#4@3`,
+                    `${operation}#3@2`,
+                    `${operation}#2@1`,
+                    `${operation}#1@0`,
+                ])
+            })
+
+            it(`throws from ${operation}() with a child open in a concurrent run, touching nothing`, async () => {
+                const held = deferred()
+                const started = deferred()
+                let before: string[] = []
+
+                await inContext(() =>
+                    Transaction.run(async (tx1) => {
+                        const blocked = Transaction.run(async () => {
+                            started.resolve()
+                            await held.promise
+                        })
+                        await started.promise
+
+                        await Promise.all([
+                            blocked,
+                            Transaction.run(async (sibling) => {
+                                before = operations()
+                                await expect(tx1[operation]()).rejects.toThrow(
+                                    `Cannot ${operation} a transaction with 1 open child transaction(s) in another async flow`,
+                                )
+
+                                expect(operations()).toEqual(before)
+                                expect(tx1.status).toBe(TransactionStatus.Active)
+                                expect(sibling.status).toBe(TransactionStatus.Active)
+                                expect(current()).toBe(sibling)
+                                held.resolve()
+                            }),
+                        ])
+                    }),
+                )
+
+                expect(before).toEqual(['begin#1@0', 'begin#2@1', 'begin#3@1'])
+                expect(operations().slice(3).sort()).toEqual(['commit#1@0', 'commit#2@1', 'commit#3@1'])
+            })
+        }
+
+        it('cascades into a parent: null run begun inside the flow', async () => {
+            await inContext(() =>
+                Transaction.run(async (tx1) => {
+                    await Transaction.run(
+                        async (independent) => {
+                            expect(independent.parent).toBeUndefined()
+                            await tx1.commit()
+                        },
+                        { parent: null },
+                    )
+                }),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@0', 'commit#2@0', 'commit#1@0'])
+        })
+    })
+
+    describe('instance run', () => {
+        it('requires an active transaction', async () => {
+            const transaction = new Transaction({ context })
+            await expect(transaction.run(async () => {})).rejects.toThrow(
+                'Cannot run a child of a transaction that is pending',
+            )
+        })
+
+        it('runs the callback in a child transaction that is current', async () => {
+            const transaction = await Transaction.begin({ context })
+
+            const result = await transaction.run(async (child) => {
+                expect(child).not.toBe(transaction)
+                expect(child.parent).toBe(transaction)
+                expect(child.depth).toBe(1)
+                expect(useTransaction()).toBe(child)
+                return 'child result'
+            })
+
+            expect(result).toBe('child result')
+            expect(transaction.status).toBe(TransactionStatus.Active)
+            expect(stack.current).toBe(transaction)
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1'])
+        })
+
+        it('rolls back only the child when its callback throws', async () => {
+            const transaction = await Transaction.begin({ context })
+
+            await expect(
+                transaction.run(async () => {
+                    throw new Error('child failure')
+                }),
+            ).rejects.toThrow('child failure')
+
+            expect(transaction.status).toBe(TransactionStatus.Active)
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'rollback#2@1'])
+        })
+
+        it('nests further from inside a child', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    await outer.run(async (middle) => {
+                        await middle.run(async (inner) => {
+                            expect(inner.depth).toBe(2)
+                            expect(useTransaction()).toBe(inner)
+                        })
+                    })
+                }),
+            )
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'commit#2@1',
+                'commit#1@0',
+            ])
+        })
+    })
+})

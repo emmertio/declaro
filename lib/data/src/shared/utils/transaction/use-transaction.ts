@@ -1,47 +1,41 @@
 import { useContext } from '@declaro/core'
 import type { Context } from '@declaro/core'
+import type { ITransaction } from '../../../domain/transaction/transaction-interface'
 import type { ITransactionScope } from '../../../types/transaction-context'
-import type { ITransactionAdapter } from '../../../domain/transaction/transaction-adapter-interface'
 
 /**
- * Gets the transaction bound to the current ambient context. This is the manual API: call `begin()`, `commit()`,
- * and `rollback()` on the result yourself.
+ * Gets the current transaction: the top of the current context's transaction stack. That is the one whose
+ * `run()` callback is executing, or the one most recently begun with `begin()` and not yet finished.
  *
- * Inside a `withTransaction()` callback, this is the transaction the callback runs in, including nested ones. In a
- * request context set up by `transactionModule()`, it is the request's own transaction, the same instance every
- * time it is called during that request.
+ * Use it to pass the current transaction to an adapter's accessor, such as `adapter.client(useTransaction())`, from
+ * code that runs inside a transaction without having the transaction passed to it.
  *
- * @typeParam TTransaction - Your adapter type, to reach ORM-specific members such as an entity manager.
- * @returns The transaction bound to the current context.
- * @throws {Error} If called outside of a Declaro context, or if the context has no transaction.
+ * @returns The current transaction. It is always `Active`.
+ * @throws {Error} If called outside of a Declaro context, or if no transaction is active in it (including from work a
+ *   run started but didn't await, once the run has finished).
  *
  * @example
  * ```ts
- * const transaction = await useTransaction()
- * await transaction.begin()
- * try {
- *     await doWork()
- *     await transaction.commit()
- * } catch (error) {
- *     await transaction.rollback()
- *     throw error
- * }
+ * await Transaction.run(async () => {
+ *     const transaction = useTransaction()
+ *     await orderService.create(input)
+ * })
  * ```
  */
-export async function useTransaction<TTransaction extends ITransactionAdapter = ITransactionAdapter>(): Promise<TTransaction> {
+export function useTransaction(): ITransaction {
     const context = useContext<Context<ITransactionScope>>()
 
     if (!context) {
         throw new Error('useTransaction() was called outside of an active context. Wrap your code with withContext().')
     }
 
-    const transaction = await context.resolve('transaction')
+    const transaction = context.resolve('transactionStack')?.current
 
     if (!transaction) {
         throw new Error(
-            'No transaction was found in the current context. Register one with transactionModule(), or run inside withTransaction().',
+            'No transaction is active in the current context. Run your code inside Transaction.run(), or begin one with Transaction.begin().',
         )
     }
 
-    return transaction as TTransaction
+    return transaction
 }

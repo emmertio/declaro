@@ -7,7 +7,8 @@
 - [Registering it](#registering-it)
 - [Using transactions](#using-transactions)
     - [`Transaction.run`](#transactionrun)
-    - [Wrapping requests: `wrapWithTransaction`](#wrapping-requests-wrapwithtransaction)
+    - [Wrapping requests, background tasks and other async work](#wrapping-requests-background-tasks-and-other-async-work)
+        - [Framework middleware](#framework-middleware)
     - [Manual lifecycle](#manual-lifecycle)
     - [Where the stack lives](#where-the-stack-lives)
     - [Nesting](#nesting)
@@ -221,27 +222,60 @@ const order = await Transaction.run(async (transaction) => {
 
 `transaction.run(callback)` does the same with a transaction nested in `transaction`, using its adapter. It throws if `transaction` isn't `Active`.
 
-- Concurrent `Transaction.run` calls each get their own transaction and their own stack, even inside the same request, so they can't disturb each other.
+- Concurrent `Transaction.run` calls each get their own transaction and their own stack, even inside the same request. Concurrent runs that would nest under the same parent are the exception: see [the rules below](#manual-lifecycle) on parallel work.
 
-### Wrapping requests: `wrapWithTransaction`
+### Wrapping requests, background tasks and other async work
 
-`wrapWithTransaction(fn)` returns a function with the same parameters that runs each call through `Transaction.run`.
+`wrapWithTransaction(fn, options?)` returns a function with the same parameters that runs each call through `Transaction.run`, passing `options` along (`adapter`, `parent`, `context`, the same as `Transaction.run`). It wraps any async unit of work: a request handler, a whole middleware chain, a background task, a queue consumer, a cron job. Everything the function does, including `useTransaction()` calls, shares one transaction; it commits when the function resolves, and a thrown error rolls it all back.
 
-Declaro's request middleware runs while the request context is being built, not around the handler, so it can't commit or roll back a request by itself. Instead, wrap the handler where your server glue runs it inside the request context:
+Inside a request, call the wrapped function in the request's `withContext` block so the transaction picks up the request context:
 
 ```ts
 import { createRequestContext, withContext } from '@declaro/core'
 import { wrapWithTransaction } from '@declaro/data'
 
-async function handle(req: Request, handler: (req: Request) => Promise<Response>) {
-    const requestContext = await createRequestContext(app, req)
-    return withContext(requestContext, () => wrapWithTransaction(handler)(req))
-}
+const createOrder = wrapWithTransaction(async (input: OrderInput) => orderService.create(input))
+
+const requestContext = await createRequestContext(app, req)
+await withContext(requestContext, () => createOrder(input))
 ```
 
-Everything the handler does, including `useTransaction()` calls, shares one transaction, and a thrown error rolls it all back. To wrap only some routes, apply `wrapWithTransaction` to just those handlers.
+To wrap only some routes, apply `wrapWithTransaction` to just those handlers.
 
-The same approach works in a framework's middleware. As an illustration only, here is one way to do it in Express, where the handler doesn't return a promise, so the middleware waits for the response to finish:
+Work that runs outside any Declaro context, such as a background job or a queue consumer, has no ambient context to find the adapter in. Pass `{ adapter }`, or `{ context }` to use the adapter registered on that context (the app context, for example):
+
+```ts
+import { wrapWithTransaction } from '@declaro/data'
+
+const handleMessage = wrapWithTransaction(
+    async (message: OrderMessage) => {
+        await orderService.fulfil(message.orderId) // useTransaction() and useTransactionAdapter() work in here
+    },
+    { adapter }, // or { context: app }
+)
+
+queue.consume('orders', handleMessage)
+```
+
+Each call gets its own top-level transaction and its own stack, so messages handled concurrently stay apart.
+
+#### Framework middleware
+
+Declaro's request middleware runs while the request context is being built, not around the handler, so it can't commit or roll back a request by itself. Put the transaction in your framework's middleware instead. The two recipes below are starting points to adapt to your app, not drop-in code. They are exercised by simulated middleware chains in Declaro's tests, not against the real frameworks. How the Declaro request context gets attached to the framework's request is app-specific.
+
+**Hono** (and other frameworks whose `next()` returns a promise of the rest of the chain): wrap `next()` in `Transaction.run`. The middleware awaits the handler, so a resolved chain commits and a thrown error rolls back, with nothing else to do:
+
+```ts
+import { withContext } from '@declaro/core'
+import { Transaction } from '@declaro/data'
+
+app.use(async (c, next) => {
+    const requestContext = c.get('declaroContext') // however your app attaches it
+    await withContext(requestContext, () => Transaction.run(() => next()))
+})
+```
+
+**Express**: `next()` returns nothing, and the handler finishes whenever it sends the response, so the middleware can't await the handler and `Transaction.run` would commit too early. Use the manual form instead: `Transaction.begin()` before `next()`, then commit when the response finishes, or roll back on a 5xx, on an error passed to `next()` (Express turns it into a 5xx), or when the connection closes before the response finished:
 
 ```ts
 import { withContext } from '@declaro/core'
@@ -249,20 +283,28 @@ import { Transaction } from '@declaro/data'
 
 expressApp.use((req, res, next) => {
     const requestContext = res.locals.declaroContext // however your app attaches it
-    withContext(requestContext, () =>
-        Transaction.run(
-            () =>
-                new Promise<void>((resolve, reject) => {
-                    res.on('finish', () => (res.statusCode >= 500 ? reject(new Error('Request failed')) : resolve()))
-                    res.on('close', () => res.writableFinished || reject(new Error('Request aborted')))
-                    next()
-                }),
-        ),
-    ).catch(() => {}) // the response has already been sent; the rollback has already happened
+    withContext(requestContext, async () => {
+        const transaction = await Transaction.begin()
+        let isSettled = false
+        const settle = (shouldCommit: boolean) => {
+            if (isSettled) return
+            isSettled = true
+            const done = shouldCommit
+                ? transaction.commit().catch(() => transaction.rollback())
+                : transaction.rollback()
+            done.catch((error) => console.error('Request transaction failed', error))
+        }
+
+        res.on('finish', () => settle(res.statusCode < 500))
+        res.on('close', () => {
+            if (!res.writableFinished) settle(false)
+        })
+        next() // called inside withContext, so the handler sees the request context and the transaction
+    }).catch(next)
 })
 ```
 
-Note that the commit happens after the response is sent, so a failed commit can't change the response. Adapt this to your framework rather than copying it as-is.
+In both recipes the transaction lives on the request context's own stack (from `transactionModule`), so the handler and everything it calls see it through `useTransaction()`. With Express, the commit happens after the response is sent, so a failed commit can't change the response; if that matters, commit in the handler before responding.
 
 ### Manual lifecycle
 
@@ -329,7 +371,8 @@ A few rules keep the stack consistent:
 - **A failed step stops the cascade.** If one of the cascaded commits or rollbacks fails, the cascade stops there and throws that error. The transaction you called it on stays `Active` (so you can still roll it back), and the transactions already finished stay finished.
 - **A `Transaction.run()` callback that leaves transactions open commits them.** When the callback returns, the run's commit cascades as above. If one of those commits fails, the run rolls back what's left and rethrows (see [`Transaction.run`](#transactionrun)).
 - **One operation at a time per transaction.** Calling `begin()`, `commit()` or `rollback()` on a transaction while another of those calls on it is still in progress throws, for example `Cannot commit a transaction while another operation on it is in progress`.
-- **Don't begin transactions manually in parallel within one flow.** Two `begin()`s racing in a `Promise.all` push onto the same stack, and each one's "current" becomes the other's. This is unsupported. For parallel work, use `Transaction.run()`, which gives each call its own stack, so `Promise.all([Transaction.run(a), Transaction.run(b)])` keeps the two apart. (Whether your database can run two transactions or savepoints on one connection at the same time is a separate question for your adapter.)
+- **Don't begin transactions manually in parallel within one flow.** Two `begin()`s racing in a `Promise.all` push onto the same stack, and each one's "current" becomes the other's. This is unsupported.
+- **Nested runs can't run in parallel under the same parent.** A nested transaction shares its parent's connection, and the savepoints on that connection form a stack, so two children of one parent can't be open at the same time. Beginning a second child while another child of the same parent is still open in a concurrent flow (for example `Promise.all([Transaction.run(a), Transaction.run(b)])` inside a transaction) throws. For parallel work, use top-level runs, `Transaction.run(callback, { parent: null })` (or `wrapWithTransaction(fn, { parent: null })`): each gets its own transaction, its own stack and, with a typical adapter, its own connection. Each one commits or rolls back on its own, independently of the transaction you started them from.
 
 ### Where the stack lives
 
@@ -473,7 +516,7 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 | `TransactionStatus`      | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                      |
 | `TransactionStack`       | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.       |
 | `transactionModule`      | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                 |
-| `wrapWithTransaction`    | function   | Wraps a function so every call runs through `Transaction.run`.                                                       |
+| `wrapWithTransaction`    | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                            |
 | `useTransaction`         | function   | Synchronously gets the current transaction. Throws when none is active.                                              |
 | `useTransactionAdapter`  | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                      |
 | `MockTransactionAdapter` | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                       |

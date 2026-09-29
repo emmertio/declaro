@@ -887,15 +887,18 @@ describe('Transaction', () => {
             expect(stack.size).toBe(0)
         })
 
-        it('keeps concurrent nested runs isolated', async () => {
+        it('keeps concurrent top-level runs started inside a run isolated', async () => {
             await inContext(() =>
-                Transaction.run(async (outer) => {
+                Transaction.run(async () => {
                     const seen = await Promise.all(
                         [1, 2].map((n) =>
-                            Transaction.run(async (nested) => {
-                                await new Promise((resolve) => setTimeout(resolve, 5 * n))
-                                return useTransaction() === nested && nested.parent === outer
-                            }),
+                            Transaction.run(
+                                async (independent) => {
+                                    await new Promise((resolve) => setTimeout(resolve, 5 * n))
+                                    return useTransaction() === independent && independent.parent === undefined
+                                },
+                                { parent: null },
+                            ),
                         ),
                     )
 
@@ -1015,26 +1018,21 @@ describe('Transaction', () => {
                         })
                         await started.promise
 
-                        await Promise.all([
-                            blocked,
-                            Transaction.run(async (sibling) => {
-                                before = operations()
-                                await expect(tx1[operation]()).rejects.toThrow(
-                                    `Cannot ${operation} a transaction with 1 open child transaction(s) in another async flow`,
-                                )
+                        before = operations()
+                        await expect(tx1[operation]()).rejects.toThrow(
+                            `Cannot ${operation} a transaction with 1 open child transaction(s) in another async flow`,
+                        )
 
-                                expect(operations()).toEqual(before)
-                                expect(tx1.status).toBe(TransactionStatus.Active)
-                                expect(sibling.status).toBe(TransactionStatus.Active)
-                                expect(current()).toBe(sibling)
-                                held.resolve()
-                            }),
-                        ])
+                        expect(operations()).toEqual(before)
+                        expect(tx1.status).toBe(TransactionStatus.Active)
+                        expect(current()).toBe(tx1)
+                        held.resolve()
+                        await blocked
                     }),
                 )
 
-                expect(before).toEqual(['begin#1@0', 'begin#2@1', 'begin#3@1'])
-                expect(operations().slice(3).sort()).toEqual(['commit#1@0', 'commit#2@1', 'commit#3@1'])
+                expect(before).toEqual(['begin#1@0', 'begin#2@1'])
+                expect(operations().slice(2)).toEqual(['commit#2@1', 'commit#1@0'])
             })
         }
 
@@ -1052,6 +1050,178 @@ describe('Transaction', () => {
             )
 
             expect(operations()).toEqual(['begin#1@0', 'begin#2@0', 'commit#2@0', 'commit#1@0'])
+        })
+    })
+
+    describe('parallel nested runs', () => {
+        const PARALLEL_ERROR =
+            'Cannot begin a nested transaction while its parent (depth 0) already has an active child in another async flow. Run parallel work in top-level transactions (parent: null) instead.'
+
+        /** A promise with its resolver, to hold a run open. */
+        const deferred = () => {
+            let resolve!: () => void
+            const promise = new Promise<void>((done) => (resolve = done))
+            return { promise, resolve }
+        }
+
+        it('refuses to begin a second Transaction.run() started in parallel under the same parent', async () => {
+            const held = deferred()
+            let first: ITransaction | undefined
+            let secondRan = false
+
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    const a = Transaction.run(async (nested) => {
+                        first = nested
+                        await held.promise
+                        return 'a'
+                    })
+                    const b = Transaction.run(async () => {
+                        secondRan = true
+                    })
+
+                    await expect(Promise.all([a, b])).rejects.toThrow(PARALLEL_ERROR)
+                    expect(secondRan).toBe(false)
+                    expect(first!.status).toBe(TransactionStatus.Active)
+
+                    held.resolve()
+                    expect(await a).toBe('a')
+                    expect(first!.status).toBe(TransactionStatus.Committed)
+                    expect(outer.status).toBe(TransactionStatus.Active)
+                }),
+            )
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('refuses a second concurrent tx.run() on the same transaction, leaving no trace', async () => {
+            const held = deferred()
+            const started = deferred()
+
+            await inContext(async () => {
+                const tx = await Transaction.begin()
+                const a = tx.run(async () => {
+                    started.resolve()
+                    await held.promise
+                })
+                await started.promise
+
+                await expect(tx.run(async () => {})).rejects.toThrow(PARALLEL_ERROR)
+                expect(operations()).toEqual(['begin#1@0', 'begin#2@1'])
+
+                held.resolve()
+                await a
+                await tx.commit()
+                expect(tx.status).toBe(TransactionStatus.Committed)
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('leaves a transaction whose begin was refused pending, off every stack', async () => {
+            const held = deferred()
+            const started = deferred()
+
+            await inContext(async () => {
+                const tx = await Transaction.begin()
+                const a = tx.run(async () => {
+                    started.resolve()
+                    await held.promise
+                })
+                await started.promise
+
+                const refused = new Transaction({ parent: tx })
+                await expect(refused.begin()).rejects.toThrow(PARALLEL_ERROR)
+                expect(refused.status).toBe(TransactionStatus.Pending)
+                expect(refused.parent).toBeUndefined()
+                expect(stack.all()).toEqual([tx])
+
+                held.resolve()
+                await a
+                // Only the finished run's child was tracked: the parent commits without a cascade error.
+                await tx.commit()
+            })
+
+            expect(operations()).toEqual(['begin#1@0', 'begin#2@1', 'commit#2@1', 'commit#1@0'])
+        })
+
+        it('still allows sequential nested runs', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    await Transaction.run(async (nested) => expect(nested.parent).toBe(outer))
+                    await outer.run(async (nested) => expect(nested.parent).toBe(outer))
+                    await Transaction.run(async (nested) => expect(nested.parent).toBe(outer))
+                }),
+            )
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'commit#2@1',
+                'begin#3@1',
+                'commit#3@1',
+                'begin#4@1',
+                'commit#4@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('still allows a grandchild begun inside a child run, and a child of the outer one from inside it', async () => {
+            await inContext(() =>
+                Transaction.run(async (outer) => {
+                    await Transaction.run(async (child) => {
+                        await Transaction.run(async (grandchild) => expect(grandchild.parent).toBe(child))
+                        await child.run(async (grandchild) => expect(grandchild.parent).toBe(child))
+                        await Transaction.run(async (sibling) => expect(sibling.parent).toBe(outer), { parent: outer })
+                    })
+                }),
+            )
+
+            expect(operations()).toEqual([
+                'begin#1@0',
+                'begin#2@1',
+                'begin#3@2',
+                'commit#3@2',
+                'begin#4@2',
+                'commit#4@2',
+                'begin#5@1',
+                'commit#5@1',
+                'commit#2@1',
+                'commit#1@0',
+            ])
+        })
+
+        it('still allows parallel top-level runs (parent: null) inside a run, each committing', async () => {
+            const held = deferred()
+            const runs: ITransaction[] = []
+
+            await inContext(() =>
+                Transaction.run(async () => {
+                    const a = Transaction.run(
+                        async (independent) => {
+                            runs.push(independent)
+                            await held.promise
+                        },
+                        { parent: null },
+                    )
+                    const b = Transaction.run(
+                        async (independent) => {
+                            runs.push(independent)
+                            held.resolve()
+                        },
+                        { parent: null },
+                    )
+                    await Promise.all([a, b])
+                }),
+            )
+
+            expect(runs.map((tx) => [tx.parent, tx.status])).toEqual([
+                [undefined, TransactionStatus.Committed],
+                [undefined, TransactionStatus.Committed],
+            ])
+            expect(operations().sort()).toEqual(
+                ['begin#1@0', 'begin#2@0', 'begin#3@0', 'commit#1@0', 'commit#2@0', 'commit#3@0'].sort(),
+            )
         })
     })
 

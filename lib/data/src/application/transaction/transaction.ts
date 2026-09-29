@@ -185,8 +185,14 @@ export class Transaction implements ITransaction {
      * The parent is decided here: the one passed to the constructor, or else the current transaction if it is
      * `Active` and uses the same adapter, or else none.
      *
+     * Nested transactions share their parent's connection, where savepoints form a single stack, so a parent can only
+     * have one flow of children at a time. Beginning a child while the parent already has an active child (or one
+     * still beginning) that the caller is not inside, such as a sibling started in parallel with `Promise.all`, throws
+     * before the adapter is called. Run parallel work in top-level transactions (`parent: null`) instead.
+     *
      * @throws {Error} If the transaction is not `Pending`, if another operation on it is in progress, if no
-     *   transaction stack can be found, if an explicit parent is not `Active`, or if the adapter fails.
+     *   transaction stack can be found, if an explicit parent is not `Active`, if the parent has an active child in
+     *   another async flow, or if the adapter fails.
      */
     async begin(): Promise<void> {
         this.assertStatus(TransactionStatus.Pending, 'begin')
@@ -194,12 +200,22 @@ export class Transaction implements ITransaction {
 
         const stack = this.resolveStack()
         const parent = this.resolveParent(stack)
+        if (parent instanceof Transaction) {
+            parent.assertNoActiveChildElsewhere(stack)
+        }
 
         this.operationInProgress = 'begin'
         this.currentParent = parent
+        // Registered before the adapter call, so a concurrent begin under the same parent sees this one in flight.
+        if (parent instanceof Transaction) {
+            parent.openChildren.add(this)
+        }
         try {
             await this.adapter.begin(this)
         } catch (error) {
+            if (parent instanceof Transaction) {
+                parent.openChildren.delete(this)
+            }
             this.currentParent = undefined
             throw error
         } finally {
@@ -210,9 +226,6 @@ export class Transaction implements ITransaction {
         this.beginOrder = ++beginCount
         this.stack = stack
         stack.push(this)
-        if (parent instanceof Transaction) {
-            parent.openChildren.add(this)
-        }
     }
 
     /**
@@ -368,7 +381,7 @@ export class Transaction implements ITransaction {
         this.assertStatus(TransactionStatus.Active, operation)
         this.assertIdle(operation)
 
-        const cascade = this.planCascade()
+        const cascade = this.planCascade(useCurrentStack())
         const members = new Set<ITransaction>([this, ...cascade])
         for (const member of members) {
             if (member instanceof Transaction) {
@@ -396,11 +409,13 @@ export class Transaction implements ITransaction {
      * When the caller is inside nested runs that were started within this transaction's flow (its stack is reached by
      * following the ambient stack outward), that is every transaction begun after this one on the stacks in between,
      * innermost stack first. Then come the transactions above this one on its own stack.
+     *
+     * @param from - The caller's transaction stack, which the walk outward starts from.
      */
-    private planCascade(): ITransaction[] {
+    private planCascade(from: TransactionStack | undefined): ITransaction[] {
         const cascade: ITransaction[] = []
         const innerStacks: TransactionStack[] = []
-        let stack = (useContext() as Context<ITransactionScope> | null)?.resolve('transactionStack')
+        let stack = from
 
         while (stack && stack !== this.stack) {
             innerStacks.push(stack)
@@ -430,6 +445,25 @@ export class Transaction implements ITransaction {
         if (elsewhere > 0) {
             throw new Error(
                 `Cannot ${operation} a transaction with ${elsewhere} open child transaction(s) in another async flow`,
+            )
+        }
+    }
+
+    /**
+     * Throws if this transaction has an open child that a caller on `stack` is not inside, which means a child is
+     * begun or running in another async flow. Uses the same reach as the commit and rollback cascade.
+     *
+     * @param stack - The stack the new child will be pushed onto.
+     */
+    private assertNoActiveChildElsewhere(stack: TransactionStack) {
+        if (this.openChildren.size === 0) {
+            return
+        }
+
+        const reachable = new Set(this.planCascade(stack))
+        if ([...this.openChildren].some((child) => !reachable.has(child))) {
+            throw new Error(
+                `Cannot begin a nested transaction while its parent (depth ${this.depth}) already has an active child in another async flow. Run parallel work in top-level transactions (parent: null) instead.`,
             )
         }
     }
@@ -480,6 +514,13 @@ async function rollBackAfter(transaction: ITransaction, error: unknown) {
     } catch (rollbackError) {
         throw new AggregateError([error, rollbackError], 'Transaction failed, and so did its rollback')
     }
+}
+
+/**
+ * The transaction stack of the ambient context, if any.
+ */
+function useCurrentStack(): TransactionStack | undefined {
+    return (useContext() as Context<ITransactionScope> | null)?.resolve('transactionStack')
 }
 
 /**

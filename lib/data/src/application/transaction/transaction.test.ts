@@ -1,4 +1,4 @@
-import { Context, withContext } from '@declaro/core'
+import { Context, useContext, withContext } from '@declaro/core'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { TransactionStatus, type ITransaction } from '../../domain/transaction/transaction-interface'
 import * as transactionExports from '../../index'
@@ -1286,6 +1286,89 @@ describe('Transaction', () => {
                 'commit#2@1',
                 'commit#1@0',
             ])
+        })
+    })
+
+    describe('the adapter context', () => {
+        /** A mock adapter that records the ambient context of each call, as `operation` and the context. */
+        class ContextRecordingAdapter extends MockTransactionAdapter {
+            readonly seen: { operation: string; context: Context | null }[] = []
+
+            override async begin(transaction: ITransaction) {
+                this.seen.push({ operation: 'begin', context: useContext() })
+                await super.begin(transaction)
+            }
+
+            override async commit(transaction: ITransaction) {
+                this.seen.push({ operation: 'commit', context: useContext() })
+                await super.commit(transaction)
+            }
+
+            override async rollback(transaction: ITransaction) {
+                this.seen.push({ operation: 'rollback', context: useContext() })
+                await super.rollback(transaction)
+            }
+        }
+
+        let recording: ContextRecordingAdapter
+        let ambient: Context<ITransactionScope>
+
+        beforeEach(() => {
+            recording = new ContextRecordingAdapter()
+            context.registerValue('transactionAdapter', recording)
+            ambient = new Context<ITransactionScope>()
+            ambient.registerValue('transactionAdapter', recording)
+            ambient.registerValue('transactionStack', new TransactionStack())
+        })
+
+        const inAmbient = <T>(fn: () => T) => withContext(ambient, fn)
+        const contexts = () => recording.seen.map(({ context }) => context)
+
+        it('calls the adapter in the context passed to the constructor', async () => {
+            await inAmbient(async () => {
+                const committed = new Transaction({ context })
+                await committed.begin()
+                await committed.commit()
+
+                const rolledBack = new Transaction({ context })
+                await rolledBack.begin()
+                await rolledBack.rollback()
+            })
+
+            expect(recording.seen.map(({ operation }) => operation)).toEqual(['begin', 'commit', 'begin', 'rollback'])
+            expect(contexts()).toEqual([context, context, context, context])
+        })
+
+        it('calls the adapter in the context passed to Transaction.begin()', async () => {
+            await inAmbient(async () => {
+                const transaction = await Transaction.begin({ context })
+                await transaction.commit()
+            })
+
+            expect(contexts()).toEqual([context, context])
+        })
+
+        it('calls the adapter in the context passed to Transaction.run()', async () => {
+            await inAmbient(() =>
+                Transaction.run(
+                    async (transaction) => {
+                        await transaction.run(() => undefined)
+                    },
+                    { context },
+                ),
+            )
+
+            expect(recording.seen.map(({ operation }) => operation)).toEqual(['begin', 'begin', 'commit', 'commit'])
+            expect(contexts()).toEqual([context, context, context, context])
+        })
+
+        it('calls the adapter in the ambient context without an explicit context', async () => {
+            await inAmbient(async () => {
+                const transaction = await Transaction.begin()
+                await transaction.commit()
+            })
+
+            expect(contexts()).toEqual([ambient, ambient])
         })
     })
 })

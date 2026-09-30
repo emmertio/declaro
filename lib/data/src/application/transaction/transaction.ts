@@ -28,7 +28,8 @@ export interface TransactionOptions {
     parent?: ITransaction | null
     /**
      * The context to use instead of the ambient one: the adapter is read from it, `begin()` uses its transaction
-     * stack, and `run()` callbacks run in a child of it.
+     * stack, and `run()` callbacks run in a child of it. The adapter's `begin()`, `commit()`, and `rollback()` also run
+     * in it, so `useContext()` inside them returns it.
      */
     context?: Context
     /**
@@ -99,6 +100,8 @@ export class Transaction implements ITransaction {
     private emitter?: EventManager
     private afterCommitCallbacks: AfterCommitCallback[] = []
     private readonly context?: Context
+    /** The context the adapter calls run in: the one passed by the caller, if any. Otherwise they see the ambient one. */
+    private adapterContext?: Context
     private readonly requestedParent?: ITransaction | null
     private currentParent?: ITransaction
     private stack?: TransactionStack
@@ -119,6 +122,7 @@ export class Transaction implements ITransaction {
             options.adapter ??
             (options.context ? withContext(options.context, () => useTransactionAdapter()) : useTransactionAdapter())
         this.context = options.context
+        this.adapterContext = options.context
         this.requestedParent = options.parent
         this.explicitEmitter = options.emitter
     }
@@ -130,6 +134,9 @@ export class Transaction implements ITransaction {
      * @param options - Same as the {@link Transaction} constructor.
      * @returns The active transaction. Commit or roll it back yourself.
      * @throws {Error} If no adapter or transaction stack can be found, or if the adapter fails to begin.
+     * @throws {Error} If an `afterBegin` listener throws, after rolling back. The caller never gets the transaction,
+     *   so it is not left open.
+     * @throws {AggregateError} If rolling back after a failing `afterBegin` listener also fails. Holds both errors.
      *
      * @example
      * ```ts
@@ -145,7 +152,17 @@ export class Transaction implements ITransaction {
      */
     static async begin(options?: TransactionOptions): Promise<Transaction> {
         const transaction = new Transaction(options)
-        await transaction.begin()
+        try {
+            await transaction.begin()
+        } catch (error) {
+            // Only an `afterBegin` listener can fail after the transaction became active. The caller can't finish it.
+            if (isActive(transaction)) {
+                await rollBackAfter(transaction, error)
+            }
+
+            throw error
+        }
+
         return transaction
     }
 
@@ -181,7 +198,11 @@ export class Transaction implements ITransaction {
             parent = current && isActive(current) && Transaction.usesAdapter(current, adapter) ? current : null
         }
 
-        return Transaction.runInNewStack(callback, { adapter, parent, emitter: options.emitter }, ambient)
+        return Transaction.runInNewStack(
+            callback,
+            { adapter, parent, emitter: options.emitter, adapterContext: options.context },
+            ambient,
+        )
     }
 
     /** The current lifecycle state. */
@@ -216,7 +237,9 @@ export class Transaction implements ITransaction {
      * @throws {Error} If the transaction is not `Pending`, if another operation on it is in progress, if no
      *   transaction stack can be found, if an explicit parent is not `Active`, if the parent has an active child in
      *   another async flow, if a `beforeBegin` listener throws (the transaction stays `Pending`), if the adapter
-     *   fails, or if an `afterBegin` listener throws (the transaction is already `Active`).
+     *   fails, or if an `afterBegin` listener throws. In that last case the transaction is already `Active` and
+     *   current, and is left that way: the caller holds it, and should roll it back. (The static
+     *   {@link Transaction.begin} and {@link Transaction.run} roll it back for you.)
      */
     async begin(): Promise<void> {
         this.assertStatus(TransactionStatus.Pending, 'begin')
@@ -237,7 +260,7 @@ export class Transaction implements ITransaction {
         }
         try {
             await this.emit(TransactionEvent.BeforeBegin)
-            await this.adapter.begin(this)
+            await this.inAdapterContext(() => this.adapter.begin(this))
         } catch (error) {
             if (parent instanceof Transaction) {
                 parent.openChildren.delete(this)
@@ -306,8 +329,10 @@ export class Transaction implements ITransaction {
      *   parent's own. That includes nested commits done by a cascade.
      * - A rollback, direct or cascaded, drops them.
      * - At the top-level commit they run in registration order, each awaited, after the transaction is `Committed` and
-     *   off its stack, so `useTransaction()` inside them does not return it. The first one that throws stops the
-     *   rest, and `commit()` rejects with its error. The transaction stays `Committed`, and `Transaction.run()` does
+     *   off its stack. They run outside any transaction: in a child of the transaction's context (or of the ambient
+     *   one) with a new, empty transaction stack, so `useContext()` still resolves the app and request dependencies,
+     *   `useTransaction()` throws, and a transaction begun inside them is top-level. The first one that throws stops
+     *   the rest, and `commit()` rejects with its error. The transaction stays `Committed`, and `Transaction.run()` does
      *   not try to roll it back.
      *
      * @param callback - The work to run after the commit.
@@ -339,7 +364,7 @@ export class Transaction implements ITransaction {
         this.assertStatus(TransactionStatus.Active, 'run a child of')
         return Transaction.runInNewStack(
             callback,
-            { adapter: this.adapter, parent: this },
+            { adapter: this.adapter, parent: this, adapterContext: this.adapterContext },
             this.context ?? useContext(),
         )
     }
@@ -349,13 +374,19 @@ export class Transaction implements ITransaction {
      * in that child context, then commits or rolls back. Shared by {@link Transaction.run} and {@link Transaction.prototype.run}.
      *
      * @param callback - The work to run.
-     * @param options - The adapter and the already-decided parent (`null` for top-level).
+     * @param options - The adapter, the already-decided parent (`null` for top-level), and the caller's explicit
+     *   context, which the adapter calls run in.
      * @param ambient - The context to derive the run's context from, if any.
      * @returns Whatever `callback` returns.
      */
     private static async runInNewStack<TResult>(
         callback: TransactionCallback<TResult>,
-        options: { adapter: ITransactionAdapter; parent: ITransaction | null; emitter?: EventManager },
+        options: {
+            adapter: ITransactionAdapter
+            parent: ITransaction | null
+            emitter?: EventManager
+            adapterContext?: Context
+        },
         ambient: Context | null,
     ): Promise<TResult> {
         const context = new Context<ITransactionScope>()
@@ -371,7 +402,10 @@ export class Transaction implements ITransaction {
         // The run's adapter may differ from the ambient one, or there may be none: expose the one the run uses.
         context.registerValue('transactionAdapter', options.adapter)
 
-        const transaction = new Transaction({ ...options, context })
+        const { adapterContext, ...transactionOptions } = options
+        const transaction = new Transaction({ ...transactionOptions, context })
+        // The run's context is internal. The adapter sees the context the caller passed, or else the ambient one.
+        transaction.adapterContext = adapterContext
         try {
             await transaction.begin()
         } catch (error) {
@@ -425,6 +459,29 @@ export class Transaction implements ITransaction {
         }
 
         return stack
+    }
+
+    /**
+     * Runs an adapter call in the caller's explicit context, if there is one, so `useContext()` inside the adapter
+     * returns it. Without one, the call sees the ambient context.
+     */
+    private inAdapterContext<T>(call: () => T): T {
+        return this.adapterContext ? withContext(this.adapterContext, call) : call()
+    }
+
+    /**
+     * Creates the context `afterCommit` callbacks run in: a child of the transaction's context (or of the ambient one)
+     * with a new, empty transaction stack, so no transaction is current inside the callbacks.
+     */
+    private createAfterCommitContext(): Context<ITransactionScope> {
+        const context = new Context<ITransactionScope>()
+        const base = this.context ?? useContext()
+        if (base) {
+            context.extend(base)
+        }
+        context.registerValue('transactionStack', new TransactionStack())
+
+        return context
     }
 
     /**
@@ -495,7 +552,7 @@ export class Transaction implements ITransaction {
             }
 
             await this.emit(operation === 'commit' ? TransactionEvent.BeforeCommit : TransactionEvent.BeforeRollback)
-            await this.adapter[operation](this)
+            await this.inAdapterContext(() => this.adapter[operation](this))
         } finally {
             this.operationInProgress = undefined
         }
@@ -515,10 +572,12 @@ export class Transaction implements ITransaction {
             for (const callback of callbacks) {
                 this.currentParent.afterCommit(callback)
             }
-        } else {
-            for (const callback of callbacks) {
-                await callback()
-            }
+        } else if (callbacks.length > 0) {
+            await withContext(this.createAfterCommitContext(), async () => {
+                for (const callback of callbacks) {
+                    await callback()
+                }
+            })
         }
         await this.emit(TransactionEvent.AfterCommit)
     }

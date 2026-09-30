@@ -1,4 +1,4 @@
-import { Context, withContext } from '@declaro/core'
+import { Context, useContext, withContext } from '@declaro/core'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { TransactionStatus, type ITransaction } from '../../domain/transaction/transaction-interface'
 import { useTransaction } from '../../shared/utils/transaction/use-transaction'
@@ -210,6 +210,69 @@ describe('Transaction.afterCommit', () => {
         expect(seen).toHaveLength(2)
         expect(seen).not.toContain(committed)
         expect(seen).toEqual([undefined, undefined])
+    })
+
+    it('runs callbacks outside any transaction, even one still open in the committing flow', async () => {
+        const errors: string[] = []
+
+        const otherContext = new Context<ITransactionScope>()
+        otherContext.registerValue('transactionAdapter', adapter)
+        otherContext.registerValue('transactionStack', new TransactionStack())
+        const transaction = await Transaction.begin({ context: otherContext })
+
+        await inContext(async () => {
+            const unrelated = await Transaction.begin()
+            transaction.afterCommit(() => {
+                try {
+                    useTransaction()
+                } catch (error) {
+                    errors.push((error as Error).message)
+                }
+            })
+
+            await transaction.commit()
+            expect(useTransaction()).toBe(unrelated)
+            await unrelated.commit()
+        })
+
+        expect(errors).toEqual([expect.stringContaining('No transaction is active')])
+    })
+
+    it("resolves the request's dependencies inside callbacks", async () => {
+        const requestContext = new Context<ITransactionScope & { requestId: string }>()
+        requestContext.registerValue('transactionAdapter', adapter)
+        requestContext.registerValue('transactionStack', new TransactionStack())
+        requestContext.registerValue('requestId', 'request-1')
+        let requestId: string | undefined
+
+        await withContext(requestContext, () =>
+            Transaction.run(async (transaction) => {
+                transaction.afterCommit(() => {
+                    requestId = useContext<typeof requestContext>()?.resolve('requestId')
+                })
+            }),
+        )
+
+        expect(requestId).toBe('request-1')
+    })
+
+    it('runs a transaction begun inside a callback as a new top-level transaction', async () => {
+        let nested: ITransaction | undefined
+
+        await inContext(() =>
+            Transaction.run(async (transaction) => {
+                transaction.afterCommit(() =>
+                    Transaction.run(async (inner) => {
+                        nested = inner
+                    }),
+                )
+            }),
+        )
+
+        expect(nested?.depth).toBe(0)
+        expect(nested?.parent).toBeUndefined()
+        expect(nested?.status).toBe(TransactionStatus.Committed)
+        expect(operations()).toEqual(['begin#1@0', 'commit#1@0', 'begin#2@0', 'commit#2@0'])
     })
 
     it('throws when the transaction is not active', async () => {

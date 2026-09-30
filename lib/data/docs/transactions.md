@@ -17,6 +17,8 @@
 - [Reaching the ORM from repositories](#reaching-the-orm-from-repositories)
 - [Event subscribers](#event-subscribers)
 - [Lifecycle events](#lifecycle-events)
+    - [Where they are emitted](#where-they-are-emitted)
+    - [How listeners affect the transaction](#how-listeners-affect-the-transaction)
 - [Testing](#testing)
 - [Reference](#reference)
 
@@ -34,11 +36,14 @@ interface ITransactionAdapter {
 
 `ITransaction` knows nothing about your ORM. It only carries the lifecycle:
 
-| Property             | Meaning                                                        |
-| -------------------- | -------------------------------------------------------------- |
-| `transaction.status` | `Pending`, `Active`, `Committed` or `RolledBack`.              |
-| `transaction.parent` | The enclosing transaction, or `undefined` for a top-level one. |
-| `transaction.depth`  | `0` for top level, `1` for the first nested level, and so on.  |
+| Property             | Meaning                                                               |
+| -------------------- | --------------------------------------------------------------------- |
+| `transaction.id`     | A stable, unique string id, assigned when the transaction is created. |
+| `transaction.status` | `Pending`, `Active`, `Committed` or `RolledBack`.                     |
+| `transaction.parent` | The enclosing transaction, or `undefined` for a top-level one.        |
+| `transaction.depth`  | `0` for top level, `1` for the first nested level, and so on.         |
+
+It also has the lifecycle methods `begin()`, `commit()`, `rollback()`, `run(callback)` and [`afterCommit(callback)`](#running-code-after-the-commit). Your adapter shouldn't call them: Declaro calls the adapter, not the other way round.
 
 Whatever your ORM needs inside a transaction (a connection, a Knex `trx`, a MikroORM `EntityManager`) is the adapter's business. The adapter keeps it in its own per-transaction state, usually a `WeakMap<ITransaction, ...>`:
 
@@ -50,7 +55,7 @@ This split is deliberate. Domain code (services, event handlers) only ever sees 
 
 An adapter is long-lived: you create one per connection pool or ORM instance and register it with the app. Declaro makes sure each method is only called in a valid state, finishes nested transactions before their parents (innermost first), and only updates `transaction.status` after your method resolves. If `commit()` throws, the transaction stays `Active` and is then rolled back (by `Transaction.run`, or by your own code), so your `rollback()` must still find its state.
 
-Per-request ORM state belongs in `begin()` for a top-level transaction. For example, a MikroORM adapter calls `orm.em.fork()` there, so each transaction gets its own identity map.
+Per-request ORM state belongs in `begin()` for a top-level transaction. For example, a MikroORM adapter forks an `EntityManager` there, so each transaction gets its own identity map (see [the MikroORM example](#orms-that-cant-nest)). Adapter methods don't receive the context as a parameter: they get it implicitly, since the adapter's `begin()`, `commit()` and `rollback()` are called in the caller's ambient context, so `useContext()` inside them reaches the current request's state. When a transaction is given an explicit `{ context }` (through `new Transaction()`, `Transaction.begin()` or `Transaction.run()`), they are called in that context instead.
 
 ### Example: a raw SQL adapter
 
@@ -139,7 +144,11 @@ If your ORM has no savepoints, let nested transactions join the outer one. Give 
 
 ```ts
 import type { EntityManager, MikroORM } from '@mikro-orm/core'
+import { useContext, type Context } from '@declaro/core'
 import { useTransaction, type ITransaction, type ITransactionAdapter } from '@declaro/data'
+
+// Whatever per-request state your app registers on its request contexts, if any.
+type RequestScope = { em?: EntityManager }
 
 export class MikroOrmTransactionAdapter implements ITransactionAdapter {
     private readonly managers = new WeakMap<ITransaction, EntityManager>()
@@ -159,7 +168,9 @@ export class MikroOrmTransactionAdapter implements ITransactionAdapter {
             return
         }
 
-        const em = this.orm.em.fork()
+        // Top level: fork per-request state. begin() runs in the caller's context, so useContext() finds the request.
+        const requestEm = useContext<Context<RequestScope>>()?.resolve('em')
+        const em = (requestEm ?? this.orm.em).fork()
         await em.begin()
         this.managers.set(transaction, em)
     }
@@ -220,7 +231,8 @@ const order = await Transaction.run(async (transaction) => {
 - It runs the callback in a child context with its own `TransactionStack`, and the new transaction is the current one there, so `useTransaction()` returns it, including in anything the callback awaits. The run's adapter is registered on that child context too, so `useTransactionAdapter()` returns it, and transactions begun inside nest in the run's transaction, even when the adapter came from `options.adapter` rather than the context.
 - If the callback commits or rolls back the transaction itself, `Transaction.run` leaves it alone. The same goes when something else finished it, such as an outer transaction committed or rolled back from inside the callback (see [Manual lifecycle](#manual-lifecycle)). The rest of the callback then runs with no current transaction, so `useTransaction()` throws there.
 - If the callback returns while transactions it began are still open, the commit commits them too, innermost first, before the run's own transaction (see [Manual lifecycle](#manual-lifecycle)).
-- If the callback throws, it rolls back and rethrows. If the commit fails, it rolls back and rethrows the commit error. The exception is a failing [`afterCommit` callback](#running-code-after-the-commit): the data is already saved by then, so the run rethrows that error without rolling back.
+- If the callback throws, it rolls back and rethrows. If the commit fails, it rolls back and rethrows the commit error. The exception is a failing [`afterCommit` callback](#running-code-after-the-commit): the data is already saved by then, so the run rethrows that error without rolling back. The same goes for a throwing [`afterCommit` event listener](#lifecycle-events).
+- If an [`afterBegin` listener](#lifecycle-events) throws, the run rolls back and rethrows without running the callback.
 - If the rollback fails too, it throws an `AggregateError` (`Transaction failed, and so did its rollback`) holding both the original error and the rollback error.
 
 `transaction.run(callback)` does the same with a transaction nested in `transaction`, using its adapter. It throws if `transaction` isn't `Active`.
@@ -356,12 +368,12 @@ await Transaction.run(async (tx1) => {
 
 The constructor and `Transaction.begin` take the same options:
 
-| Option    | Default                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adapter` | The adapter registered on `context`, or on the current context. Resolved in the constructor, which throws if there is none.                        |
-| `context` | The current context. `begin()` uses this context's transaction stack, and `run()` callbacks run in a child of it.                                  |
-| `parent`  | Decided at `begin()` (see below). Pass a transaction to nest in it (it must be active when you begin), or `null` to force a top-level transaction. |
-| `emitter` | The event manager of the transaction's context. Where the transaction's [lifecycle events](#lifecycle-events) are emitted.                         |
+| Option    | Default                                                                                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter` | The adapter registered on `context`, or on the current context. Resolved in the constructor, which throws if there is none.                                    |
+| `context` | The current context. `begin()` uses this context's transaction stack, and `run()` callbacks run in a child of it.                                              |
+| `parent`  | Decided at `begin()` (see below). Pass a transaction to nest in it (it must be active when you begin), or `null` to force a top-level transaction.             |
+| `emitter` | The `events` of the context the transaction begins in (see [Lifecycle events](#lifecycle-events)). Applies only to this transaction, not to ones nested in it. |
 
 The parent is chosen when you call `begin()`, not when you construct the transaction: it is the transaction that is current at that moment, if it is active and uses the same adapter. Otherwise the transaction is top-level. So `parent` and `depth` only mean something after `begin()`; before it, `depth` is `0`. An explicit `parent` that isn't active makes `begin()` throw, for example `Cannot begin a transaction nested in a parent that is committed`. If the adapter's `begin()` fails, the transaction stays `Pending` with no parent, so a retried `begin()` decides the parent again from whatever is current then.
 
@@ -481,11 +493,11 @@ await Transaction.run(async (transaction) => {
 // the order is saved, then published
 ```
 
-`afterCommit` can only be called while the transaction is `Active`; otherwise it throws. The callback takes no arguments and can return a promise. Callbacks follow the data:
+`afterCommit` is part of `ITransaction`, so it works on whatever `useTransaction()` returns. It can only be called while the transaction is `Active`; otherwise it throws. The callback is an `AfterCommitCallback`, `() => unknown | Promise<unknown>`: it takes no arguments and can return a promise. Callbacks follow the data:
 
 - **Nested transactions pass them up.** A nested commit isn't final (see [What a nested commit means](#what-a-nested-commit-means)), so it moves its callbacks to its parent, after the ones the parent already has. They only run after the **top-level** commit. That includes nested transactions committed by a [cascade](#manual-lifecycle).
 - **A rollback drops them.** When a transaction rolls back, directly or through a cascade, its callbacks never run. So do the callbacks its committed children passed up to it.
-- **The top-level commit runs them in the order they were registered**, one after another, each awaited, once the adapter's commit has succeeded and the status is `Committed`. They run outside any transaction: `useTransaction()` in a callback doesn't return the committed transaction.
+- **The top-level commit runs them in the order they were registered**, one after another, each awaited, once the adapter's commit has succeeded and the status is `Committed`. They run outside any transaction: in a child of the transaction's context (or of the ambient one) with a new, empty transaction stack. `useContext()` still resolves the app and request dependencies, but `useTransaction()` throws, even when an unrelated transaction is still open in the flow that called `commit()`. A transaction begun in a callback, such as with `Transaction.run`, is a new top-level transaction.
 - **The first failure stops them.** If a callback throws, the remaining callbacks don't run and `commit()` rejects with that error. The data is already saved, so the transaction stays `Committed` and there is nothing to roll back. Inside `Transaction.run`, the run rethrows the error without trying to roll back. If you need every callback to run whatever happens, catch errors inside each one.
 
 This matches the default behavior of Django's `transaction.on_commit`.
@@ -565,27 +577,45 @@ Every transaction, top-level or nested, emits an event before and after each ste
 | `BeforeRollback`   | `declaro::transaction.beforeRollback` |
 | `AfterRollback`    | `declaro::transaction.afterRollback`  |
 
-The type strings follow the same `<namespace>::<resource>.<action>` convention as `ModelService` events. They are emitted with an awaited `emitAsync` on the event manager of the transaction's context, or on the `emitter` you pass in the [options](#manual-lifecycle). With neither, nothing is emitted.
-
-The event's data is a plain summary, `{ id, depth, status, parentId? }`, so it survives `JSON.stringify` and can go through adapters that forward events elsewhere, such as Redis. The live `Transaction` is also reachable from the event for in-process listeners, but it isn't serialized.
-
-Use them for cross-cutting concerns such as metrics and logging:
+The `TransactionEvent` enum holds the actions. The type strings follow the same `<namespace>::<resource>.<action>` convention as `ModelService` events, and `TransactionLifecycleEvent.getType(action)` builds them for you (`TransactionLifecycleEvent.getDescriptor(action)` returns the `ActionDescriptor`). These two are equivalent:
 
 ```ts
-app.on('declaro::transaction.afterCommit', (event) => {
-    metrics.increment('transactions.committed', { depth: event.data.depth })
+import { TransactionEvent, TransactionLifecycleEvent } from '@declaro/data'
+
+app.on(TransactionLifecycleEvent.getType(TransactionEvent.AfterCommit), listener)
+app.on('declaro::transaction.afterCommit', listener)
+```
+
+Each event is a `TransactionLifecycleEvent`, a `DomainEvent` whose `data` is an `ITransactionEventData`: a plain summary, `{ id, depth, status, parentId? }`, taken when the event was emitted. It survives `JSON.stringify`, so it can go through adapters that forward events elsewhere, such as Redis. For in-process listeners, `event.transaction` is the live `ITransaction`. It is non-enumerable, so it is left out of serialization and spreads.
+
+Use them for cross-cutting concerns such as metrics and logging. `app.on` listeners receive the context and the event; `app.events.on` listeners receive only the event:
+
+```ts
+import { TransactionEvent, TransactionLifecycleEvent } from '@declaro/data'
+
+app.on(TransactionLifecycleEvent.getType(TransactionEvent.AfterCommit), (context, event: TransactionLifecycleEvent) => {
+    metrics.increment('transactions.committed', { depth: event.data?.depth })
 })
 
-app.on('declaro::transaction.afterRollback', (event) => {
+app.events.on('declaro::transaction.afterRollback', (event: TransactionLifecycleEvent) => {
     logger.warn('Transaction rolled back', event.data)
 })
 ```
 
-How listeners affect the transaction:
+### Where they are emitted
+
+Events are emitted with an awaited `emitAsync` on the `events` of the context the transaction begins in: the `context` option if you passed one, or else the ambient context. The emitter is captured by `begin()` and reused for that transaction's commit or rollback. With no context and no `emitter` option, nothing is emitted.
+
+Listeners registered on the app context still reach transactions begun in requests and runs, because `Context.extend` copies the parent's listeners into a request context, and into each run's child context, when that context is created. The copy is a snapshot: a listener added to the app after a request or run context was created isn't seen by that context. Register lifecycle listeners at startup.
+
+Pass the `emitter` option to send a transaction's events somewhere else. It applies only to that transaction (for `Transaction.run`, the run's own transaction), not to transactions nested in it, which use their own context's `events`.
+
+### How listeners affect the transaction
 
 - **A `before*` listener that throws stops that step.** The adapter isn't called and the status doesn't change, and the error reaches the caller. Inside `Transaction.run`, a throwing `beforeCommit` listener therefore makes the run roll back.
-- **An `after*` listener that throws reaches the caller too, but the step has already happened**: the transaction is already begun, committed or rolled back.
-- **In a cascade, each transaction emits its own events as it is finished**, innermost first.
+- **An `after*` listener that throws reaches the caller too, but the step has already happened**: the transaction is already begun, committed or rolled back. If an `afterBegin` listener throws inside `Transaction.run`, the run rolls back and rethrows without running the callback. The static `Transaction.begin()` also rolls back and rethrows, since the caller never gets the transaction. An instance's `transaction.begin()` leaves it `Active` and current: you hold it, so roll it back yourself.
+- **Type-specific listeners run before `'*'` listeners**, one after another. So when a `before*` listener throws, `'*'` listeners (such as an event forwarder) never see that event.
+- **In a cascade, each transaction emits its own events as it is finished**, innermost first. The target's own `beforeCommit` or `beforeRollback` fires after the cascade, just before its adapter call. If that listener throws, the target stays `Active`, and the inner transactions the cascade already finished stay finished.
 - **A top-level commit runs in this order:** the adapter's commit, the status changes to `Committed`, the [`afterCommit` callbacks](#running-code-after-the-commit) run, then the `afterCommit` event is emitted. A failure at any point stops the sequence, so a failing callback also means no `afterCommit` event. A nested commit moves its callbacks to its parent instead of running them, then emits its `afterCommit` event.
 
 A nested transaction's `afterCommit` event doesn't mean its data is saved (see [What a nested commit means](#what-a-nested-commit-means)), and the events fire for every transaction in the app. For a side effect that belongs to one piece of work, register an [`afterCommit` callback](#running-code-after-the-commit) on its transaction rather than listening for the event.
@@ -622,18 +652,21 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 
 ## Reference
 
-| Export                    | Kind       | Purpose                                                                                                                                                                               |
-| ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ITransactionAdapter`     | interface  | The adapter contract your app implements: `begin`, `commit`, `rollback`.                                                                                                              |
-| `ITransaction`            | interface  | What an adapter receives: `status`, `parent`, `depth`. ORM-agnostic.                                                                                                                  |
-| `Transaction`             | class      | One transaction. `new Transaction(options?)` (`adapter`, `context`, `parent`, `emitter`); statics `begin`, `run`; instance `id`, `begin`, `commit`, `rollback`, `run`, `afterCommit`. |
-| `transaction.id`          | property   | A stable, unique string id, set at construction. Included in lifecycle event data.                                                                                                    |
-| `transaction.afterCommit` | method     | Registers a callback to run once the top-level transaction has committed. Dropped on rollback.                                                                                        |
-| `TransactionStatus`       | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                                                                                       |
-| `TransactionEvent`        | enum       | The six lifecycle actions, `BeforeBegin` to `AfterRollback`. Event types are `declaro::transaction.<action>`.                                                                         |
-| `TransactionStack`        | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.                                                                        |
-| `transactionModule`       | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                                                                                  |
-| `wrapWithTransaction`     | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                                                                                             |
-| `useTransaction`          | function   | Synchronously gets the current transaction. Throws when none is active.                                                                                                               |
-| `useTransactionAdapter`   | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                                                                       |
-| `MockTransactionAdapter`  | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                                                                        |
+| Export                      | Kind       | Purpose                                                                                                                                     |
+| --------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ITransactionAdapter`       | interface  | The adapter contract your app implements: `begin`, `commit`, `rollback`.                                                                    |
+| `ITransaction`              | interface  | One transaction, ORM-agnostic: `id`, `status`, `parent`, `depth`, and `begin`, `commit`, `rollback`, `run`, `afterCommit`.                  |
+| `Transaction`               | class      | Implements `ITransaction`. `new Transaction(options?)`; statics `begin(options?)` and `run(callback, options?)`.                            |
+| `TransactionOptions`        | interface  | `adapter`, `context`, `parent`, `emitter`. Taken by the constructor, `Transaction.begin`, `Transaction.run` and `wrapWithTransaction`.      |
+| `TransactionCallback`       | type       | `(transaction: ITransaction) => TResult \| Promise<TResult>`, the work passed to `run`.                                                     |
+| `AfterCommitCallback`       | type       | `() => unknown \| Promise<unknown>`, the work passed to `afterCommit`.                                                                      |
+| `TransactionStatus`         | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                                             |
+| `TransactionEvent`          | enum       | The six lifecycle actions, `BeforeBegin` to `AfterRollback`. Event types are `declaro::transaction.<action>`.                               |
+| `TransactionLifecycleEvent` | class      | The lifecycle event: `data` (`ITransactionEventData`), non-enumerable `transaction`; statics `getType(action)` and `getDescriptor(action)`. |
+| `ITransactionEventData`     | interface  | The serializable event data: `id`, `depth`, `status`, `parentId?`.                                                                          |
+| `TransactionStack`          | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.                              |
+| `transactionModule`         | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                                        |
+| `wrapWithTransaction`       | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                                                   |
+| `useTransaction`            | function   | Synchronously gets the current transaction. Throws when none is active.                                                                     |
+| `useTransactionAdapter`     | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                             |
+| `MockTransactionAdapter`    | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                              |

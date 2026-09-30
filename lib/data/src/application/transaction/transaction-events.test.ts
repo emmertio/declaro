@@ -248,6 +248,30 @@ describe('Transaction lifecycle events', () => {
             expect(operations()).toEqual(['begin#1@0'])
         })
 
+        it('rolls back and rethrows from Transaction.begin() when afterBegin throws', async () => {
+            failOn(TransactionEvent.AfterBegin)
+
+            await expect(Transaction.begin({ context })).rejects.toThrow('afterBegin listener failure')
+
+            expect(stack.size).toBe(0)
+            expect(operations()).toEqual(['begin#1@0', 'rollback#1@0'])
+        })
+
+        it('throws an AggregateError from Transaction.begin() when the rollback after afterBegin fails too', async () => {
+            failOn(TransactionEvent.AfterBegin)
+            adapter.failures.rollback = true
+
+            const error = await Transaction.begin({ context }).catch((error: unknown) => error)
+
+            expect(error).toBeInstanceOf(AggregateError)
+            expect((error as AggregateError).message).toBe('Transaction failed, and so did its rollback')
+            expect((error as AggregateError).errors.map((inner: Error) => inner.message)).toEqual([
+                'afterBegin listener failure',
+                'Mock rollback failure',
+            ])
+            expect(operations()).toEqual(['begin#1@0'])
+        })
+
         it('propagates an afterCommit failure with the transaction already committed', async () => {
             const transaction = await Transaction.begin({ context })
             failOn(TransactionEvent.AfterCommit)

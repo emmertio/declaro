@@ -650,6 +650,61 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 
 `adapter.handle(transaction)` returns a transaction's handle, the current transaction's by default. It throws for a transaction that hasn't begun on this adapter, or that has committed or rolled back. Set `failures` (`{ begin?, commit?, rollback? }`) to make a call throw `Mock <operation> failure`, for testing error paths: pass it to the constructor, `new MockTransactionAdapter({ failures: { commit: true } })`, or change it at any time, for example `adapter.failures.commit = true`.
 
+### Rolling back integration tests
+
+For integration tests against a real database, run each test in a transaction that is always rolled back, so it leaves no data behind. The helpers take no test-framework dependency, so they work with Bun, Vitest and Jest alike.
+
+**Per test**: `withRollback(fn, options?)` runs `fn` in a top-level transaction, rolls it back whether `fn` resolves or throws, then returns `fn`'s result or rethrows its error. `rollbackTest(fn, options?)` wraps the same thing as a test function to pass straight to `it`. Both take the `Transaction.run` options (`adapter`, `context`, `parent`, `emitter`); pass `parent` to nest in an existing transaction instead. The transaction is current inside `fn`, which receives it.
+
+```ts
+import { expect, it } from 'bun:test'
+import { rollbackTest, withRollback } from '@declaro/data'
+
+it(
+    'creates an order',
+    rollbackTest(
+        async () => {
+            const order = await orderService.create(input)
+            expect(await orderService.load(order.id)).toBeDefined()
+        },
+        { context: app },
+    ),
+)
+
+it('reserves stock', () =>
+    withRollback(
+        async () => {
+            await inventoryService.reserve(items)
+        },
+        { context: app },
+    ))
+```
+
+**For a whole suite**: `rollbackEachTest({ beforeEach, afterEach }, options?)` registers the hooks through the functions you pass in. Before each test it begins a top-level transaction; after each test it rolls it back, cascading to any transaction the test left open. A `beforeEach` hook can't make a transaction current in the test body through the ambient context, so the transaction lives on a test context instead: a child of `options.context` with its own `TransactionStack` (a new one each test), and with `options.adapter` registered on it when passed. It returns `{ context, transaction }`: run the code under test with `withContext(suite.context, ...)`, and read `suite.transaction` inside a test for the current test's transaction.
+
+```ts
+import { withContext } from '@declaro/core'
+import { rollbackEachTest } from '@declaro/data'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+
+describe('orders', () => {
+    const suite = rollbackEachTest({ beforeEach, afterEach }, { context: app })
+
+    it('creates an order', () =>
+        withContext(suite.context, async () => {
+            const order = await orderService.create(input)
+            expect(await orderService.load(order.id)).toBeDefined()
+        }))
+})
+```
+
+What the rollback covers, in both forms:
+
+- **Nested commits are undone.** Code under test that commits a nested transaction only saves into the test's transaction (see [What a nested commit means](#what-a-nested-commit-means)), so the final rollback still undoes it.
+- **A new top-level transaction escapes.** Code that begins its own top-level transaction, with `parent: null` or through a `Transaction.run` outside the test's context, commits for real, and the rollback can't undo it.
+- **`afterCommit` callbacks never run**, because the test's transaction never commits.
+- **Don't commit the test's transaction itself.** Its changes would be saved, so `withRollback` and the `afterEach` hook throw when they find it `Committed`.
+
 ## Reference
 
 | Export                      | Kind       | Purpose                                                                                                                                     |
@@ -670,3 +725,6 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 | `useTransaction`            | function   | Synchronously gets the current transaction. Throws when none is active.                                                                     |
 | `useTransactionAdapter`     | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                             |
 | `MockTransactionAdapter`    | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                              |
+| `withRollback`              | function   | Runs a test body in a top-level transaction that is always rolled back. Takes the `Transaction.run` options.                                |
+| `rollbackTest`              | function   | Wraps a test body as an argument-less test function that runs through `withRollback`.                                                       |
+| `rollbackEachTest`          | function   | Registers `beforeEach`/`afterEach` hooks that roll back every test in a suite. Returns `{ context, transaction }` (`RollbackTestSuite`).    |

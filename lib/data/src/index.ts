@@ -1,5 +1,6 @@
 export * from './application/model-controller'
 export * from './application/read-only-model-controller'
+export * from './application/transaction/test-rollback'
 export * from './application/transaction/transaction'
 export * from './application/transaction/transaction-module'
 export * from './application/transaction/transaction-stack'

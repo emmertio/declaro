@@ -650,6 +650,35 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 
 `adapter.handle(transaction)` returns a transaction's handle, the current transaction's by default. It throws for a transaction that hasn't begun on this adapter, or that has committed or rolled back. Set `failures` (`{ begin?, commit?, rollback? }`) to make a call throw `Mock <operation> failure`, for testing error paths: pass it to the constructor, `new MockTransactionAdapter({ failures: { commit: true } })`, or change it at any time, for example `adapter.failures.commit = true`.
 
+### Rolling back the in-memory repository
+
+`MockMemoryRepository` doesn't take part in transactions on its own. Track it on the adapter and a rollback undoes its writes, so tests can check what a failed transaction leaves behind. Pass repositories to the constructor, or add them later with `adapter.track(...repositories)`:
+
+```ts
+import { Context, withContext } from '@declaro/core'
+import { MockMemoryRepository, MockTransactionAdapter, Transaction, transactionModule } from '@declaro/data'
+
+const books = new MockMemoryRepository({ schema: BookSchema })
+const adapter = new MockTransactionAdapter({ repositories: [books] })
+const app = new Context()
+await app.use(transactionModule({ adapter }))
+
+await withContext(app, () =>
+    Transaction.run(async () => {
+        await books.create({ id: 1, title: 'Dune' })
+        throw new Error('card declined')
+    }),
+).catch(() => {})
+
+expect(await books.load({ id: 1 })).toBeNull()
+```
+
+Every transaction, top-level or nested, snapshots each tracked repository (its data, trash and id counter) when it begins. `commit` discards the snapshot and `rollback` restores it. So a nested rollback undoes only the nested writes, while a parent rollback also undoes the writes of nested transactions that committed inside it. Untracked repositories are never touched, and a repository tracked while a transaction is active is only covered by transactions that begin after.
+
+The repository methods behind this are `snapshot()` and `restoreSnapshot(snapshot)`, and any object with both can be tracked. Snapshots are deep copies made with `structuredClone`: plain objects, arrays and Dates survive, class prototypes don't, so keep stored records plain data.
+
+This is a test mock, not isolation. Each rollback restores the whole repository, so transactions writing to one tracked repository must run one after another: two concurrent top-level transactions would clobber each other's writes when one rolls back.
+
 ## Reference
 
 | Export                      | Kind       | Purpose                                                                                                                                     |

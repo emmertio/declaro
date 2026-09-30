@@ -20,6 +20,12 @@ export enum TransactionStatus {
 export type TransactionCallback<TResult> = (transaction: ITransaction) => TResult | Promise<TResult>
 
 /**
+ * Work to run once a transaction's changes are permanently saved. Registered with
+ * {@link ITransaction.afterCommit}.
+ */
+export type AfterCommitCallback = () => unknown | Promise<unknown>
+
+/**
  * A single transaction. One instance is one transaction, and it is used once: it moves from `Pending` to `Active`,
  * then to `Committed` or `RolledBack`.
  *
@@ -27,6 +33,8 @@ export type TransactionCallback<TResult> = (transaction: ITransaction) => TResul
  * client, a forked entity manager, ...) and exposes it through its own typed accessor.
  */
 export interface ITransaction {
+    /** A stable, unique id for the transaction, assigned when it is created. */
+    readonly id: string
     /** The current lifecycle state. */
     readonly status: TransactionStatus
     /** The transaction this one is nested in, if any. Decided when the transaction begins. */
@@ -48,6 +56,17 @@ export interface ITransaction {
      * @returns Whatever `callback` returns.
      */
     run<TResult>(callback: TransactionCallback<TResult>): Promise<TResult>
+    /**
+     * Registers `callback` to run once the work is permanently saved, i.e. after the top-level transaction commits.
+     * Only valid while `Active`.
+     *
+     * A nested transaction's commit hands its callbacks to its parent, and a rollback drops them. At the top-level
+     * commit they run in registration order, each awaited, outside any transaction. The first one that throws stops
+     * the rest, and `commit()` rejects with its error while the transaction stays `Committed`.
+     *
+     * @param callback - The work to run after the commit.
+     */
+    afterCommit(callback: AfterCommitCallback): void
 }
 
 /**

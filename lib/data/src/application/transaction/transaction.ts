@@ -1,6 +1,9 @@
-import { Context, useContext, withContext } from '@declaro/core'
+import { Context, useContext, withContext, type EventManager } from '@declaro/core'
+import { v4 as uuid } from 'uuid'
+import { TransactionEvent, TransactionLifecycleEvent } from '../../domain/events/transaction-event'
 import {
     TransactionStatus,
+    type AfterCommitCallback,
     type ITransaction,
     type ITransactionAdapter,
     type TransactionCallback,
@@ -28,6 +31,14 @@ export interface TransactionOptions {
      * stack, and `run()` callbacks run in a child of it.
      */
     context?: Context
+    /**
+     * Where to emit the transaction's lifecycle events (see {@link TransactionEvent}). Defaults to the event manager
+     * (`events`) of the context the transaction begins in: `context` if passed, or else the ambient one. Contexts copy
+     * their parents' listeners when they are created, so listeners registered on the app context before a request
+     * context (or a run) is created receive the events of transactions begun inside it. Without either, no events are
+     * emitted.
+     */
+    emitter?: EventManager
 }
 
 /**
@@ -80,7 +91,13 @@ let beginCount = 0
  * ```
  */
 export class Transaction implements ITransaction {
+    /** A stable, unique id for the transaction, assigned when it is created. */
+    readonly id: string = uuid()
+
     private readonly adapter: ITransactionAdapter
+    private readonly explicitEmitter?: EventManager
+    private emitter?: EventManager
+    private afterCommitCallbacks: AfterCommitCallback[] = []
     private readonly context?: Context
     private readonly requestedParent?: ITransaction | null
     private currentParent?: ITransaction
@@ -103,6 +120,7 @@ export class Transaction implements ITransaction {
             (options.context ? withContext(options.context, () => useTransactionAdapter()) : useTransactionAdapter())
         this.context = options.context
         this.requestedParent = options.parent
+        this.explicitEmitter = options.emitter
     }
 
     /**
@@ -147,7 +165,9 @@ export class Transaction implements ITransaction {
      * @param options - Same as the {@link Transaction} constructor.
      * @returns Whatever `callback` returns.
      * @throws {Error} Whatever `callback` throws, after rolling back.
-     * @throws {Error} If the commit fails, after rolling back.
+     * @throws {Error} If the commit fails, after rolling back. If it fails once the transaction is `Committed` (an
+     *   `afterCommit` callback or listener threw), it is rethrown without a rollback.
+     * @throws {Error} If an `afterBegin` listener throws, after rolling back, without running `callback`.
      * @throws {AggregateError} If rolling back after a failure also fails. Holds both errors.
      */
     static run<TResult>(callback: TransactionCallback<TResult>, options: TransactionOptions = {}): Promise<TResult> {
@@ -161,7 +181,7 @@ export class Transaction implements ITransaction {
             parent = current && isActive(current) && Transaction.usesAdapter(current, adapter) ? current : null
         }
 
-        return Transaction.runInNewStack(callback, { adapter, parent }, ambient)
+        return Transaction.runInNewStack(callback, { adapter, parent, emitter: options.emitter }, ambient)
     }
 
     /** The current lifecycle state. */
@@ -190,9 +210,13 @@ export class Transaction implements ITransaction {
      * still beginning) that the caller is not inside, such as a sibling started in parallel with `Promise.all`, throws
      * before the adapter is called. Run parallel work in top-level transactions (`parent: null`) instead.
      *
+     * Emits `beforeBegin` before the adapter call and `afterBegin` once the transaction is `Active` and current (see
+     * {@link TransactionEvent}).
+     *
      * @throws {Error} If the transaction is not `Pending`, if another operation on it is in progress, if no
      *   transaction stack can be found, if an explicit parent is not `Active`, if the parent has an active child in
-     *   another async flow, or if the adapter fails.
+     *   another async flow, if a `beforeBegin` listener throws (the transaction stays `Pending`), if the adapter
+     *   fails, or if an `afterBegin` listener throws (the transaction is already `Active`).
      */
     async begin(): Promise<void> {
         this.assertStatus(TransactionStatus.Pending, 'begin')
@@ -206,17 +230,20 @@ export class Transaction implements ITransaction {
 
         this.operationInProgress = 'begin'
         this.currentParent = parent
+        this.emitter = this.resolveEmitter()
         // Registered before the adapter call, so a concurrent begin under the same parent sees this one in flight.
         if (parent instanceof Transaction) {
             parent.openChildren.add(this)
         }
         try {
+            await this.emit(TransactionEvent.BeforeBegin)
             await this.adapter.begin(this)
         } catch (error) {
             if (parent instanceof Transaction) {
                 parent.openChildren.delete(this)
             }
             this.currentParent = undefined
+            this.emitter = undefined
             throw error
         } finally {
             this.operationInProgress = undefined
@@ -226,6 +253,8 @@ export class Transaction implements ITransaction {
         this.beginOrder = ++beginCount
         this.stack = stack
         stack.push(this)
+
+        await this.emit(TransactionEvent.AfterBegin)
     }
 
     /**
@@ -236,8 +265,15 @@ export class Transaction implements ITransaction {
      * nested run, the transactions of the runs between the caller and this one. If one of those commits fails, the
      * cascade stops there and this transaction stays `Active`, so it can still be rolled back.
      *
+     * Then it emits `beforeCommit`, commits through the adapter, and marks the transaction `Committed`. A nested
+     * transaction hands its {@link Transaction.afterCommit | afterCommit} callbacks to its parent; a top-level one runs
+     * them in registration order. Finally it emits `afterCommit`. Each transaction in the cascade emits its own events
+     * as it is finished, innermost first.
+     *
      * @throws {Error} If the transaction is not `Active`, if another operation on it is in progress, if a child is
-     *   still open in another async flow (checked before anything is committed), or if a commit fails.
+     *   still open in another async flow (checked before anything is committed), if a `beforeCommit` listener throws
+     *   or a commit fails (the transaction stays `Active`), or, once it is `Committed`, if an `afterCommit` callback
+     *   or `afterCommit` listener throws. A failing callback skips the remaining callbacks and the `afterCommit` event.
      */
     commit(): Promise<void> {
         return this.finishWithCascade('commit')
@@ -250,11 +286,44 @@ export class Transaction implements ITransaction {
      * {@link Transaction.commit | commit()} cascades. If one of those rollbacks fails, the cascade stops there and this
      * transaction stays `Active`.
      *
+     * Then it emits `beforeRollback`, rolls back through the adapter, marks the transaction `RolledBack` and drops its
+     * {@link Transaction.afterCommit | afterCommit} callbacks, and emits `afterRollback`.
+     *
      * @throws {Error} If the transaction is not `Active`, if another operation on it is in progress, if a child is
-     *   still open in another async flow (checked before anything is rolled back), or if a rollback fails.
+     *   still open in another async flow (checked before anything is rolled back), if a `beforeRollback` listener
+     *   throws or a rollback fails (the transaction stays `Active`), or if an `afterRollback` listener throws (the
+     *   transaction is already `RolledBack`).
      */
     rollback(): Promise<void> {
         return this.finishWithCascade('rollback')
+    }
+
+    /**
+     * Registers `callback` to run once the work is permanently saved: after the top-level transaction's adapter commit
+     * succeeds.
+     *
+     * - A nested transaction's commit only saves into its parent, so its callbacks move to the parent, after the
+     *   parent's own. That includes nested commits done by a cascade.
+     * - A rollback, direct or cascaded, drops them.
+     * - At the top-level commit they run in registration order, each awaited, after the transaction is `Committed` and
+     *   off its stack, so `useTransaction()` inside them does not return it. The first one that throws stops the
+     *   rest, and `commit()` rejects with its error. The transaction stays `Committed`, and `Transaction.run()` does
+     *   not try to roll it back.
+     *
+     * @param callback - The work to run after the commit.
+     * @throws {Error} If the transaction is not `Active`.
+     *
+     * @example
+     * ```ts
+     * await Transaction.run(async (transaction) => {
+     *     const order = await orderService.create(input)
+     *     transaction.afterCommit(() => mailer.sendConfirmation(order))
+     * })
+     * ```
+     */
+    afterCommit(callback: AfterCommitCallback): void {
+        this.assertStatus(TransactionStatus.Active, 'register an afterCommit callback on')
+        this.afterCommitCallbacks.push(callback)
     }
 
     /**
@@ -286,7 +355,7 @@ export class Transaction implements ITransaction {
      */
     private static async runInNewStack<TResult>(
         callback: TransactionCallback<TResult>,
-        options: { adapter: ITransactionAdapter; parent: ITransaction | null },
+        options: { adapter: ITransactionAdapter; parent: ITransaction | null; emitter?: EventManager },
         ambient: Context | null,
     ): Promise<TResult> {
         const context = new Context<ITransactionScope>()
@@ -303,7 +372,16 @@ export class Transaction implements ITransaction {
         context.registerValue('transactionAdapter', options.adapter)
 
         const transaction = new Transaction({ ...options, context })
-        await transaction.begin()
+        try {
+            await transaction.begin()
+        } catch (error) {
+            // Only an `afterBegin` listener can fail after the transaction became active. Nobody else can finish it.
+            if (isActive(transaction)) {
+                await rollBackAfter(transaction, error)
+            }
+
+            throw error
+        }
 
         let result: TResult
         try {
@@ -347,6 +425,27 @@ export class Transaction implements ITransaction {
         }
 
         return stack
+    }
+
+    /**
+     * Picks where lifecycle events go: the explicit emitter, or else the event manager of the context `begin()` uses.
+     */
+    private resolveEmitter(): EventManager | undefined {
+        return this.explicitEmitter ?? (this.context ?? useContext())?.events
+    }
+
+    /**
+     * Emits a lifecycle event about this transaction and waits for its listeners. Does nothing without an emitter.
+     *
+     * Uses the event manager's `emitAsync()` directly rather than `context.emit()`, which would rebind the ambient
+     * context while listeners run.
+     *
+     * @param action - The lifecycle step.
+     */
+    private async emit(action: TransactionEvent): Promise<void> {
+        if (this.emitter) {
+            await this.emitter.emitAsync(new TransactionLifecycleEvent(action, this))
+        }
     }
 
     /**
@@ -395,12 +494,33 @@ export class Transaction implements ITransaction {
                 await transaction[operation]()
             }
 
+            await this.emit(operation === 'commit' ? TransactionEvent.BeforeCommit : TransactionEvent.BeforeRollback)
             await this.adapter[operation](this)
         } finally {
             this.operationInProgress = undefined
         }
 
-        this.finish(operation === 'commit' ? TransactionStatus.Committed : TransactionStatus.RolledBack)
+        if (operation === 'rollback') {
+            this.finish(TransactionStatus.RolledBack)
+            this.afterCommitCallbacks = []
+            await this.emit(TransactionEvent.AfterRollback)
+            return
+        }
+
+        this.finish(TransactionStatus.Committed)
+        const callbacks = this.afterCommitCallbacks
+        this.afterCommitCallbacks = []
+        if (this.currentParent) {
+            // Not final yet: the work is only saved into the parent.
+            for (const callback of callbacks) {
+                this.currentParent.afterCommit(callback)
+            }
+        } else {
+            for (const callback of callbacks) {
+                await callback()
+            }
+        }
+        await this.emit(TransactionEvent.AfterCommit)
     }
 
     /**

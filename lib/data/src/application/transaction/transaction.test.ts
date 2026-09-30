@@ -251,16 +251,19 @@ describe('Transaction', () => {
 
         it('rejects a rollback while a commit is in flight, even after the adapter was called', async () => {
             const transaction = await Transaction.begin({ context })
-            let release!: () => void
+            let release: (() => void) | undefined
             adapter.commit = async (tx) => {
                 await new Promise<void>((resolve) => (release = resolve))
                 return MockTransactionAdapter.prototype.commit.call(adapter, tx)
             }
 
             const committing = transaction.commit()
-            await Promise.resolve()
+            // The beforeCommit event is awaited first, so wait until the adapter call is actually in flight.
+            while (!release) {
+                await Promise.resolve()
+            }
             await expect(transaction.rollback()).rejects.toThrow('while another operation on it is in progress')
-            release()
+            release!()
             await committing
 
             expect(transaction.status).toBe(TransactionStatus.Committed)

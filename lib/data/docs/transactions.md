@@ -12,8 +12,11 @@
     - [Manual lifecycle](#manual-lifecycle)
     - [Where the stack lives](#where-the-stack-lives)
     - [Nesting](#nesting)
+        - [What a nested commit means](#what-a-nested-commit-means)
+- [Running code after the commit](#running-code-after-the-commit)
 - [Reaching the ORM from repositories](#reaching-the-orm-from-repositories)
 - [Event subscribers](#event-subscribers)
+- [Lifecycle events](#lifecycle-events)
 - [Testing](#testing)
 - [Reference](#reference)
 
@@ -217,7 +220,7 @@ const order = await Transaction.run(async (transaction) => {
 - It runs the callback in a child context with its own `TransactionStack`, and the new transaction is the current one there, so `useTransaction()` returns it, including in anything the callback awaits. The run's adapter is registered on that child context too, so `useTransactionAdapter()` returns it, and transactions begun inside nest in the run's transaction, even when the adapter came from `options.adapter` rather than the context.
 - If the callback commits or rolls back the transaction itself, `Transaction.run` leaves it alone. The same goes when something else finished it, such as an outer transaction committed or rolled back from inside the callback (see [Manual lifecycle](#manual-lifecycle)). The rest of the callback then runs with no current transaction, so `useTransaction()` throws there.
 - If the callback returns while transactions it began are still open, the commit commits them too, innermost first, before the run's own transaction (see [Manual lifecycle](#manual-lifecycle)).
-- If the callback throws, it rolls back and rethrows. If the commit fails, it rolls back and rethrows the commit error.
+- If the callback throws, it rolls back and rethrows. If the commit fails, it rolls back and rethrows the commit error. The exception is a failing [`afterCommit` callback](#running-code-after-the-commit): the data is already saved by then, so the run rethrows that error without rolling back.
 - If the rollback fails too, it throws an `AggregateError` (`Transaction failed, and so did its rollback`) holding both the original error and the rollback error.
 
 `transaction.run(callback)` does the same with a transaction nested in `transaction`, using its adapter. It throws if `transaction` isn't `Active`.
@@ -358,6 +361,7 @@ The constructor and `Transaction.begin` take the same options:
 | `adapter` | The adapter registered on `context`, or on the current context. Resolved in the constructor, which throws if there is none.                        |
 | `context` | The current context. `begin()` uses this context's transaction stack, and `run()` callbacks run in a child of it.                                  |
 | `parent`  | Decided at `begin()` (see below). Pass a transaction to nest in it (it must be active when you begin), or `null` to force a top-level transaction. |
+| `emitter` | The event manager of the transaction's context. Where the transaction's [lifecycle events](#lifecycle-events) are emitted.                         |
 
 The parent is chosen when you call `begin()`, not when you construct the transaction: it is the transaction that is current at that moment, if it is active and uses the same adapter. Otherwise the transaction is top-level. So `parent` and `depth` only mean something after `begin()`; before it, `depth` is `0`. An explicit `parent` that isn't active makes `begin()` throw, for example `Cannot begin a transaction nested in a parent that is committed`. If the adapter's `begin()` fails, the transaction stays `Pending` with no parent, so a retried `begin()` decides the parent again from whatever is current then.
 
@@ -422,6 +426,70 @@ await Transaction.run(async () => {
 
 Inside a nested callback, `useTransaction()` returns the nested transaction. When the callback finishes, the outer transaction is current again. If the error isn't caught, it rolls back the nested transaction, then escapes the outer callback and rolls that back too.
 
+#### What a nested commit means
+
+"Committed" doesn't mean "saved" for a nested transaction. Committing a nested transaction saves its work **into its parent**. Only the top-level commit makes anything permanent. So if the parent rolls back later, for example because code after the nested commit throws, the nested work is undone too, even though its transaction says `Committed`:
+
+```ts
+await Transaction.run(async () => {
+    await Transaction.run(async () => {
+        await createOrder()
+    }) // nested commit: the order is saved into the outer transaction, not yet to the database
+
+    await sendInvoice() // throws
+}) // the outer transaction rolls back, and the order with it
+```
+
+This is the all-or-nothing guarantee every database and ORM gives: a top-level transaction either saves everything done inside it, nested transactions included, or nothing. When you want something else, say so explicitly:
+
+- **To undo only some later work, wrap that work in its own nested transaction.** If it fails, it rolls back to its savepoint, and the earlier nested work survives as long as the parent commits:
+
+    ```ts
+    await Transaction.run(async () => {
+        await Transaction.run(() => createOrder())
+
+        try {
+            await Transaction.run(() => sendInvoice()) // throws: only this nested transaction rolls back
+        } catch {
+            await markInvoicePending()
+        }
+    }) // commits the order and the "pending" flag
+    ```
+
+- **To keep work whatever the parent does, run it as its own top-level transaction** with `parent: null`. It commits for real when its callback resolves, and a later rollback of the transaction you started it from doesn't touch it:
+
+    ```ts
+    await Transaction.run(async () => {
+        await Transaction.run(() => recordLoginAttempt(), { parent: null }) // permanent once this resolves
+        await signIn() // if this throws, the login attempt is still recorded
+    })
+    ```
+
+    A top-level transaction usually means its own connection, so it doesn't see the outer transaction's uncommitted writes, and it can block on rows the outer transaction has locked.
+
+## Running code after the commit
+
+Some side effects must only happen once the data is permanently saved: publishing to Redis, sending an email, calling a webhook. Register them with `transaction.afterCommit(callback)`:
+
+```ts
+import { Transaction } from '@declaro/data'
+
+await Transaction.run(async (transaction) => {
+    const order = await orderService.create(input)
+    transaction.afterCommit(() => redis.publish('orders', JSON.stringify({ id: order.id })))
+})
+// the order is saved, then published
+```
+
+`afterCommit` can only be called while the transaction is `Active`; otherwise it throws. The callback takes no arguments and can return a promise. Callbacks follow the data:
+
+- **Nested transactions pass them up.** A nested commit isn't final (see [What a nested commit means](#what-a-nested-commit-means)), so it moves its callbacks to its parent, after the ones the parent already has. They only run after the **top-level** commit. That includes nested transactions committed by a [cascade](#manual-lifecycle).
+- **A rollback drops them.** When a transaction rolls back, directly or through a cascade, its callbacks never run. So do the callbacks its committed children passed up to it.
+- **The top-level commit runs them in the order they were registered**, one after another, each awaited, once the adapter's commit has succeeded and the status is `Committed`. They run outside any transaction: `useTransaction()` in a callback doesn't return the committed transaction.
+- **The first failure stops them.** If a callback throws, the remaining callbacks don't run and `commit()` rejects with that error. The data is already saved, so the transaction stays `Committed` and there is nothing to roll back. Inside `Transaction.run`, the run rethrows the error without trying to roll back. If you need every callback to run whatever happens, catch errors inside each one.
+
+This matches the default behavior of Django's `transaction.on_commit`.
+
 ## Reaching the ORM from repositories
 
 Repositories get the database handle from the adapter, for the current transaction, not from a global, so they automatically take part in whatever transaction is running:
@@ -474,7 +542,53 @@ emitter.on('shop::order.beforeCreate', async (event) => {
 Two things to watch for:
 
 - **Emitting through a stored context hides the transaction.** `context.emit()` runs listeners inside `context`. If `context` is an app or request context you kept a reference to, its stack is not the one carrying the current transaction (a run has its own), so listeners won't see it: `useTransaction()` throws, or returns a different transaction. Emit through `context.events.emitAsync(event)`, which keeps the current context, or through `useContext({ strict: true }).emit(event)`.
-- **`after*` events fire before the transaction commits.** A listener that does something outside the database, such as publishing to Redis or sending an email, may announce data that later rolls back. For now, do that kind of work after your `Transaction.run` resolves. A post-commit hook is planned.
+- **`after*` events fire before the transaction commits.** A listener that does something outside the database, such as publishing to Redis or sending an email, may announce data that later rolls back. Defer that work with [`afterCommit`](#running-code-after-the-commit), so it only happens once the data is saved, and never if it rolls back:
+
+    ```ts
+    emitter.on('shop::order.afterCreate', async (event) => {
+        useTransaction().afterCommit(() => redis.publish('orders', JSON.stringify(event.data)))
+    })
+    ```
+
+    `useTransaction()` throws when no transaction is active, so a listener that can also run outside a transaction should check for one first or publish directly.
+
+## Lifecycle events
+
+Every transaction, top-level or nested, emits an event before and after each step:
+
+| `TransactionEvent` | Type string                           |
+| ------------------ | ------------------------------------- |
+| `BeforeBegin`      | `declaro::transaction.beforeBegin`    |
+| `AfterBegin`       | `declaro::transaction.afterBegin`     |
+| `BeforeCommit`     | `declaro::transaction.beforeCommit`   |
+| `AfterCommit`      | `declaro::transaction.afterCommit`    |
+| `BeforeRollback`   | `declaro::transaction.beforeRollback` |
+| `AfterRollback`    | `declaro::transaction.afterRollback`  |
+
+The type strings follow the same `<namespace>::<resource>.<action>` convention as `ModelService` events. They are emitted with an awaited `emitAsync` on the event manager of the transaction's context, or on the `emitter` you pass in the [options](#manual-lifecycle). With neither, nothing is emitted.
+
+The event's data is a plain summary, `{ id, depth, status, parentId? }`, so it survives `JSON.stringify` and can go through adapters that forward events elsewhere, such as Redis. The live `Transaction` is also reachable from the event for in-process listeners, but it isn't serialized.
+
+Use them for cross-cutting concerns such as metrics and logging:
+
+```ts
+app.on('declaro::transaction.afterCommit', (event) => {
+    metrics.increment('transactions.committed', { depth: event.data.depth })
+})
+
+app.on('declaro::transaction.afterRollback', (event) => {
+    logger.warn('Transaction rolled back', event.data)
+})
+```
+
+How listeners affect the transaction:
+
+- **A `before*` listener that throws stops that step.** The adapter isn't called and the status doesn't change, and the error reaches the caller. Inside `Transaction.run`, a throwing `beforeCommit` listener therefore makes the run roll back.
+- **An `after*` listener that throws reaches the caller too, but the step has already happened**: the transaction is already begun, committed or rolled back.
+- **In a cascade, each transaction emits its own events as it is finished**, innermost first.
+- **A top-level commit runs in this order:** the adapter's commit, the status changes to `Committed`, the [`afterCommit` callbacks](#running-code-after-the-commit) run, then the `afterCommit` event is emitted. A failure at any point stops the sequence, so a failing callback also means no `afterCommit` event. A nested commit moves its callbacks to its parent instead of running them, then emits its `afterCommit` event.
+
+A nested transaction's `afterCommit` event doesn't mean its data is saved (see [What a nested commit means](#what-a-nested-commit-means)), and the events fire for every transaction in the app. For a side effect that belongs to one piece of work, register an [`afterCommit` callback](#running-code-after-the-commit) on its transaction rather than listening for the event.
 
 ## Testing
 
@@ -508,15 +622,18 @@ expect(adapter.operations.map((op) => `${op.operation}@${op.depth}`)).toEqual([
 
 ## Reference
 
-| Export                   | Kind       | Purpose                                                                                                              |
-| ------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------- |
-| `ITransactionAdapter`    | interface  | The adapter contract your app implements: `begin`, `commit`, `rollback`.                                             |
-| `ITransaction`           | interface  | What an adapter receives: `status`, `parent`, `depth`. ORM-agnostic.                                                 |
-| `Transaction`            | class      | One transaction. `new Transaction(options?)`; statics `begin`, `run`; instance `begin`, `commit`, `rollback`, `run`. |
-| `TransactionStatus`      | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                      |
-| `TransactionStack`       | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.       |
-| `transactionModule`      | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                 |
-| `wrapWithTransaction`    | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                            |
-| `useTransaction`         | function   | Synchronously gets the current transaction. Throws when none is active.                                              |
-| `useTransactionAdapter`  | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                      |
-| `MockTransactionAdapter` | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                       |
+| Export                    | Kind       | Purpose                                                                                                                                                                               |
+| ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ITransactionAdapter`     | interface  | The adapter contract your app implements: `begin`, `commit`, `rollback`.                                                                                                              |
+| `ITransaction`            | interface  | What an adapter receives: `status`, `parent`, `depth`. ORM-agnostic.                                                                                                                  |
+| `Transaction`             | class      | One transaction. `new Transaction(options?)` (`adapter`, `context`, `parent`, `emitter`); statics `begin`, `run`; instance `id`, `begin`, `commit`, `rollback`, `run`, `afterCommit`. |
+| `transaction.id`          | property   | A stable, unique string id, set at construction. Included in lifecycle event data.                                                                                                    |
+| `transaction.afterCommit` | method     | Registers a callback to run once the top-level transaction has committed. Dropped on rollback.                                                                                        |
+| `TransactionStatus`       | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                                                                                       |
+| `TransactionEvent`        | enum       | The six lifecycle actions, `BeforeBegin` to `AfterRollback`. Event types are `declaro::transaction.<action>`.                                                                         |
+| `TransactionStack`        | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.                                                                        |
+| `transactionModule`       | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                                                                                  |
+| `wrapWithTransaction`     | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                                                                                             |
+| `useTransaction`          | function   | Synchronously gets the current transaction. Throws when none is active.                                                                                                               |
+| `useTransactionAdapter`   | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                                                                       |
+| `MockTransactionAdapter`  | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                                                                        |

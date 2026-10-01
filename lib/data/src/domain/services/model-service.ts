@@ -1,4 +1,4 @@
-import type { ActionDescriptor, AnyModelSchema, IActionDescriptor, IAnyModel } from '@declaro/core'
+import type { ActionDescriptor, AnyModelSchema, IAnyModel } from '@declaro/core'
 import type {
     InferDetail,
     InferFilters,
@@ -6,15 +6,15 @@ import type {
     InferLookup,
     InferSummary,
 } from '../../shared/utils/schema-inference'
-import { ModelMutationAction, ModelQueryEvent } from '../events/event-types'
+import { ModelMutationAction } from '../events/event-types'
 import {
-    MutationEvent,
-    type ICreateEventMeta,
-    type IUpdateEventMeta,
-    type IRemoveEventMeta,
-    type IRestoreEventMeta,
-    type IDuplicateEventMeta,
-} from '../events/mutation-event'
+    ModelMutationEvent,
+    type IDuplicateMutationArgs,
+    type IModelMutationArgs,
+    type IModelMutationEventMeta,
+    type IMutationEntry,
+} from '../events/model-mutation-event'
+import { MutationEvent } from '../events/mutation-event'
 import type { IModelServiceArgs } from './model-service-args'
 import { ReadOnlyModelService, type ILoadOptions } from './read-only-model-service'
 import type { IActionOptions } from './base-model-service'
@@ -37,6 +37,13 @@ export interface INormalizeInputArgs<TSchema extends AnyModelSchema> {
     descriptor: ActionDescriptor
 }
 
+/**
+ * The options every mutation accepts, as far as event dispatch is concerned.
+ */
+interface IDispatchOptions {
+    doNotDispatchEvents?: boolean
+}
+
 export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelService<TSchema> {
     constructor(args: IModelServiceArgs<TSchema>) {
         super(args)
@@ -54,6 +61,63 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         args: INormalizeInputArgs<TSchema>,
     ): Promise<InferInput<TSchema>> {
         return input
+    }
+
+    /**
+     * Builds the event for a mutation action. Every entity the action touches is one entry, and the
+     * event knows the schema's primary key so entries can be looked up by key.
+     * @param action The lifecycle action the event announces.
+     * @param entries The entries of the batch, one per entity.
+     * @param args The call-level arguments of the mutation.
+     * @returns The event, ready to dispatch.
+     */
+    protected createMutationEvent<
+        TResult,
+        TInput,
+        TLookup = unknown,
+        TArgs extends IModelMutationArgs = IModelMutationArgs,
+    >(
+        action: ModelMutationAction,
+        entries: IMutationEntry<TResult, TInput, TLookup>[],
+        args?: TArgs,
+    ): ModelMutationEvent<TResult, TInput, TLookup, IModelMutationEventMeta<TArgs>> {
+        return new ModelMutationEvent<TResult, TInput, TLookup, IModelMutationEventMeta<TArgs>>(
+            this.getDescriptor(action),
+            entries,
+            { primaryKey: this.entityMetadata?.primaryKey, args },
+        )
+    }
+
+    /**
+     * Dispatches a mutation event for the given action, unless the options ask not to or there is
+     * nothing to announce.
+     *
+     * The event is returned so the caller can read back what subscribers changed: a before-event
+     * subscriber may replace an entry's input, an after-event subscriber may replace its result.
+     *
+     * @param action The lifecycle action the event announces.
+     * @param entries The entries of the batch, one per entity.
+     * @param args The call-level arguments of the mutation.
+     * @param options The options of the mutation, checked for `doNotDispatchEvents`.
+     * @returns The dispatched event, or undefined when no event was dispatched.
+     */
+    protected async dispatchMutation<
+        TResult,
+        TInput,
+        TLookup = unknown,
+        TArgs extends IModelMutationArgs = IModelMutationArgs,
+    >(
+        action: ModelMutationAction,
+        entries: IMutationEntry<TResult, TInput, TLookup>[],
+        args?: TArgs,
+        options?: IDispatchOptions,
+    ): Promise<ModelMutationEvent<TResult, TInput, TLookup, IModelMutationEventMeta<TArgs>> | undefined> {
+        if (options?.doNotDispatchEvents || entries.length === 0) {
+            return undefined
+        }
+        const event = this.createMutationEvent<TResult, TInput, TLookup, TArgs>(action, entries, args)
+        await this.emitter.emitAsync(event)
+        return event
     }
 
     /**
@@ -118,38 +182,39 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         }
 
         // Merge optional overrides
-        const finalInput = overrides ? Object.assign({}, input, overrides) : input
+        const finalInput = (overrides ? Object.assign({}, input, overrides) : input) as InferInput<TSchema>
+
+        const args: IDuplicateMutationArgs<InferInput<TSchema>> = {
+            overrides,
+            options: options as Record<string, unknown>,
+        }
+        const entry: IMutationEntry<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>> = {
+            lookup,
+            input: finalInput,
+            existing,
+        }
 
         // Emit the before duplicate event
-        if (!options?.doNotDispatchEvents) {
-            const beforeDuplicateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                IDuplicateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.BeforeDuplicate),
-                finalInput as InferInput<TSchema>,
-            ).setMeta({ existing, args: { lookup, overrides, options: options as Record<string, unknown> } })
-            await this.emitter.emitAsync(beforeDuplicateEvent)
-        }
+        const beforeDuplicateEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>,
+            IDuplicateMutationArgs<InferInput<TSchema>>
+        >(ModelMutationAction.BeforeDuplicate, [entry], args, options)
+        const inputToCreate = beforeDuplicateEvent?.entries[0]?.input ?? finalInput
 
         // Create the new record (also emits beforeCreate/afterCreate)
-        const result = await this.create(finalInput as InferInput<TSchema>, options)
+        const result = await this.create(inputToCreate, options)
 
         // Emit the after duplicate event
-        if (!options?.doNotDispatchEvents) {
-            const afterDuplicateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                IDuplicateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.AfterDuplicate),
-                finalInput as InferInput<TSchema>,
-            ).setMeta({ existing, args: { lookup, overrides, options: options as Record<string, unknown> } }).setResult(result)
-            await this.emitter.emitAsync(afterDuplicateEvent)
-        }
+        const afterDuplicateEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>,
+            IDuplicateMutationArgs<InferInput<TSchema>>
+        >(ModelMutationAction.AfterDuplicate, [{ ...entry, input: inputToCreate, result }], args, options)
 
-        return result
+        return afterDuplicateEvent?.entries[0]?.result ?? result
     }
 
     /**
@@ -159,34 +224,32 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async remove(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         const normalizedLookup = await this.normalizeLookup(lookup)
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
+        const entry: IMutationEntry<InferSummary<TSchema>, InferLookup<TSchema>, InferLookup<TSchema>> = {
+            lookup: normalizedLookup,
+            input: normalizedLookup,
+        }
 
         // Emit the before remove event
-        const beforeRemoveEvent = new MutationEvent<
+        const beforeRemoveEvent = await this.dispatchMutation<
             InferSummary<TSchema>,
             InferLookup<TSchema>,
-            IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
-        >(
-            this.getDescriptor(ModelMutationAction.BeforeRemove),
-            normalizedLookup,
-        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } })
-        await this.emitter.emitAsync(beforeRemoveEvent)
+            InferLookup<TSchema>
+        >(ModelMutationAction.BeforeRemove, [entry], args, options)
+        const lookupToRemove = beforeRemoveEvent?.entries[0]?.input ?? normalizedLookup
 
         // Perform the removal
-        const result = await this.repository.remove(normalizedLookup, options)
+        const result = await this.repository.remove(lookupToRemove, options)
 
         // Emit the after remove event
-        const afterRemoveEvent = new MutationEvent<
+        const afterRemoveEvent = await this.dispatchMutation<
             InferSummary<TSchema>,
             InferLookup<TSchema>,
-            IRemoveEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
-        >(
-            this.getDescriptor(ModelMutationAction.AfterRemove),
-            normalizedLookup,
-        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } }).setResult(result)
-        await this.emitter.emitAsync(afterRemoveEvent)
+            InferLookup<TSchema>
+        >(ModelMutationAction.AfterRemove, [{ ...entry, input: lookupToRemove, result }], args, options)
 
         // Return the results of the removal
-        return this.wrapSummary(await this.normalizeSummary(result))
+        return this.wrapSummary(await this.normalizeSummary(afterRemoveEvent?.entries[0]?.result ?? result))
     }
 
     /**
@@ -197,34 +260,32 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async restore(lookup: InferLookup<TSchema>, options?: ILoadOptions): Promise<InferSummary<TSchema>> {
         const normalizedLookup = await this.normalizeLookup(lookup)
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
+        const entry: IMutationEntry<InferSummary<TSchema>, InferLookup<TSchema>, InferLookup<TSchema>> = {
+            lookup: normalizedLookup,
+            input: normalizedLookup,
+        }
 
         // Emit the before restore event
-        const beforeRestoreEvent = new MutationEvent<
+        const beforeRestoreEvent = await this.dispatchMutation<
             InferSummary<TSchema>,
             InferLookup<TSchema>,
-            IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
-        >(
-            this.getDescriptor(ModelMutationAction.BeforeRestore),
-            normalizedLookup,
-        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } })
-        await this.emitter.emitAsync(beforeRestoreEvent)
+            InferLookup<TSchema>
+        >(ModelMutationAction.BeforeRestore, [entry], args, options)
+        const lookupToRestore = beforeRestoreEvent?.entries[0]?.input ?? normalizedLookup
 
         // Perform the restore operation
-        const result = await this.repository.restore(normalizedLookup, options)
+        const result = await this.repository.restore(lookupToRestore, options)
 
         // Emit the after restore event
-        const afterRestoreEvent = new MutationEvent<
+        const afterRestoreEvent = await this.dispatchMutation<
             InferSummary<TSchema>,
             InferLookup<TSchema>,
-            IRestoreEventMeta<InferSummary<TSchema>, InferLookup<TSchema>>
-        >(
-            this.getDescriptor(ModelMutationAction.AfterRestore),
-            normalizedLookup,
-        ).setMeta({ args: { lookup: normalizedLookup, options: options as Record<string, unknown> } }).setResult(result)
-        await this.emitter.emitAsync(afterRestoreEvent)
+            InferLookup<TSchema>
+        >(ModelMutationAction.AfterRestore, [{ ...entry, input: lookupToRestore, result }], args, options)
 
         // Return the results of the restore operation
-        return this.wrapSummary(await this.normalizeSummary(result))
+        return this.wrapSummary(await this.normalizeSummary(afterRestoreEvent?.entries[0]?.result ?? result))
     }
 
     async create(input: InferInput<TSchema>, options?: ICreateOptions): Promise<InferDetail<TSchema>> {
@@ -232,38 +293,31 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         const normalizedInput = await this.normalizeInput(input, {
             descriptor: this.getDescriptor(ModelMutationAction.Create),
         })
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
+        const entry: IMutationEntry<InferDetail<TSchema>, InferInput<TSchema>> = { input: normalizedInput }
 
         // Emit the before create event
-        if (!options?.doNotDispatchEvents) {
-            const beforeCreateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                ICreateEventMeta<InferDetail<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.BeforeCreate),
-                normalizedInput,
-            ).setMeta({ args: { input: normalizedInput, options: options as Record<string, unknown> } })
-            await this.emitter.emitAsync(beforeCreateEvent)
-        }
+        const beforeCreateEvent = await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>>(
+            ModelMutationAction.BeforeCreate,
+            [entry],
+            args,
+            options,
+        )
+        const inputToCreate = beforeCreateEvent?.entries[0]?.input ?? normalizedInput
 
         // Perform the creation
-        const result = await this.repository.create(normalizedInput, options)
+        const result = await this.repository.create(inputToCreate, options)
 
         // Emit the after create event
-        if (!options?.doNotDispatchEvents) {
-            const afterCreateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                ICreateEventMeta<InferDetail<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.AfterCreate),
-                normalizedInput,
-            ).setMeta({ args: { input: normalizedInput, options: options as Record<string, unknown> } }).setResult(result)
-            await this.emitter.emitAsync(afterCreateEvent)
-        }
+        const afterCreateEvent = await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>>(
+            ModelMutationAction.AfterCreate,
+            [{ ...entry, input: inputToCreate, result }],
+            args,
+            options,
+        )
 
         // Return the results of the creation
-        return this.wrapDetail(await this.normalizeDetail(result))
+        return this.wrapDetail(await this.normalizeDetail(afterCreateEvent?.entries[0]?.result ?? result))
     }
 
     async update(
@@ -278,38 +332,33 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             existing,
             descriptor: this.getDescriptor(ModelMutationAction.Update),
         })
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
+        const entry: IMutationEntry<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>> = {
+            lookup: normalizedLookup,
+            input: normalizedInput,
+            existing: existing ?? undefined,
+        }
 
         // Emit the before update event
-        if (!options?.doNotDispatchEvents) {
-            const beforeUpdateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                IUpdateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.BeforeUpdate),
-                normalizedInput,
-            ).setMeta({ existing, args: { lookup: normalizedLookup, input, options: options as Record<string, unknown> } })
-            await this.emitter.emitAsync(beforeUpdateEvent)
-        }
+        const beforeUpdateEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.BeforeUpdate, [entry], args, options)
+        const inputToUpdate = beforeUpdateEvent?.entries[0]?.input ?? normalizedInput
 
         // Perform the update
-        const result = await this.repository.update(normalizedLookup, normalizedInput, options)
+        const result = await this.repository.update(normalizedLookup, inputToUpdate, options)
 
         // Emit the after update event
-        if (!options?.doNotDispatchEvents) {
-            const afterUpdateEvent = new MutationEvent<
-                InferDetail<TSchema>,
-                InferInput<TSchema>,
-                IUpdateEventMeta<InferDetail<TSchema>, InferLookup<TSchema>, InferInput<TSchema>>
-            >(
-                this.getDescriptor(ModelMutationAction.AfterUpdate),
-                normalizedInput,
-            ).setMeta({ existing, args: { lookup: normalizedLookup, input, options: options as Record<string, unknown> } }).setResult(result)
-            await this.emitter.emitAsync(afterUpdateEvent)
-        }
+        const afterUpdateEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.AfterUpdate, [{ ...entry, input: inputToUpdate, result }], args, options)
 
         // Return the results of the update
-        return this.wrapDetail(await this.normalizeDetail(result))
+        return this.wrapDetail(await this.normalizeDetail(afterUpdateEvent?.entries[0]?.result ?? result))
     }
 
     /**
@@ -324,6 +373,7 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
         let operation: ModelMutationAction
         let beforeOperation: ModelMutationAction
         let afterOperation: ModelMutationAction
+        let lookup: InferLookup<TSchema> | undefined = undefined
         let existingItem: InferDetail<TSchema> | undefined = undefined
 
         if (primaryKeyValue === undefined) {
@@ -331,15 +381,13 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             beforeOperation = ModelMutationAction.BeforeCreate
             afterOperation = ModelMutationAction.AfterCreate
         } else {
-            existingItem = await this.load(
-                {
-                    [this.entityMetadata.primaryKey]: primaryKeyValue,
-                } as InferLookup<TSchema>,
-                {
-                    ...options,
-                    doNotDispatchEvents: true,
-                },
-            )
+            lookup = {
+                [this.entityMetadata.primaryKey]: primaryKeyValue,
+            } as InferLookup<TSchema>
+            existingItem = await this.load(lookup, {
+                ...options,
+                doNotDispatchEvents: true,
+            })
 
             if (existingItem) {
                 operation = ModelMutationAction.Update
@@ -357,34 +405,43 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             descriptor: this.getDescriptor(operation),
             existing: existingItem,
         })
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
+        const entry: IMutationEntry<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>> = {
+            lookup,
+            input: normalizedInput,
+            existing: existingItem ?? undefined,
+        }
 
         // Emit the before upsert event
-        if (!options?.doNotDispatchEvents) {
-            const beforeUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                this.getDescriptor(beforeOperation),
-                normalizedInput,
-            )
-            await this.emitter.emitAsync(beforeUpsertEvent)
-        }
+        const beforeUpsertEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>
+        >(beforeOperation, [entry], args, options)
+        const inputToUpsert = beforeUpsertEvent?.entries[0]?.input ?? normalizedInput
 
         // Perform the upsert operation
-        const result = await this.repository.upsert(normalizedInput, options)
+        const result = await this.repository.upsert(inputToUpsert, options)
 
         // Emit the after upsert event
-        if (!options?.doNotDispatchEvents) {
-            const afterUpsertEvent = new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                this.getDescriptor(afterOperation),
-                normalizedInput,
-            ).setResult(result)
-            await this.emitter.emitAsync(afterUpsertEvent)
-        }
+        const afterUpsertEvent = await this.dispatchMutation<
+            InferDetail<TSchema>,
+            InferInput<TSchema>,
+            InferLookup<TSchema>
+        >(afterOperation, [{ ...entry, input: inputToUpsert, result }], args, options)
 
         // Return the results of the upsert operation
-        return this.wrapDetail(await this.normalizeDetail(result))
+        return this.wrapDetail(await this.normalizeDetail(afterUpsertEvent?.entries[0]?.result ?? result))
     }
 
     /**
      * Bulk upserts multiple records (creates if they don't exist, updates if they do).
+     *
+     * The batch is announced with at most four events: one `beforeCreate` carrying every entry that
+     * will be created, one `beforeUpdate` carrying every entry that will be updated, and the matching
+     * `afterCreate` and `afterUpdate` once the repository has written. An event whose group is empty
+     * is not dispatched.
+     *
      * @param inputs Array of input data for the bulk upsert operation.
      * @param options Optional create or update options.
      * @returns Array of upserted records.
@@ -397,31 +454,12 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             return []
         }
 
-        // Keep track of input metadata for each position (preserves order and duplicates)
-        type InputInfo = {
-            input: InferInput<TSchema>
-            index: number
-            primaryKeyValue?: string | number
-            existingEntity?: InferDetail<TSchema>
-            operation?: ModelMutationAction
-        }
+        type Entry = IMutationEntry<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>>
 
-        const inputInfos: InputInfo[] = []
+        // Collect the unique lookups of the inputs that carry a primary key
         const uniqueLookups = new Map<string | number, InferLookup<TSchema>>()
-
-        // Process each input and collect unique lookups
-        for (let i = 0; i < inputs.length; i++) {
-            const input = inputs[i]
+        for (const input of inputs) {
             const primaryKeyValue = this.getPrimaryKeyValue(input)
-
-            const inputInfo: InputInfo = {
-                input,
-                index: i,
-                primaryKeyValue,
-            }
-            inputInfos.push(inputInfo)
-
-            // Collect unique lookups for entities that have primary keys
             if (primaryKeyValue !== undefined) {
                 uniqueLookups.set(primaryKeyValue, {
                     [this.entityMetadata.primaryKey]: primaryKeyValue,
@@ -447,82 +485,73 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
             })
         }
 
-        // Normalize all inputs and determine operations in parallel
-        const normalizationPromises = inputInfos.map(async (inputInfo) => {
-            // Set existing entity if found
-            if (inputInfo.primaryKeyValue !== undefined) {
-                inputInfo.existingEntity = existingEntitiesMap.get(inputInfo.primaryKeyValue)
-            }
+        // Build one entry per input (preserves order and duplicates), normalizing in parallel
+        const entries: Entry[] = await Promise.all(
+            inputs.map(async (input): Promise<Entry> => {
+                const primaryKeyValue = this.getPrimaryKeyValue(input)
+                const lookup = primaryKeyValue !== undefined ? uniqueLookups.get(primaryKeyValue) : undefined
+                const existing = primaryKeyValue !== undefined ? existingEntitiesMap.get(primaryKeyValue) : undefined
 
-            // Determine operation type
-            inputInfo.operation = inputInfo.existingEntity
-                ? ModelMutationAction.BeforeUpdate
-                : ModelMutationAction.BeforeCreate
+                const normalizedInput = await this.normalizeInput(input, {
+                    existing,
+                    descriptor: this.getDescriptor(existing ? ModelMutationAction.Update : ModelMutationAction.Create),
+                })
 
-            // Normalize the input
-            const normalizedInput = await this.normalizeInput(inputInfo.input, {
-                existing: inputInfo.existingEntity,
-                descriptor: this.getDescriptor(
-                    inputInfo.existingEntity ? ModelMutationAction.Update : ModelMutationAction.Create,
-                ),
-            })
+                return { lookup, input: normalizedInput, existing }
+            }),
+        )
 
-            inputInfo.input = normalizedInput
-            return normalizedInput
-        })
+        const isUpdate = (entry: Entry) => entry.existing !== undefined
+        const args: IModelMutationArgs = { options: options as Record<string, unknown> }
 
-        const normalizedInputs = await Promise.all(normalizationPromises)
-
-        // Create before events
-        if (!options?.doNotDispatchEvents) {
-            const beforeEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
-            for (const inputInfo of inputInfos) {
-                beforeEvents.push(
-                    new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                        this.getDescriptor(inputInfo.operation!),
-                        inputInfo.input,
-                    ),
-                )
-            }
-
-            // Emit all before events
-            await Promise.all(beforeEvents.map((event) => this.emitter.emitAsync(event)))
-        }
+        // Emit the before events: one for the creates, one for the updates. The entry objects are
+        // shared with `entries`, so an input a subscriber replaces is the one written below.
+        await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>>(
+            ModelMutationAction.BeforeCreate,
+            entries.filter((entry) => !isUpdate(entry)),
+            args,
+            options,
+        )
+        await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>>(
+            ModelMutationAction.BeforeUpdate,
+            entries.filter(isUpdate),
+            args,
+            options,
+        )
 
         // Perform the bulk upsert operation with all normalized inputs
-        const results = await this.repository.bulkUpsert(normalizedInputs, options)
+        const results = await this.repository.bulkUpsert(
+            entries.map((entry) => entry.input),
+            options,
+        )
 
-        // Create after events and return results
-        if (!options?.doNotDispatchEvents) {
-            const afterEvents: MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>[] = []
+        // Emit the after events: one for the creates, one for the updates
+        const afterEntries: Entry[] = entries.map((entry, i) => ({ ...entry, result: results[i] }))
+        await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>>(
+            ModelMutationAction.AfterCreate,
+            afterEntries.filter((entry) => !isUpdate(entry)),
+            args,
+            options,
+        )
+        await this.dispatchMutation<InferDetail<TSchema>, InferInput<TSchema>, InferLookup<TSchema>>(
+            ModelMutationAction.AfterUpdate,
+            afterEntries.filter(isUpdate),
+            args,
+            options,
+        )
 
-            for (let i = 0; i < inputInfos.length; i++) {
-                const inputInfo = inputInfos[i]
-                const result = results[i]
-
-                const afterOperation =
-                    inputInfo.operation === ModelMutationAction.BeforeCreate
-                        ? ModelMutationAction.AfterCreate
-                        : ModelMutationAction.AfterUpdate
-
-                afterEvents.push(
-                    new MutationEvent<InferDetail<TSchema>, InferInput<TSchema>>(
-                        this.getDescriptor(afterOperation),
-                        inputInfo.input,
-                    ).setResult(result),
-                )
-            }
-
-            // Emit all after events
-            await Promise.all(afterEvents.map((event) => this.emitter.emitAsync(event)))
-        }
-
-        // Return normalized results
-        return this.wrapDetails(await Promise.all(results.map((result) => this.normalizeDetail(result))))
+        // Return normalized results, honoring any result a subscriber replaced
+        const finalResults = afterEntries.map((entry, i) => entry.result ?? results[i])
+        return this.wrapDetails(await Promise.all(finalResults.map((result) => this.normalizeDetail(result))))
     }
 
     /**
      * Permanently deletes all items from trash, optionally filtered by the provided criteria.
+     *
+     * This is the one mutation that is not announced per entity: nothing identifies the records it
+     * deletes except the filters, so its events stay plain `MutationEvent`s carrying the filters as
+     * input and the deleted count as result.
+     *
      * @param filters Optional filters to apply when selecting items to delete from trash.
      * @returns The count of permanently deleted items.
      */
@@ -555,26 +584,31 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async permanentlyDeleteFromTrash(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
         const normalizedLookup = await this.normalizeLookup(lookup)
+        const entry: IMutationEntry<InferSummary<TSchema>, InferLookup<TSchema>, InferLookup<TSchema>> = {
+            lookup: normalizedLookup,
+            input: normalizedLookup,
+        }
 
         // Emit the before permanently delete from trash event
-        const beforePermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelMutationAction.BeforePermanentlyDeleteFromTrash),
-            normalizedLookup,
-        )
-        await this.emitter.emitAsync(beforePermanentlyDeleteFromTrashEvent)
+        const beforeEvent = await this.dispatchMutation<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.BeforePermanentlyDeleteFromTrash, [entry])
+        const lookupToDelete = beforeEvent?.entries[0]?.input ?? normalizedLookup
 
         // Perform the permanent deletion from trash
-        const result = await this.repository.permanentlyDeleteFromTrash(normalizedLookup)
+        const result = await this.repository.permanentlyDeleteFromTrash(lookupToDelete)
 
         // Emit the after permanently delete from trash event
-        const afterPermanentlyDeleteFromTrashEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelMutationAction.AfterPermanentlyDeleteFromTrash),
-            normalizedLookup,
-        ).setResult(result)
-        await this.emitter.emitAsync(afterPermanentlyDeleteFromTrashEvent)
+        const afterEvent = await this.dispatchMutation<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.AfterPermanentlyDeleteFromTrash, [{ ...entry, input: lookupToDelete, result }])
 
         // Return the results of the permanent deletion
-        return this.wrapSummary(await this.normalizeSummary(result))
+        return this.wrapSummary(await this.normalizeSummary(afterEvent?.entries[0]?.result ?? result))
     }
 
     /**
@@ -584,25 +618,30 @@ export class ModelService<TSchema extends AnyModelSchema> extends ReadOnlyModelS
      */
     async permanentlyDelete(lookup: InferLookup<TSchema>): Promise<InferSummary<TSchema>> {
         const normalizedLookup = await this.normalizeLookup(lookup)
+        const entry: IMutationEntry<InferSummary<TSchema>, InferLookup<TSchema>, InferLookup<TSchema>> = {
+            lookup: normalizedLookup,
+            input: normalizedLookup,
+        }
 
         // Emit the before permanently delete event
-        const beforePermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelMutationAction.BeforePermanentlyDelete),
-            normalizedLookup,
-        )
-        await this.emitter.emitAsync(beforePermanentlyDeleteEvent)
+        const beforeEvent = await this.dispatchMutation<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.BeforePermanentlyDelete, [entry])
+        const lookupToDelete = beforeEvent?.entries[0]?.input ?? normalizedLookup
 
         // Perform the permanent deletion
-        const result = await this.repository.permanentlyDelete(normalizedLookup)
+        const result = await this.repository.permanentlyDelete(lookupToDelete)
 
         // Emit the after permanently delete event
-        const afterPermanentlyDeleteEvent = new MutationEvent<InferSummary<TSchema>, InferLookup<TSchema>>(
-            this.getDescriptor(ModelMutationAction.AfterPermanentlyDelete),
-            normalizedLookup,
-        ).setResult(result)
-        await this.emitter.emitAsync(afterPermanentlyDeleteEvent)
+        const afterEvent = await this.dispatchMutation<
+            InferSummary<TSchema>,
+            InferLookup<TSchema>,
+            InferLookup<TSchema>
+        >(ModelMutationAction.AfterPermanentlyDelete, [{ ...entry, input: lookupToDelete, result }])
 
         // Return the results of the permanent deletion
-        return this.wrapSummary(await this.normalizeSummary(result))
+        return this.wrapSummary(await this.normalizeSummary(afterEvent?.entries[0]?.result ?? result))
     }
 }

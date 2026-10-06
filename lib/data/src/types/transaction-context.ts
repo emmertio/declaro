@@ -1,12 +1,24 @@
-import type { ITransactionAdapter } from '../domain/transaction/transaction-adapter-interface'
+import type { TransactionStack } from '../application/transaction/transaction-stack'
+import type { ITransactionAdapter } from '../domain/transaction/transaction-interface'
 
 /**
  * Scope contributed to a Declaro {@link Context} by the transaction layer.
  *
- * Merged into `DataScope` so that data-layer code can reach the active transaction
- * through the ambient context instead of having it passed explicitly.
+ * Merged into `DataScope` so that data-layer code can reach the adapter and the current transaction through the
+ * ambient context instead of having them passed explicitly.
  */
 export interface ITransactionScope {
-    /** The adapter for the transaction bound to the current context. */
-    transaction: Promise<ITransactionAdapter>
+    /**
+     * The app's long-lived transaction adapter. Registered on the app context by `transactionModule()`, and on the
+     * child context of each `Transaction.run()` and `transaction.run()` as the adapter that run uses.
+     */
+    transactionAdapter: ITransactionAdapter
+    /**
+     * The active transactions of the current async flow. Outside tests, never registered on a shared app-level context:
+     * `transactionModule()` registers a new one on every request context, each `Transaction.run()` and
+     * `transaction.run()` registers its own on the child context its callback runs in, and scripts can register one
+     * themselves. The test helpers (`rollbackEachTest()`, `withRollback()`) register one on the context they are given
+     * for the length of a test, and request contexts created from it start nested under the test's transaction.
+     */
+    transactionStack: TransactionStack
 }

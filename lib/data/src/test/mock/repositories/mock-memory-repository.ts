@@ -10,6 +10,7 @@ import type {
     InferSummary,
 } from '../../../shared/utils/schema-inference'
 import { v4 as uuid } from 'uuid'
+import type { MockTransactionAdapter } from '../transaction/mock-transaction-adapter'
 import type { ILoadOptions, ISearchOptions } from '../../../domain/services/read-only-model-service'
 import type { ICreateOptions, IUpdateOptions } from '../../../domain/services/model-service'
 
@@ -18,6 +19,19 @@ export interface IMockMemoryRepositoryArgs<TSchema extends AnyModelSchema> {
     lookup?: (data: InferDetail<TSchema>, lookup: InferLookup<TSchema>) => boolean
     filter?: (data: InferSummary<TSchema>, filters: InferFilters<TSchema>) => boolean
     assign?: (data: InferDetail<TSchema>, input: InferInput<TSchema>) => InferDetail<TSchema>
+}
+
+/**
+ * A deep copy of a {@link MockMemoryRepository}'s state, taken by {@link MockMemoryRepository.snapshot}.
+ * Test support: it lets {@link MockTransactionAdapter} roll a tracked repository back.
+ */
+export interface MockMemoryRepositorySnapshot<TSchema extends AnyModelSchema> {
+    /** The active records, by primary key. */
+    data: Map<string, InferDetail<TSchema>>
+    /** The removed (trashed) records, by primary key. */
+    trash: Map<string, InferDetail<TSchema>>
+    /** The numeric id counter used to generate primary keys. */
+    nextId: number
 }
 
 export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRepository<TSchema> {
@@ -31,6 +45,34 @@ export class MockMemoryRepository<TSchema extends AnyModelSchema> implements IRe
         if (!this.entityMetadata?.primaryKey) {
             throw new Error('Primary key must be specified for MockMemoryRepository')
         }
+    }
+
+    /**
+     * Test support: takes a deep copy of the repository's state (its data, trash and id counter), so later writes
+     * don't change it. {@link MockTransactionAdapter} uses this to roll back tracked repositories.
+     *
+     * The copy uses `structuredClone`, which keeps plain objects, arrays, Dates and Maps, but not class prototypes:
+     * records are expected to be plain data, as the default `assign` produces.
+     *
+     * @returns The snapshot.
+     */
+    snapshot(): MockMemoryRepositorySnapshot<TSchema> {
+        return structuredClone({ data: this.data, trash: this.trash, nextId: this.nextId })
+    }
+
+    /**
+     * Test support: puts the repository back to the state in a {@link MockMemoryRepository.snapshot}. The snapshot is
+     * copied again, so it stays unchanged and can be restored more than once.
+     *
+     * Not to be confused with {@link MockMemoryRepository.restore}, which restores one record from the trash.
+     *
+     * @param snapshot - A snapshot taken from this repository.
+     */
+    restoreSnapshot(snapshot: MockMemoryRepositorySnapshot<TSchema>): void {
+        const copy = structuredClone(snapshot)
+        this.data = copy.data
+        this.trash = copy.trash
+        this.nextId = copy.nextId
     }
 
     private findOne(

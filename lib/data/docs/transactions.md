@@ -754,6 +754,17 @@ describe('orders', () => {
 })
 ```
 
+**On Bun**, import the helpers from `@declaro/data/testing/bun` instead. Its `rollbackEachTest(context, options?)` registers through `beforeEach` and `afterEach` from `bun:test` itself, so you pass no hooks. It also re-exports `withRollback` and `rollbackTest`. It imports `bun:test`, so only import it from Bun test files.
+
+```ts
+import { rollbackEachTest } from '@declaro/data/testing/bun'
+
+describe('orders', () => {
+    rollbackEachTest(app)
+    // ...
+})
+```
+
 After each test (and after each `withRollback`), the context's previous `transactionStack` registration is restored. When it had none, it is left with no stack again (a context can't unregister a dependency, so `undefined` is registered in its place), so transactions begun directly in it are [stateless](#without-a-context) again, as they were before the tests.
 
 What the rollback covers, in all three forms:

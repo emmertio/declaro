@@ -1,7 +1,16 @@
-import { EventManager } from '@declaro/core'
+import { EventManager, type IEvent } from '@declaro/core'
 import { beforeEach, describe, expect, it, mock } from 'bun:test'
-import { MockBookSchema } from '../../test/mock/models/mock-book-models'
+import {
+    MockBookSchema,
+    type MockBookDetail,
+    type MockBookFilters,
+    type MockBookInput,
+    type MockBookLookup,
+    type MockBookSummary,
+} from '../../test/mock/models/mock-book-models'
 import { MockMemoryRepository } from '../../test/mock/repositories/mock-memory-repository'
+import { ModelMutationEvent, type ModelDuplicateEvent } from '../events/model-mutation-event'
+import { MutationEvent } from '../events/mutation-event'
 import { ModelService } from './model-service'
 
 describe('ModelService', () => {
@@ -480,14 +489,19 @@ describe('ModelService', () => {
 
             await service.bulkUpsert(inputs)
 
-            expect(beforeCreateSpy).toHaveBeenCalledTimes(2)
-            expect(afterCreateSpy).toHaveBeenCalledTimes(2)
+            // One event per lifecycle step carries the whole batch
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+            expect(afterCreateSpy).toHaveBeenCalledTimes(1)
             expect(beforeUpdateSpy).not.toHaveBeenCalled()
             expect(afterUpdateSpy).not.toHaveBeenCalled()
 
             // Verify event details
-            expect(beforeCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeCreate' }))
-            expect(afterCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterCreate' }))
+            expect(beforeCreateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.beforeCreate', size: 2 }),
+            )
+            expect(afterCreateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.afterCreate', size: 2 }),
+            )
         })
 
         it('should trigger correct before and after events for bulk update operations', async () => {
@@ -513,14 +527,19 @@ describe('ModelService', () => {
 
             await service.bulkUpsert(updateInputs)
 
-            expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
-            expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+            // One event per lifecycle step carries the whole batch
+            expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+            expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
             expect(beforeCreateSpy).not.toHaveBeenCalled()
             expect(afterCreateSpy).not.toHaveBeenCalled()
 
             // Verify event details
-            expect(beforeUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.beforeUpdate' }))
-            expect(afterUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'books::book.afterUpdate' }))
+            expect(beforeUpdateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.beforeUpdate', size: 2 }),
+            )
+            expect(afterUpdateSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'books::book.afterUpdate', size: 2 }),
+            )
         })
 
         it('should trigger correct before and after events for mixed operations', async () => {
@@ -559,8 +578,10 @@ describe('ModelService', () => {
 
             await service.bulkUpsert(inputsWithoutIds)
 
-            expect(beforeCreateSpy).toHaveBeenCalledTimes(2)
-            expect(afterCreateSpy).toHaveBeenCalledTimes(2)
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+            expect(beforeCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 2, keys: [] }))
+            expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+            expect(afterCreateSpy.mock.calls[0][0].keys).toHaveLength(2)
             expect(beforeUpdateSpy).not.toHaveBeenCalled()
             expect(afterUpdateSpy).not.toHaveBeenCalled()
         })
@@ -581,9 +602,11 @@ describe('ModelService', () => {
             expect(results).toHaveLength(batchSize)
             expect(results).toEqual(inputs)
 
-            // Verify events were triggered for all items
-            expect(beforeCreateSpy).toHaveBeenCalledTimes(batchSize)
-            expect(afterCreateSpy).toHaveBeenCalledTimes(batchSize)
+            // Verify a single event per lifecycle step carried every item
+            expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+            expect(beforeCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: batchSize }))
+            expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+            expect(afterCreateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: batchSize }))
 
             // Basic performance check - should complete in reasonable time
             expect(endTime - startTime).toBeLessThan(5000) // Less than 5 seconds
@@ -1020,7 +1043,12 @@ describe('ModelService', () => {
 
     describe('duplicate', () => {
         it('should create a duplicate of an existing record with a new primary key', async () => {
-            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const original = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+            }
             await repository.create(original)
 
             const duplicate = await service.duplicate({ id: 42 })
@@ -1033,7 +1061,12 @@ describe('ModelService', () => {
         })
 
         it('should apply overrides to the duplicated record', async () => {
-            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const original = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+            }
             await repository.create(original)
 
             const duplicate = await service.duplicate({ id: 42 }, { title: 'Duplicated Book' })
@@ -1068,7 +1101,12 @@ describe('ModelService', () => {
         })
 
         it('should not modify the original record', async () => {
-            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const original = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+            }
             await repository.create(original)
 
             await service.duplicate({ id: 42 }, { title: 'Modified Title' })
@@ -1079,15 +1117,23 @@ describe('ModelService', () => {
         })
 
         it('should allow overriding multiple fields', async () => {
-            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const original = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+            }
             await repository.create(original)
 
             const newDate = new Date('2024-01-01')
-            const duplicate = await service.duplicate({ id: 42 }, {
-                title: 'New Title',
-                author: 'New Author',
-                publishedDate: newDate,
-            })
+            const duplicate = await service.duplicate(
+                { id: 42 },
+                {
+                    title: 'New Title',
+                    author: 'New Author',
+                    publishedDate: newDate,
+                },
+            )
 
             expect(duplicate.title).toBe('New Title')
             expect(duplicate.author).toBe('New Author')
@@ -1096,13 +1142,21 @@ describe('ModelService', () => {
         })
 
         it('should create independent records that can be modified separately', async () => {
-            const original = { id: 42, title: 'Original Book', author: 'Author Name', publishedDate: new Date('2023-06-15') }
+            const original = {
+                id: 42,
+                title: 'Original Book',
+                author: 'Author Name',
+                publishedDate: new Date('2023-06-15'),
+            }
             await repository.create(original)
 
             const duplicate = await service.duplicate({ id: 42 })
 
             // Update the duplicate
-            await service.update({ id: duplicate.id }, { title: 'Updated Duplicate', author: 'Updated Author', publishedDate: new Date() })
+            await service.update(
+                { id: duplicate.id },
+                { title: 'Updated Duplicate', author: 'Updated Author', publishedDate: new Date() },
+            )
 
             // Verify original is unchanged
             const loadedOriginal = await repository.load({ id: 42 })
@@ -1321,9 +1375,11 @@ describe('ModelService', () => {
                 expect(beforeLoadManySpy).not.toHaveBeenCalled()
                 expect(afterLoadManySpy).not.toHaveBeenCalled()
 
-                // Update events should be dispatched (2 updates)
-                expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
-                expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+                // Update events should be dispatched, one per lifecycle step carrying both updates
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(beforeUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 2 }))
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(afterUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 2 }))
             })
 
             it('should not dispatch loadMany events even when doNotDispatchEvents is not specified', async () => {
@@ -1363,9 +1419,11 @@ describe('ModelService', () => {
                 expect(beforeLoadManySpy).not.toHaveBeenCalled()
                 expect(afterLoadManySpy).not.toHaveBeenCalled()
 
-                // Update events should be dispatched (2 updates)
-                expect(beforeUpdateSpy).toHaveBeenCalledTimes(2)
-                expect(afterUpdateSpy).toHaveBeenCalledTimes(2)
+                // Update events should be dispatched, one per lifecycle step carrying both updates
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(beforeUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 2 }))
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+                expect(afterUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 2 }))
             })
 
             it('should not dispatch any events with doNotDispatchEvents for mixed create and update operations', async () => {
@@ -1407,76 +1465,163 @@ describe('ModelService', () => {
         })
     })
 
-    describe('event meta (existing and args)', () => {
+    describe('event entries and meta', () => {
         const input = { id: 42, title: 'Test Book', author: 'Author Name', publishedDate: new Date('2024-01-01') }
 
-        describe('create events', () => {
-            it('beforeCreate event includes args with input and options', async () => {
-                let capturedEvent: any
+        type BookEvent = ModelMutationEvent<MockBookDetail, MockBookInput, MockBookLookup>
+        type BookSummaryEvent = ModelMutationEvent<MockBookSummary, MockBookLookup, MockBookLookup>
+        type BookDuplicateEvent = ModelDuplicateEvent<typeof mockSchema>
 
-                emitter.on('books::book.beforeCreate', (event) => {
-                    capturedEvent = event
-                })
+        function capture<TEvent extends IEvent>(type: string): { event?: TEvent } {
+            const captured: { event?: TEvent } = {}
+            emitter.on<TEvent>(type, (event) => {
+                captured.event = event
+            })
+            return captured
+        }
+
+        describe('create events', () => {
+            it('beforeCreate carries one entry with the input, and meta with the options and primary key', async () => {
+                const captured = capture<BookEvent>('books::book.beforeCreate')
 
                 const options = { doNotDispatchEvents: false }
                 await service.create(input, options)
 
-                expect(capturedEvent.meta.args.input).toEqual(input)
-                expect(capturedEvent.meta.args.options).toEqual(options)
+                expect(captured.event).toBeInstanceOf(ModelMutationEvent)
+                expect(captured.event!.size).toBe(1)
+                expect(captured.event!.entries[0].input).toEqual(input)
+                expect(captured.event!.entries[0].key).toBe(42)
+                expect(captured.event!.entries[0].existing).toBeUndefined()
+                expect(captured.event!.entries[0].result).toBeUndefined()
+                expect(captured.event!.meta.primaryKey).toBe('id')
+                expect(captured.event!.meta.args?.options).toEqual(options)
             })
 
-            it('afterCreate event includes args and result', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.afterCreate', (event) => {
-                    capturedEvent = event
-                })
+            it('afterCreate carries the result on the entry and finds it by key', async () => {
+                const captured = capture<BookEvent>('books::book.afterCreate')
 
                 await service.create(input)
 
-                expect(capturedEvent.meta.args.input).toEqual(input)
-                expect(capturedEvent.data).toBeDefined()
-                expect(capturedEvent.data.id).toBe(42)
+                expect(captured.event!.entries[0].input).toEqual(input)
+                expect(captured.event!.entries[0].result?.id).toBe(42)
+                expect(captured.event!.getResult(42)?.title).toBe('Test Book')
+                expect(captured.event!.get(42)?.input).toEqual(input)
+                expect(captured.event!.results).toHaveLength(1)
+            })
+
+            it('the key is unknown before a create without an id and known after it', async () => {
+                const before = capture<BookEvent>('books::book.beforeCreate')
+                const after = capture<BookEvent>('books::book.afterCreate')
+                const { id, ...inputWithoutId } = input
+
+                const created = await service.create(inputWithoutId)
+
+                expect(before.event!.entries[0].key).toBeUndefined()
+                expect(before.event!.keys).toEqual([])
+                expect(after.event!.entries[0].key).toBe(created.id)
+                expect(after.event!.has(created.id)).toBe(true)
+            })
+
+            it('a beforeCreate subscriber can replace the input that gets written', async () => {
+                emitter.on<BookEvent>('books::book.beforeCreate', (event) => {
+                    event.entries[0].input = { ...event.entries[0].input, title: 'Replaced Title' }
+                })
+
+                const created = await service.create(input)
+
+                expect(created.title).toBe('Replaced Title')
+                expect((await repository.load({ id: 42 }))?.title).toBe('Replaced Title')
+            })
+
+            it('a beforeCreate subscriber can mutate the input in place', async () => {
+                emitter.on<BookEvent>('books::book.beforeCreate', (event) => {
+                    Object.assign(event.entries[0].input, { title: 'Mutated Title' })
+                })
+
+                const created = await service.create({ ...input })
+
+                expect(created.title).toBe('Mutated Title')
+                expect((await repository.load({ id: 42 }))?.title).toBe('Mutated Title')
+            })
+
+            it('an afterCreate subscriber can replace the result that gets returned', async () => {
+                emitter.on<BookEvent>('books::book.afterCreate', (event) => {
+                    event.entries[0].result = { ...event.entries[0].result!, title: 'Enriched Title' }
+                })
+
+                const created = await service.create(input)
+
+                expect(created.title).toBe('Enriched Title')
+                expect((await repository.load({ id: 42 }))?.title).toBe('Test Book')
             })
         })
 
         describe('update events', () => {
+            const updateInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
+
             beforeEach(async () => {
                 await repository.create(input)
             })
 
-            it('beforeUpdate event includes existing record and args', async () => {
-                let capturedEvent: any
+            it('beforeUpdate carries the lookup, the existing record and the input on one entry', async () => {
+                const captured = capture<BookEvent>('books::book.beforeUpdate')
 
-                emitter.on('books::book.beforeUpdate', (event) => {
-                    capturedEvent = event
-                })
-
-                const updateInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
                 await service.update({ id: 42 }, updateInput)
 
-                expect(capturedEvent.meta.existing).toBeDefined()
-                expect(capturedEvent.meta.existing.id).toBe(42)
-                expect(capturedEvent.meta.existing.title).toBe('Test Book')
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.meta.args.input).toEqual(updateInput)
+                const [entry] = captured.event!.entries
+                expect(entry.key).toBe(42)
+                expect(entry.lookup).toEqual({ id: 42 })
+                expect(entry.existing?.title).toBe('Test Book')
+                expect(entry.input).toEqual(updateInput)
+                expect(entry.result).toBeUndefined()
+                expect(captured.event!.getExisting(42)?.id).toBe(42)
             })
 
-            it('afterUpdate event includes existing record, args, and result', async () => {
-                let capturedEvent: any
+            it('afterUpdate carries the existing record and the result side by side', async () => {
+                const captured = capture<BookEvent>('books::book.afterUpdate')
 
-                emitter.on('books::book.afterUpdate', (event) => {
-                    capturedEvent = event
-                })
-
-                const updateInput = { title: 'Updated Book', author: 'Updated Author', publishedDate: new Date() }
                 await service.update({ id: 42 }, updateInput)
 
-                expect(capturedEvent.meta.existing).toBeDefined()
-                expect(capturedEvent.meta.existing.id).toBe(42)
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.data).toBeDefined()
-                expect(capturedEvent.data.title).toBe('Updated Book')
+                expect(captured.event!.getExisting(42)?.title).toBe('Test Book')
+                expect(captured.event!.getResult(42)?.title).toBe('Updated Book')
+                expect(captured.event!.existing).toHaveLength(1)
+                expect(captured.event!.results).toHaveLength(1)
+            })
+
+            it('a beforeUpdate subscriber can replace the input that gets written', async () => {
+                emitter.on<BookEvent>('books::book.beforeUpdate', (event) => {
+                    event.entries[0].input = { ...event.entries[0].input, title: 'Replaced Title' }
+                })
+
+                const updated = await service.update({ id: 42 }, updateInput)
+
+                expect(updated.title).toBe('Replaced Title')
+            })
+        })
+
+        describe('upsert events', () => {
+            it('an upsert of an existing record dispatches update events carrying the existing record', async () => {
+                await repository.create(input)
+                const before = capture<BookEvent>('books::book.beforeUpdate')
+                const after = capture<BookEvent>('books::book.afterUpdate')
+
+                await service.upsert({ ...input, title: 'Upserted Book' })
+
+                expect(before.event!.entries[0].lookup).toEqual({ id: 42 })
+                expect(before.event!.getExisting(42)?.title).toBe('Test Book')
+                expect(before.event!.meta.args?.options).toBeUndefined()
+                expect(after.event!.getResult(42)?.title).toBe('Upserted Book')
+            })
+
+            it('an upsert of a new record dispatches create events without an existing record', async () => {
+                const before = capture<BookEvent>('books::book.beforeCreate')
+                const after = capture<BookEvent>('books::book.afterCreate')
+
+                await service.upsert(input)
+
+                expect(before.event!.entries[0].existing).toBeUndefined()
+                expect(before.event!.entries[0].key).toBe(42)
+                expect(after.event!.getResult(42)?.title).toBe('Test Book')
             })
         })
 
@@ -1485,30 +1630,34 @@ describe('ModelService', () => {
                 await repository.create(input)
             })
 
-            it('beforeRemove event includes args with lookup and options', async () => {
-                let capturedEvent: any
+            it('beforeRemove carries the lookup as both lookup and input, and the options in meta', async () => {
+                const captured = capture<BookSummaryEvent>('books::book.beforeRemove')
 
-                emitter.on('books::book.beforeRemove', (event) => {
-                    capturedEvent = event
-                })
+                const options = { scope: 'detail' }
+                await service.remove({ id: 42 }, options)
 
-                await service.remove({ id: 42 })
-
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                const [entry] = captured.event!.entries
+                expect(entry.key).toBe(42)
+                expect(entry.lookup).toEqual({ id: 42 })
+                expect(entry.input).toEqual({ id: 42 })
+                expect(captured.event!.meta.args?.options).toEqual(options)
             })
 
-            it('afterRemove event includes args and result', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.afterRemove', (event) => {
-                    capturedEvent = event
-                })
+            it('afterRemove carries the removed summary as the result', async () => {
+                const captured = capture<BookSummaryEvent>('books::book.afterRemove')
 
                 await service.remove({ id: 42 })
 
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.data).toBeDefined()
-                expect(capturedEvent.data.id).toBe(42)
+                expect(captured.event!.getResult(42)?.id).toBe(42)
+                expect(captured.event!.getResult(42)?.title).toBe('Test Book')
+            })
+
+            it('honors doNotDispatchEvents', async () => {
+                await service.remove({ id: 42 }, { doNotDispatchEvents: true })
+
+                expect(beforeRemoveSpy).not.toHaveBeenCalled()
+                expect(afterRemoveSpy).not.toHaveBeenCalled()
+                expect(await repository.load({ id: 42 })).toBeNull()
             })
         })
 
@@ -1518,30 +1667,57 @@ describe('ModelService', () => {
                 await repository.remove({ id: 42 })
             })
 
-            it('beforeRestore event includes args with lookup', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.beforeRestore', (event) => {
-                    capturedEvent = event
-                })
+            it('beforeRestore carries the lookup', async () => {
+                const captured = capture<BookSummaryEvent>('books::book.beforeRestore')
 
                 await service.restore({ id: 42 })
 
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
+                expect(captured.event!.entries[0].lookup).toEqual({ id: 42 })
+                expect(captured.event!.keys).toEqual([42])
             })
 
-            it('afterRestore event includes args and result', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.afterRestore', (event) => {
-                    capturedEvent = event
-                })
+            it('afterRestore carries the restored summary as the result', async () => {
+                const captured = capture<BookSummaryEvent>('books::book.afterRestore')
 
                 await service.restore({ id: 42 })
 
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.data).toBeDefined()
-                expect(capturedEvent.data.id).toBe(42)
+                expect(captured.event!.getResult(42)?.id).toBe(42)
+            })
+
+            it('honors doNotDispatchEvents', async () => {
+                await service.restore({ id: 42 }, { doNotDispatchEvents: true })
+
+                expect(beforeRestoreSpy).not.toHaveBeenCalled()
+                expect(afterRestoreSpy).not.toHaveBeenCalled()
+                expect(await repository.load({ id: 42 })).toEqual(input)
+            })
+        })
+
+        describe('permanent delete events', () => {
+            beforeEach(async () => {
+                await repository.create(input)
+            })
+
+            it('permanentlyDelete events carry the lookup and then the deleted summary', async () => {
+                const before = capture<BookSummaryEvent>('books::book.beforePermanentlyDelete')
+                const after = capture<BookSummaryEvent>('books::book.afterPermanentlyDelete')
+
+                await service.permanentlyDelete({ id: 42 })
+
+                expect(before.event!.entries[0].lookup).toEqual({ id: 42 })
+                expect(before.event!.entries[0].result).toBeUndefined()
+                expect(after.event!.getResult(42)?.title).toBe('Test Book')
+            })
+
+            it('permanentlyDeleteFromTrash events carry the lookup and then the deleted summary', async () => {
+                await repository.remove({ id: 42 })
+                const before = capture<BookSummaryEvent>('books::book.beforePermanentlyDeleteFromTrash')
+                const after = capture<BookSummaryEvent>('books::book.afterPermanentlyDeleteFromTrash')
+
+                await service.permanentlyDeleteFromTrash({ id: 42 })
+
+                expect(before.event!.keys).toEqual([42])
+                expect(after.event!.getResult(42)?.title).toBe('Test Book')
             })
         })
 
@@ -1550,66 +1726,187 @@ describe('ModelService', () => {
                 await repository.create(input)
             })
 
-            it('beforeDuplicate event includes existing record and args', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.beforeDuplicate', (event) => {
-                    capturedEvent = event
-                })
+            it('beforeDuplicate carries the source lookup, the source record and the input for the copy', async () => {
+                const captured = capture<BookDuplicateEvent>('books::book.beforeDuplicate')
 
                 const overrides = { title: 'Duplicate Title' }
                 await service.duplicate({ id: 42 }, overrides)
 
-                expect(capturedEvent.meta.existing).toBeDefined()
-                expect(capturedEvent.meta.existing.id).toBe(42)
-                expect(capturedEvent.meta.existing.title).toBe('Test Book')
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.meta.args.overrides).toEqual(overrides)
+                const [entry] = captured.event!.entries
+                expect(entry.key).toBe(42)
+                expect(entry.lookup).toEqual({ id: 42 })
+                expect(entry.existing?.title).toBe('Test Book')
+                expect(entry.input.title).toBe('Duplicate Title')
+                expect(entry.input.id).toBeUndefined()
+                expect(captured.event!.meta.args?.overrides).toEqual(overrides)
             })
 
-            it('afterDuplicate event includes existing, args, and the new record as result', async () => {
-                let capturedEvent: any
+            it('afterDuplicate carries the source record and the new copy as the result', async () => {
+                const captured = capture<BookDuplicateEvent>('books::book.afterDuplicate')
 
-                emitter.on('books::book.afterDuplicate', (event) => {
-                    capturedEvent = event
-                })
+                await service.duplicate({ id: 42 }, { title: 'Duplicate Title' })
 
-                const overrides = { title: 'Duplicate Title' }
-                await service.duplicate({ id: 42 }, overrides)
-
-                expect(capturedEvent.meta.existing).toBeDefined()
-                expect(capturedEvent.meta.existing.id).toBe(42)
-                expect(capturedEvent.meta.args.lookup).toEqual({ id: 42 })
-                expect(capturedEvent.meta.args.overrides).toEqual(overrides)
-                expect(capturedEvent.data).toBeDefined()
-                expect(capturedEvent.data.title).toBe('Duplicate Title')
-                expect(capturedEvent.data.id).not.toBe(42)
-            })
-
-            it('beforeDuplicate input is the finalInput (with overrides applied, without primary key)', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.beforeDuplicate', (event) => {
-                    capturedEvent = event
-                })
-
-                await service.duplicate({ id: 42 }, { title: 'Override Title' })
-
-                expect(capturedEvent.input.title).toBe('Override Title')
-                expect(capturedEvent.input.id).toBeUndefined()
+                const [entry] = captured.event!.entries
+                expect(entry.existing?.id).toBe(42)
+                expect(entry.result?.title).toBe('Duplicate Title')
+                expect(entry.result?.id).not.toBe(42)
+                expect(captured.event!.getExisting(42)?.title).toBe('Test Book')
             })
 
             it('duplicate without overrides has undefined overrides in args', async () => {
-                let capturedEvent: any
-
-                emitter.on('books::book.beforeDuplicate', (event) => {
-                    capturedEvent = event
-                })
+                const captured = capture<BookDuplicateEvent>('books::book.beforeDuplicate')
 
                 await service.duplicate({ id: 42 })
 
-                expect(capturedEvent.meta.args.overrides).toBeUndefined()
-                expect(capturedEvent.meta.existing.title).toBe('Test Book')
+                expect(captured.event!.meta.args?.overrides).toBeUndefined()
+                expect(captured.event!.entries[0].existing?.title).toBe('Test Book')
+            })
+        })
+
+        describe('bulkUpsert events', () => {
+            const existingInput = { id: 10, title: 'Existing Book', author: 'Author 1', publishedDate: new Date() }
+            const inputs = [
+                { id: 10, title: 'Updated Book', author: 'Author 1', publishedDate: new Date() },
+                { id: 20, title: 'New Book With Id', author: 'Author 2', publishedDate: new Date() },
+                { title: 'New Book Without Id', author: 'Author 3', publishedDate: new Date() },
+            ]
+
+            beforeEach(async () => {
+                await repository.create(existingInput)
+            })
+
+            it('dispatches one beforeCreate and one beforeUpdate, each carrying every entry of its kind', async () => {
+                const beforeCreate = capture<BookEvent>('books::book.beforeCreate')
+                const beforeUpdate = capture<BookEvent>('books::book.beforeUpdate')
+
+                await service.bulkUpsert(inputs)
+
+                expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+                expect(beforeUpdateSpy).toHaveBeenCalledTimes(1)
+
+                expect(beforeUpdate.event!.size).toBe(1)
+                expect(beforeUpdate.event!.keys).toEqual([10])
+                expect(beforeUpdate.event!.getExisting(10)?.title).toBe('Existing Book')
+                expect(beforeUpdate.event!.getInput(10)?.title).toBe('Updated Book')
+
+                expect(beforeCreate.event!.size).toBe(2)
+                expect(beforeCreate.event!.keys).toEqual([20])
+                expect(beforeCreate.event!.inputs.map((i) => i.title)).toEqual([
+                    'New Book With Id',
+                    'New Book Without Id',
+                ])
+                expect(beforeCreate.event!.existing).toEqual([])
+            })
+
+            it('dispatches one afterCreate and one afterUpdate carrying the results, with every key known', async () => {
+                const afterCreate = capture<BookEvent>('books::book.afterCreate')
+                const afterUpdate = capture<BookEvent>('books::book.afterUpdate')
+
+                const results = await service.bulkUpsert(inputs)
+
+                expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+                expect(afterUpdateSpy).toHaveBeenCalledTimes(1)
+
+                expect(afterUpdate.event!.getResult(10)?.title).toBe('Updated Book')
+                expect(afterUpdate.event!.getExisting(10)?.title).toBe('Existing Book')
+
+                expect(afterCreate.event!.size).toBe(2)
+                expect(afterCreate.event!.keys).toEqual([20, results[2].id])
+                expect(afterCreate.event!.getResult(results[2].id)?.title).toBe('New Book Without Id')
+                expect(afterCreate.event!.results).toHaveLength(2)
+            })
+
+            it('dispatches no update events when every input is a create', async () => {
+                await service.bulkUpsert([inputs[1], inputs[2]])
+
+                expect(beforeCreateSpy).toHaveBeenCalledTimes(1)
+                expect(afterCreateSpy).toHaveBeenCalledTimes(1)
+                expect(beforeUpdateSpy).not.toHaveBeenCalled()
+                expect(afterUpdateSpy).not.toHaveBeenCalled()
+            })
+
+            it('writes the inputs that before-event subscribers replaced or mutated', async () => {
+                emitter.on<BookEvent>('books::book.beforeCreate', (event) => {
+                    for (const entry of event.entries) {
+                        entry.input = { ...entry.input, title: `${entry.input.title} (created)` }
+                    }
+                })
+                emitter.on<BookEvent>('books::book.beforeUpdate', (event) => {
+                    for (const entry of event.entries) {
+                        Object.assign(entry.input, { title: `${entry.input.title} (updated)` })
+                    }
+                })
+
+                const results = await service.bulkUpsert(inputs.map((item) => ({ ...item })))
+
+                expect(results.map((r) => r.title)).toEqual([
+                    'Updated Book (updated)',
+                    'New Book With Id (created)',
+                    'New Book Without Id (created)',
+                ])
+                expect((await repository.load({ id: 10 }))?.title).toBe('Updated Book (updated)')
+                expect((await repository.load({ id: 20 }))?.title).toBe('New Book With Id (created)')
+            })
+
+            it('returns the results that after-event subscribers replaced, in input order', async () => {
+                emitter.on<BookEvent>('books::book.afterUpdate', (event) => {
+                    const entry = event.get(10)!
+                    entry.result = { ...entry.result!, title: 'Enriched Update' }
+                })
+                emitter.on<BookEvent>('books::book.afterCreate', (event) => {
+                    const entry = event.get(20)!
+                    entry.result = { ...entry.result!, title: 'Enriched Create' }
+                })
+
+                const results = await service.bulkUpsert(inputs)
+
+                expect(results.map((r) => r.title)).toEqual([
+                    'Enriched Update',
+                    'Enriched Create',
+                    'New Book Without Id',
+                ])
+                expect((await repository.load({ id: 10 }))?.title).toBe('Updated Book')
+            })
+
+            it('dispatches before events ahead of the write and after events behind it', async () => {
+                const order: string[] = []
+                emitter.on<BookEvent>('books::book.beforeCreate', async () => {
+                    order.push(`beforeCreate:${(await repository.load({ id: 20 })) ? 'written' : 'pending'}`)
+                })
+                emitter.on<BookEvent>('books::book.beforeUpdate', async () => {
+                    order.push(`beforeUpdate:${(await repository.load({ id: 10 }))?.title}`)
+                })
+                emitter.on<BookEvent>('books::book.afterCreate', async () => {
+                    order.push(`afterCreate:${(await repository.load({ id: 20 })) ? 'written' : 'pending'}`)
+                })
+                emitter.on<BookEvent>('books::book.afterUpdate', async () => {
+                    order.push(`afterUpdate:${(await repository.load({ id: 10 }))?.title}`)
+                })
+
+                await service.bulkUpsert(inputs)
+
+                expect(order).toEqual([
+                    'beforeCreate:pending',
+                    'beforeUpdate:Existing Book',
+                    'afterCreate:written',
+                    'afterUpdate:Updated Book',
+                ])
+            })
+        })
+
+        describe('emptyTrash events', () => {
+            it('stay plain mutation events carrying the filters and the count', async () => {
+                await repository.create(input)
+                await repository.remove({ id: 42 })
+                const before =
+                    capture<MutationEvent<number, MockBookFilters | undefined>>('books::book.beforeEmptyTrash')
+                const after = capture<MutationEvent<number, MockBookFilters | undefined>>('books::book.afterEmptyTrash')
+
+                await service.emptyTrash({ text: 'anything' })
+
+                expect(before.event).toBeInstanceOf(MutationEvent)
+                expect(before.event!.input).toEqual({ text: 'anything' })
+                expect(after.event!.data).toBe(1)
             })
         })
     })

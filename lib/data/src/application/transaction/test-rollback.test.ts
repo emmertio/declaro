@@ -175,7 +175,7 @@ describe('withRollback', () => {
         const { adapter, app } = await setup()
         const stack = new TransactionStack()
         app.registerValue('transactionStack', stack)
-        const outer = await Transaction.begin({ context: app })
+        const outer = await withContext(app, () => Transaction.begin())
 
         await withRollback(app, async (transaction) => {
             expect(transaction.parent).toBeUndefined()
@@ -188,14 +188,13 @@ describe('withRollback', () => {
         expect(log(adapter)).toEqual(['begin@0', 'begin@0', 'rollback@0', 'rollback@0'])
     })
 
-    it('leaves an empty stack registered when the context had none', async () => {
+    it('leaves the context with no stack again when it had none', async () => {
         const { app } = await setup()
         expect(app.resolve('transactionStack')).toBeUndefined()
 
         await withRollback(app, async () => {})
 
-        expect(app.resolve('transactionStack')?.current).toBeUndefined()
-        expect(app.resolve('transactionStack')?.size).toBe(0)
+        expect(app.resolve('transactionStack')).toBeUndefined()
     })
 
     it('only accepts a context typed with the transaction scope', () => {
@@ -362,7 +361,7 @@ describe('rollbackEachTest', () => {
         )
 
         expect(leftOpen?.status).toBe(TransactionStatus.RolledBack)
-        expect(app.resolve('transactionStack')?.size).toBe(0)
+        expect(app.resolve('transactionStack')).toBeUndefined()
         expect(log(adapter)).toEqual(['begin@0', 'begin@1', 'begin@2', 'rollback@2', 'rollback@1', 'rollback@0'])
     })
 
@@ -458,17 +457,22 @@ describe('rollbackEachTest', () => {
         await expect(runTest(async () => {})).rejects.toThrow()
     })
 
-    it('leaves an empty stack on the context after a test when it had none', async () => {
-        const { app } = await setup()
+    it('leaves the context with no stack after a test when it had none, so app-level transactions are stateless again', async () => {
+        const { adapter, app } = await setup()
         const { hooks, runTest } = fakeHooks()
         rollbackEachTest(app, { hooks })
 
         await runTest(async () => {
             await withContext(app, () => Transaction.begin())
         })
+        await runTest(async () => {})
 
-        expect(app.resolve('transactionStack')?.size).toBe(0)
+        expect(app.resolve('transactionStack')).toBeUndefined()
+        const transaction = await withContext(app, () => Transaction.begin({ adapter }))
+        expect(transaction.parent).toBeUndefined()
         expect(() => withContext(app, () => useTransaction())).toThrow('No transaction is active')
+        await transaction.commit()
+        expect(log(adapter).slice(-2)).toEqual(['begin@0', 'commit@0'])
     })
 
     it('restores the previous stack registration after each test', async () => {

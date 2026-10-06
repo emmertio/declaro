@@ -30,11 +30,16 @@ describe('transactionModule', () => {
         expect(withContext(appContext, () => useTransactionAdapter())).toBe(adapter)
     })
 
-    it('does not register a transaction stack on the app context', async () => {
+    it('does not register a transaction stack on the app context, so app-level transactions are stateless', async () => {
         expect(appContext.resolve('transactionStack')).toBeUndefined()
-        await expect(withContext(appContext, () => Transaction.begin())).rejects.toThrow(
-            'No transaction stack was found',
-        )
+
+        const transaction = await withContext(appContext, () => Transaction.begin())
+        expect(() => withContext(appContext, () => useTransaction())).toThrow('No transaction is active')
+        const requestContext = await newRequestContext()
+        expect(() => withContext(requestContext, () => useTransaction())).toThrow('No transaction is active')
+
+        await transaction.commit()
+        expect(operations()).toEqual(['begin@0', 'commit@0'])
     })
 
     it('registers a new transaction stack on each request context', async () => {
@@ -111,7 +116,7 @@ describe('transactionModule', () => {
         })
 
         it('starts the request nested under its active current transaction', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const requestContext = await newRequestContext()
             const stack = requestContext.resolve('transactionStack')
 
@@ -138,7 +143,7 @@ describe('transactionModule', () => {
         })
 
         it('cascades a rollback of the outer transaction into what the request left open', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const requestContext = await newRequestContext()
             const leftOpen = await withContext(requestContext, async () => {
                 const first = await Transaction.begin()
@@ -154,7 +159,7 @@ describe('transactionModule', () => {
         })
 
         it('cascades a commit of the outer transaction into what the request left open', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const requestContext = await newRequestContext()
             const leftOpen = await withContext(requestContext, () => Transaction.begin())
 
@@ -165,7 +170,7 @@ describe('transactionModule', () => {
         })
 
         it('cascades into a request created from a request nested under the outer transaction', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const first = await newRequestContext()
             const firstOpen = await withContext(first, () => Transaction.begin())
             const second = (await createRequestContext(first, request)) as unknown as Context<DataScope>
@@ -182,7 +187,7 @@ describe('transactionModule', () => {
         })
 
         it('gives each request its own stack, and still rejects parallel children of the outer transaction', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const first = await newRequestContext()
             const second = await newRequestContext()
 
@@ -201,7 +206,7 @@ describe('transactionModule', () => {
         })
 
         it('still rejects finishing the outer transaction while a request runs a child in parallel', async () => {
-            const outer = await Transaction.begin({ context: appContext })
+            const outer = await withContext(appContext, () => Transaction.begin())
             const requestContext = await newRequestContext()
             let release!: () => void
             const blocked = new Promise<void>((resolve) => (release = resolve))
@@ -224,7 +229,7 @@ describe('transactionModule', () => {
         })
 
         it('starts the request with an empty stack when the outer stack has no active transaction', async () => {
-            const finished = await Transaction.begin({ context: appContext })
+            const finished = await withContext(appContext, () => Transaction.begin())
             await finished.commit()
 
             const requestContext = await newRequestContext()

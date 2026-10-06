@@ -11,6 +11,7 @@
         - [Framework middleware](#framework-middleware)
     - [Manual lifecycle](#manual-lifecycle)
     - [Where the stack lives](#where-the-stack-lives)
+        - [Without a context](#without-a-context)
     - [Nesting](#nesting)
         - [What a nested commit means](#what-a-nested-commit-means)
 - [Running code after the commit](#running-code-after-the-commit)
@@ -57,7 +58,7 @@ This split is deliberate. Domain code (services, event handlers) only ever sees 
 
 An adapter is long-lived: you create one per connection pool or ORM instance and register it with the app. Declaro makes sure each method is only called in a valid state, finishes nested transactions before their parents (innermost first), and only updates `transaction.status` after your method resolves. If `commit()` throws, the transaction stays `Active` and is then rolled back (by `Transaction.run`, or by your own code), so your `rollback()` must still find its state.
 
-Per-request ORM state belongs in `begin()` for a top-level transaction. For example, a MikroORM adapter forks an `EntityManager` there, so each transaction gets its own identity map (see [the MikroORM example](#orms-that-cant-nest)). Adapter methods don't receive the context as a parameter: they get it implicitly, since the adapter's `begin()`, `commit()` and `rollback()` are called in the caller's ambient context, so `useContext()` inside them reaches the current request's state. When a transaction is given an explicit `{ context }` (through `new Transaction()`, `Transaction.begin()` or `Transaction.run()`), they are called in that context instead.
+Per-request ORM state belongs in `begin()` for a top-level transaction. For example, a MikroORM adapter forks an `EntityManager` there, so each transaction gets its own identity map (see [the MikroORM example](#orms-that-cant-nest)). Adapter methods don't receive the context as a parameter: they get it implicitly. A transaction captures the context it begins in, and the adapter's `begin()`, `commit()` and `rollback()` are all called in that context, so `useContext()` inside them reaches the current request's state, even when the commit or rollback is called from somewhere else. For a `Transaction.run`, that is the run's own child context, which extends the context the run was called in. A transaction begun with no context at all (see [Without a context](#without-a-context)) calls the adapter as is.
 
 ### Example: a raw SQL adapter
 
@@ -229,10 +230,10 @@ const order = await Transaction.run(async (transaction) => {
 })
 ```
 
-`Transaction.run(callback, options?)` takes the same options as the constructor (see [Manual lifecycle](#manual-lifecycle)). It needs an adapter: it uses `options.adapter`, or else the one registered on `options.context` or on the current context, so call it inside `withContext(...)`, or pass `{ context }` or `{ adapter }`. What it does:
+`Transaction.run(callback, options?)` takes the same options as the constructor (see [Manual lifecycle](#manual-lifecycle)). It needs an adapter: it uses `options.adapter`, or else the one registered on the current context, so call it inside `withContext(...)` on a context set up with `transactionModule()`, or pass `{ adapter }`. With neither, it rejects with `No transaction adapter could be found. ...` before doing anything. What it does:
 
 - If a transaction is current and active, and uses the same adapter, it starts a transaction **nested** in that one. Otherwise it starts a top-level transaction. Pass `{ parent }` to choose the parent yourself (`null` forces top level).
-- It runs the callback in a child context with its own `TransactionStack`, and the new transaction is the current one there, so `useTransaction()` returns it, including in anything the callback awaits. The run's adapter is registered on that child context too, so `useTransactionAdapter()` returns it, and transactions begun inside nest in the run's transaction, even when the adapter came from `options.adapter` rather than the context.
+- It runs the callback in a child of the current context (or, with no current context, a fresh one) with its own `TransactionStack`, and the new transaction is the current one there, so `useTransaction()` returns it, including in anything the callback awaits. The run's adapter is registered on that child context too, so `useTransactionAdapter()` returns it, and transactions begun inside nest in the run's transaction, even when the adapter came from `options.adapter` rather than the context.
 - If the callback commits or rolls back the transaction itself, `Transaction.run` leaves it alone. The same goes when something else finished it, such as an outer transaction committed or rolled back from inside the callback (see [Manual lifecycle](#manual-lifecycle)). The rest of the callback then runs with no current transaction, so `useTransaction()` throws there.
 - If the callback returns while transactions it began are still open, the commit commits them too, innermost first, before the run's own transaction (see [Manual lifecycle](#manual-lifecycle)).
 - If the callback throws, it rolls back and rethrows. If the commit fails, it rolls back and rethrows the commit error. The exception is a failing [`afterCommit` callback](#running-code-after-the-commit): the data is already saved by then, so the run rethrows that error without rolling back. The same goes for a throwing [`afterCommit` event listener](#lifecycle-events).
@@ -245,7 +246,7 @@ const order = await Transaction.run(async (transaction) => {
 
 ### Wrapping requests, background tasks and other async work
 
-`wrapWithTransaction(fn, options?)` returns a function with the same parameters that runs each call through `Transaction.run`, passing `options` along (`adapter`, `parent`, `context`, the same as `Transaction.run`). It wraps any async unit of work: a request handler, a whole middleware chain, a background task, a queue consumer, a cron job. Everything the function does, including `useTransaction()` calls, shares one transaction; it commits when the function resolves, and a thrown error rolls it all back.
+`wrapWithTransaction(fn, options?)` returns a function with the same parameters that runs each call through `Transaction.run`. Its only option is `parent`, passed along to every call. It doesn't set up a context: each call runs in the current one, and finds the adapter there. It wraps any async unit of work: a request handler, a whole middleware chain, a background task, a queue consumer, a cron job. Everything the function does, including `useTransaction()` calls, shares one transaction; it commits when the function resolves, and a thrown error rolls it all back.
 
 Inside a request, call the wrapped function in the request's `withContext` block so the transaction picks up the request context:
 
@@ -261,19 +262,17 @@ await withContext(requestContext, () => createOrder(input))
 
 To wrap only some routes, apply `wrapWithTransaction` to just those handlers.
 
-Work that runs outside any Declaro context, such as a background job or a queue consumer, has no ambient context to find the adapter in. Pass `{ adapter }`, or `{ context }` to use the adapter registered on that context (the app context, for example):
+Work that runs outside a request, such as a background job or a queue consumer, calls the wrapped function inside `withContext(app, ...)`, so the transaction finds the adapter registered on the app context:
 
 ```ts
+import { withContext } from '@declaro/core'
 import { wrapWithTransaction } from '@declaro/data'
 
-const handleMessage = wrapWithTransaction(
-    async (message: OrderMessage) => {
-        await orderService.fulfil(message.orderId) // useTransaction() and useTransactionAdapter() work in here
-    },
-    { adapter }, // or { context: app }
-)
+const handleMessage = wrapWithTransaction(async (message: OrderMessage) => {
+    await orderService.fulfil(message.orderId) // useTransaction() and useTransactionAdapter() work in here
+})
 
-queue.consume('orders', handleMessage)
+queue.consume('orders', (message) => withContext(app, () => handleMessage(message)))
 ```
 
 Each call gets its own top-level transaction and its own stack, so messages handled concurrently stay apart.
@@ -370,14 +369,16 @@ await Transaction.run(async (tx1) => {
 // tx1 already rolled back, so Transaction.run leaves it alone
 ```
 
-The constructor and `Transaction.begin` take the same options:
+The constructor, `Transaction.begin` and `Transaction.run` take the same options. Everything else comes from the current context: its transaction stack, and its `events` for [lifecycle events](#lifecycle-events).
 
-| Option    | Default                                                                                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adapter` | The adapter registered on `context`, or on the current context. Resolved in the constructor, which throws if there is none.                                    |
-| `context` | The current context. `begin()` uses this context's transaction stack, and `run()` callbacks run in a child of it.                                              |
-| `parent`  | Decided at `begin()` (see below). Pass a transaction to nest in it (it must be active when you begin), or `null` to force a top-level transaction.             |
-| `emitter` | The `events` of the context the transaction begins in (see [Lifecycle events](#lifecycle-events)). Applies only to this transaction, not to ones nested in it. |
+| Option    | Default                                                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter` | The adapter registered on the current context, looked up in the constructor. A passed adapter is used as is, with no lookup. With neither, it throws `No transaction adapter could be found`. |
+| `parent`  | Decided at `begin()` (see below). Pass a transaction to nest in it (it must be active when you begin), or `null` to force a top-level transaction.                                            |
+
+The lookup lives in a protected method, `resolveAdapter()`, which the constructor calls only when no `adapter` is passed. To take the adapter from somewhere else, extend `Transaction`, call `super(options)`, and override it. It runs during construction, before the subclass's own fields are set.
+
+A transaction captures the context it begins in, and uses it for the rest of its life: its later `commit()` and `rollback()` take it off that context's stack, call the adapter in that context, emit their events to that context's `events`, and run [`afterCommit` callbacks](#running-code-after-the-commit) in a child of it, even when you call them from somewhere with no current context.
 
 The parent is chosen when you call `begin()`, not when you construct the transaction: it is the transaction that is current at that moment, if it is active and uses the same adapter. Otherwise the transaction is top-level. So `parent` and `depth` only mean something after `begin()`; before it, `depth` is `0`. An explicit `parent` that isn't active makes `begin()` throw, for example `Cannot begin a transaction nested in a parent that is committed`. If the adapter's `begin()` fails, the transaction stays `Pending` with no parent, so a retried `begin()` decides the parent again from whatever is current then.
 
@@ -401,7 +402,7 @@ The current transaction is tracked by a `TransactionStack`, registered on a cont
 
 - **Each request context gets its own**, from `transactionModule`'s request middleware. It starts nested under the current transaction of the context the request is created from, if that context has a stack with an active one (only the [rollback test helpers](#rolling-back-integration-tests) put one there).
 - **Every run gets its own.** `Transaction.run()` and `transaction.run()` run their callback in a child context with a fresh stack, whose first entry is the run's transaction. That is what keeps concurrent runs isolated.
-- **Scripts, jobs and tests outside both** either wrap their work in `Transaction.run()`, or register a stack on their own context:
+- **Scripts, jobs and tests outside both** either wrap their work in `Transaction.run()`, register a stack on their own context, or hold their transactions themselves ([without a context](#without-a-context)):
 
 ```ts
 import { Context, withContext } from '@declaro/core'
@@ -422,7 +423,30 @@ Its public API is read-only: `current` (the top of the stack, or `undefined`), `
 
 `new TransactionStack({ outer })` starts a stack nested under `outer`'s current transaction, if that one is active (otherwise it's an ordinary empty stack). While the new stack is empty, `current` returns that transaction; transactions begun on the stack nest in it; and committing or rolling it back cascades into whatever is still open on the new stack. `transactionModule` uses this for request contexts.
 
-`begin()` without a stack throws: `No transaction stack was found in the current context. Use Transaction.run(), or begin transactions inside a request context set up by transactionModule().` `Transaction.run()` never needs one, since it brings its own.
+`Transaction.run()` never needs a stack in the current context, since it brings its own. A `begin()` without one doesn't throw either: the transaction is stateless.
+
+#### Without a context
+
+Tracking on a stack is the default, and needs nothing passed around. When there is no stack to track on, because there is no current context at all or the current one has no `transactionStack` (such as the app context outside tests), transactions fall back to a stateless mode. `begin()`, `commit()` and `rollback()` still work against the adapter, but the transaction is current nowhere: `useTransaction()` doesn't return it, and nothing nests in it automatically. The rules on finishing still hold for what it knows about: an open child you began with `parent: transaction` still blocks or is cascaded into, as above.
+
+Use it for plain unit tests of code that takes a transaction, or for scripts that hold their transaction themselves. Pass the adapter when there is no context to find it on, and pass the transaction along yourself, as `parent` for a child. Lifecycle events go to the current context's `events` if there is one, and are skipped otherwise:
+
+```ts
+import { Transaction } from '@declaro/data'
+
+const transaction = await Transaction.begin({ adapter }) // no context needed
+const child = await Transaction.begin({ adapter, parent: transaction }) // nests only because it was passed
+await child.commit()
+
+// run() makes its transaction current inside the callback, in either mode.
+await transaction.run(async () => {
+    await orderService.create(input) // useTransaction() returns the run's transaction in here
+})
+
+await transaction.commit()
+```
+
+`Transaction.run()` and `transaction.run()` are the way back to ambient tracking: their callback runs in a child of the current context (or a fresh context when there is none) with its own stack and the adapter registered on it, so everything inside is tracked as usual.
 
 ### Nesting
 
@@ -504,7 +528,7 @@ await Transaction.run(async (transaction) => {
 
 - **Nested transactions pass them up.** A nested commit isn't final (see [What a nested commit means](#what-a-nested-commit-means)), so it moves its callbacks to its parent, after the ones the parent already has. They only run after the **top-level** commit. That includes nested transactions committed by a [cascade](#manual-lifecycle).
 - **A rollback drops them.** When a transaction rolls back, directly or through a cascade, its callbacks never run. So do the callbacks its committed children passed up to it.
-- **The top-level commit runs them in the order they were registered**, one after another, each awaited, once the adapter's commit has succeeded and the status is `Committed`. They run outside any transaction: in a child of the transaction's context (or of the ambient one) with a new, empty transaction stack. `useContext()` still resolves the app and request dependencies, but `useTransaction()` throws, even when an unrelated transaction is still open in the flow that called `commit()`. A transaction begun in a callback, such as with `Transaction.run`, is a new top-level transaction.
+- **The top-level commit runs them in the order they were registered**, one after another, each awaited, once the adapter's commit has succeeded and the status is `Committed`. They run outside any transaction: in a child of the context the transaction began in (or a fresh context, if it began in none) with a new, empty transaction stack. `useContext()` still resolves the app and request dependencies, but `useTransaction()` throws, even when an unrelated transaction is still open in the flow that called `commit()`. A transaction begun in a callback, such as with `Transaction.run`, is a new top-level transaction.
 - **The first failure stops them.** If a callback throws, the remaining callbacks don't run and `commit()` rejects with that error. The data is already saved, so the transaction stays `Committed` and there is nothing to roll back. Inside `Transaction.run`, the run rethrows the error without trying to roll back. If you need every callback to run whatever happens, catch errors inside each one.
 
 This matches the default behavior of Django's `transaction.on_commit`.
@@ -611,11 +635,11 @@ app.events.on('declaro::transaction.afterRollback', (event: TransactionLifecycle
 
 ### Where they are emitted
 
-Events are emitted with an awaited `emitAsync` on the `events` of the context the transaction begins in: the `context` option if you passed one, or else the ambient context. The emitter is captured by `begin()` and reused for that transaction's commit or rollback. With no context and no `emitter` option, nothing is emitted.
+Events are emitted with an awaited `emitAsync` on the `events` of the context the transaction begins in. That context is captured by `begin()` and reused for the transaction's commit or rollback, wherever they are called from. A transaction begun with no current context emits nothing.
 
 Listeners registered on the app context still reach transactions begun in requests and runs, because `Context.extend` copies the parent's listeners into a request context, and into each run's child context, when that context is created. The copy is a snapshot: a listener added to the app after a request or run context was created isn't seen by that context. Register lifecycle listeners at startup.
 
-Pass the `emitter` option to send a transaction's events somewhere else. It applies only to that transaction (for `Transaction.run`, the run's own transaction), not to transactions nested in it, which use their own context's `events`.
+To send a transaction's events somewhere else, begin it in a context whose `events` you listen on.
 
 ### How listeners affect the transaction
 
@@ -730,7 +754,7 @@ describe('orders', () => {
 })
 ```
 
-After each test (and after each `withRollback`), the context's previous `transactionStack` registration is restored. A context can't unregister a dependency, so when it had none, an empty stack is left registered, which no transaction is current on.
+After each test (and after each `withRollback`), the context's previous `transactionStack` registration is restored. When it had none, it is left with no stack again (a context can't unregister a dependency, so `undefined` is registered in its place), so transactions begun directly in it are [stateless](#without-a-context) again, as they were before the tests.
 
 What the rollback covers, in all three forms:
 
@@ -748,7 +772,7 @@ What the rollback covers, in all three forms:
 | `ITransactionAdapter`       | interface  | The adapter contract your app implements: `begin`, `commit`, `rollback`.                                                                    |
 | `ITransaction`              | interface  | One transaction, ORM-agnostic: `id`, `status`, `parent`, `depth`, and `begin`, `commit`, `rollback`, `run`, `afterCommit`.                  |
 | `Transaction`               | class      | Implements `ITransaction`. `new Transaction(options?)`; statics `begin(options?)` and `run(callback, options?)`.                            |
-| `TransactionOptions`        | interface  | `adapter`, `context`, `parent`, `emitter`. Taken by the constructor, `Transaction.begin`, `Transaction.run` and `wrapWithTransaction`.      |
+| `TransactionOptions`        | interface  | `adapter?`, `parent?`. Taken by the constructor, `Transaction.begin` and `Transaction.run`.                                                 |
 | `TransactionCallback`       | type       | `(transaction: ITransaction) => TResult \| Promise<TResult>`, the work passed to `run`.                                                     |
 | `AfterCommitCallback`       | type       | `() => unknown \| Promise<unknown>`, the work passed to `afterCommit`.                                                                      |
 | `TransactionStatus`         | enum       | `Pending`, `Active`, `Committed`, `RolledBack`.                                                                                             |
@@ -757,7 +781,7 @@ What the rollback covers, in all three forms:
 | `ITransactionEventData`     | interface  | The serializable event data: `id`, `depth`, `status`, `parentId?`.                                                                          |
 | `TransactionStack`          | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. `new TransactionStack({ outer? })`.                    |
 | `transactionModule`         | middleware | Registers the adapter, and gives each request its own `TransactionStack`, nested under the outer context's active transaction if any.       |
-| `wrapWithTransaction`       | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                                                   |
+| `wrapWithTransaction`       | function   | Wraps any async work so every call runs through `Transaction.run` in the current context. Options: `parent?`.                               |
 | `useTransaction`            | function   | Synchronously gets the current transaction. Throws when none is active.                                                                     |
 | `useTransactionAdapter`     | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                             |
 | `MockTransactionAdapter`    | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                              |

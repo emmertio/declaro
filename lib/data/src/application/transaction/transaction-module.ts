@@ -20,7 +20,7 @@ export interface TransactionModuleOptions {
  * - Registers the app's transaction adapter as `transactionAdapter`, so `Transaction.run()` and friends can find it
  *   anywhere in the app, including request contexts derived from the app context.
  * - Adds request middleware that registers a new {@link TransactionStack} as `transactionStack` on each request
- *   context, so every request tracks its own transactions and `Transaction.begin()` works inside it.
+ *   context, so every request tracks its own transactions and `Transaction.begin()` makes them current inside it.
  *
  * If the context the request is created from has a transaction stack whose current transaction is `Active`, the
  * request's stack starts nested under that transaction (see {@link TransactionStackOptions.outer}): `useTransaction()`

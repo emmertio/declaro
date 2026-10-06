@@ -218,7 +218,7 @@ describe('Transaction.afterCommit', () => {
         const otherContext = new Context<ITransactionScope>()
         otherContext.registerValue('transactionAdapter', adapter)
         otherContext.registerValue('transactionStack', new TransactionStack())
-        const transaction = await Transaction.begin({ context: otherContext })
+        const transaction = await withContext(otherContext, () => Transaction.begin())
 
         await inContext(async () => {
             const unrelated = await Transaction.begin()
@@ -273,6 +273,22 @@ describe('Transaction.afterCommit', () => {
         expect(nested?.parent).toBeUndefined()
         expect(nested?.status).toBe(TransactionStatus.Committed)
         expect(operations()).toEqual(['begin#1@0', 'commit#1@0', 'begin#2@0', 'commit#2@0'])
+    })
+
+    it('runs callbacks in a child of the context the transaction began in, even when committed outside it', async () => {
+        const requestContext = new Context<ITransactionScope & { requestId: string }>()
+        requestContext.registerValue('transactionAdapter', adapter)
+        requestContext.registerValue('transactionStack', new TransactionStack())
+        requestContext.registerValue('requestId', 'request-2')
+        let requestId: string | undefined
+
+        const transaction = await withContext(requestContext, () => Transaction.begin())
+        transaction.afterCommit(() => {
+            requestId = useContext<typeof requestContext>()?.resolve('requestId')
+        })
+        await transaction.commit()
+
+        expect(requestId).toBe('request-2')
     })
 
     it('throws when the transaction is not active', async () => {

@@ -62,8 +62,8 @@ interface TestTransaction {
  * afterwards, so an integration test against a real database leaves no data behind.
  *
  * The transaction lives on `context` itself: a new {@link TransactionStack} is registered on it for the length of the
- * call, and the previous `transactionStack` registration is restored afterwards (or, if there was none, an empty stack
- * is left registered). The adapter and the event manager are the ones registered on `context`. So `useTransaction()`
+ * call, and the previous `transactionStack` registration is restored afterwards (or, if there was none, `context` is
+ * left with no stack again, so transactions begun directly in it are stateless as before). The adapter and the event manager are the ones registered on `context`. So `useTransaction()`
  * returns the test's transaction in `fn`, and everything that runs in `context` nests in it:
  *
  * - **Nested commits are rolled back too.** Code under test that commits a nested transaction only saves into the
@@ -153,8 +153,8 @@ export function rollbackTest<TScope extends ITransactionScope, TResult>(
  * or failed.
  *
  * The transaction lives on `context` itself: `beforeEach` registers a new {@link TransactionStack} on it, and
- * `afterEach` restores the previous `transactionStack` registration (or, if there was none, leaves an empty stack
- * registered, since a context can't unregister a dependency). The adapter and the event manager are the ones
+ * `afterEach` restores the previous `transactionStack` registration (or, if there was none, leaves `context` with no
+ * stack again, so transactions begun directly in it are stateless as before). The adapter and the event manager are the ones
  * registered on `context`. So code the test runs in `context` (`withContext(context, ...)`, or services resolved from
  * it and called inside it) sees the test's transaction as current and nests in it:
  *
@@ -262,7 +262,7 @@ async function beginTestTransaction<TScope extends ITransactionScope>(
     context.registerValue('transactionStack', new TransactionStack())
 
     try {
-        const transaction = await Transaction.begin({ context, parent: null })
+        const transaction = await withContext(context, () => Transaction.begin({ parent: null }))
         return { transaction, previousStack }
     } catch (error) {
         restoreStack(context, previousStack)
@@ -290,7 +290,8 @@ async function endTestTransaction<TScope extends ITransactionScope>(
 
 /**
  * Puts back the `transactionStack` registration a test replaced. A context can't unregister a dependency, so when
- * there was none, an empty stack is registered instead.
+ * there was none, `undefined` is registered instead: `resolve()` then yields no stack, and transactions begun in the
+ * context are stateless again, as they were before the test.
  */
 function restoreStack(
     context: Context<ITransactionScope>,
@@ -299,7 +300,7 @@ function restoreStack(
     if (previousStack) {
         context.register('transactionStack', previousStack)
     } else {
-        context.registerValue('transactionStack', new TransactionStack())
+        context.registerValue('transactionStack', undefined as unknown as TransactionStack)
     }
 }
 

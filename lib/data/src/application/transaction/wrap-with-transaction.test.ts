@@ -52,44 +52,43 @@ describe('wrapWithTransaction', () => {
     })
 
     describe('options', () => {
-        it('runs a background task outside any context with { adapter }', async () => {
-            const adapter = new MockTransactionAdapter()
+        it('runs a background task in the app context, which has no stack', async () => {
+            const { adapter, context } = setup()
             let seen: ITransaction | undefined
 
-            const processJob = wrapWithTransaction(
-                async (jobId: string) => {
-                    seen = useTransaction()
-                    expect(useTransactionAdapter()).toBe(adapter)
-                    expect(adapter.handle().depth).toBe(0)
-                    return `processed ${jobId}`
-                },
-                { adapter },
-            )
+            const processJob = wrapWithTransaction(async (jobId: string) => {
+                seen = useTransaction()
+                expect(useTransactionAdapter()).toBe(adapter)
+                expect(adapter.handle().depth).toBe(0)
+                return `processed ${jobId}`
+            })
 
-            expect(await processJob('job-1')).toBe('processed job-1')
+            expect(await withContext(context, () => processJob('job-1'))).toBe('processed job-1')
             expect(seen?.status).toBe(TransactionStatus.Committed)
             expect(adapter.operations.map(({ operation }) => operation)).toEqual(['begin', 'commit'])
         })
 
         it('rolls back a background task that throws', async () => {
-            const adapter = new MockTransactionAdapter()
-            const processJob = wrapWithTransaction(
-                async () => {
-                    throw new Error('job failed')
-                },
-                { adapter },
-            )
+            const { adapter, context } = setup()
+            const processJob = wrapWithTransaction(async () => {
+                throw new Error('job failed')
+            })
 
-            await expect(processJob()).rejects.toThrow('job failed')
+            await expect(withContext(context, () => processJob())).rejects.toThrow('job failed')
             expect(adapter.operations.map(({ operation }) => operation)).toEqual(['begin', 'rollback'])
         })
 
-        it('uses the adapter registered on { context }', async () => {
-            const { adapter, context } = setup()
-            const processJob = wrapWithTransaction(async () => useTransactionAdapter(), { context })
+        it('throws when called where no adapter can be found', async () => {
+            let hasRun = false
+            const processJob = wrapWithTransaction(async () => {
+                hasRun = true
+            })
 
-            expect(await processJob()).toBe(adapter)
-            expect(adapter.operations.map(({ operation }) => operation)).toEqual(['begin', 'commit'])
+            await expect(processJob()).rejects.toThrow('No transaction adapter could be found')
+            await expect(withContext(new Context(), () => processJob())).rejects.toThrow(
+                'No transaction adapter could be found',
+            )
+            expect(hasRun).toBe(false)
         })
 
         it('starts a top-level transaction from inside a run with { parent: null }', async () => {

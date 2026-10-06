@@ -1,4 +1,4 @@
-import { Context, createRequestContext, EventManager, useDeclaro, withContext, type Request } from '@declaro/core'
+import { Context, createRequestContext, useDeclaro, withContext, type Request } from '@declaro/core'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { TransactionEvent, TransactionLifecycleEvent } from '../../domain/events/transaction-event'
 import { TransactionStatus, type ITransaction } from '../../domain/transaction/transaction-interface'
@@ -179,9 +179,9 @@ describe('Transaction lifecycle events', () => {
     describe('before listeners', () => {
         it('stops begin when beforeBegin throws', async () => {
             failOn(TransactionEvent.BeforeBegin)
-            const transaction = new Transaction({ context })
+            const transaction = inContext(() => new Transaction())
 
-            await expect(transaction.begin()).rejects.toThrow('beforeBegin listener failure')
+            await expect(inContext(() => transaction.begin())).rejects.toThrow('beforeBegin listener failure')
 
             expect(transaction.status).toBe(TransactionStatus.Pending)
             expect(transaction.parent).toBeUndefined()
@@ -192,7 +192,7 @@ describe('Transaction lifecycle events', () => {
         })
 
         it('stops commit when beforeCommit throws', async () => {
-            const transaction = await Transaction.begin({ context })
+            const transaction = await inContext(() => Transaction.begin())
             failOn(TransactionEvent.BeforeCommit)
 
             await expect(inContext(() => transaction.commit())).rejects.toThrow('beforeCommit listener failure')
@@ -203,7 +203,7 @@ describe('Transaction lifecycle events', () => {
         })
 
         it('stops rollback when beforeRollback throws', async () => {
-            const transaction = await Transaction.begin({ context })
+            const transaction = await inContext(() => Transaction.begin())
             failOn(TransactionEvent.BeforeRollback)
 
             await expect(inContext(() => transaction.rollback())).rejects.toThrow('beforeRollback listener failure')
@@ -239,9 +239,9 @@ describe('Transaction lifecycle events', () => {
     describe('after listeners', () => {
         it('propagates an afterBegin failure with the transaction already active', async () => {
             failOn(TransactionEvent.AfterBegin)
-            const transaction = new Transaction({ context })
+            const transaction = inContext(() => new Transaction())
 
-            await expect(transaction.begin()).rejects.toThrow('afterBegin listener failure')
+            await expect(inContext(() => transaction.begin())).rejects.toThrow('afterBegin listener failure')
 
             expect(transaction.status).toBe(TransactionStatus.Active)
             expect(stack.current).toBe(transaction)
@@ -251,7 +251,7 @@ describe('Transaction lifecycle events', () => {
         it('rolls back and rethrows from Transaction.begin() when afterBegin throws', async () => {
             failOn(TransactionEvent.AfterBegin)
 
-            await expect(Transaction.begin({ context })).rejects.toThrow('afterBegin listener failure')
+            await expect(inContext(() => Transaction.begin())).rejects.toThrow('afterBegin listener failure')
 
             expect(stack.size).toBe(0)
             expect(operations()).toEqual(['begin#1@0', 'rollback#1@0'])
@@ -261,7 +261,7 @@ describe('Transaction lifecycle events', () => {
             failOn(TransactionEvent.AfterBegin)
             adapter.failures.rollback = true
 
-            const error = await Transaction.begin({ context }).catch((error: unknown) => error)
+            const error = await inContext(() => Transaction.begin()).catch((error: unknown) => error)
 
             expect(error).toBeInstanceOf(AggregateError)
             expect((error as AggregateError).message).toBe('Transaction failed, and so did its rollback')
@@ -273,7 +273,7 @@ describe('Transaction lifecycle events', () => {
         })
 
         it('propagates an afterCommit failure with the transaction already committed', async () => {
-            const transaction = await Transaction.begin({ context })
+            const transaction = await inContext(() => Transaction.begin())
             failOn(TransactionEvent.AfterCommit)
 
             await expect(inContext(() => transaction.commit())).rejects.toThrow('afterCommit listener failure')
@@ -284,7 +284,7 @@ describe('Transaction lifecycle events', () => {
         })
 
         it('propagates an afterRollback failure with the transaction already rolled back', async () => {
-            const transaction = await Transaction.begin({ context })
+            const transaction = await inContext(() => Transaction.begin())
             failOn(TransactionEvent.AfterRollback)
 
             await expect(inContext(() => transaction.rollback())).rejects.toThrow('afterRollback listener failure')
@@ -406,34 +406,8 @@ describe('Transaction lifecycle events', () => {
         })
     })
 
-    describe('emitter', () => {
-        it('emits to an explicit emitter instead of the context', async () => {
-            const emitter = new EventManager()
-            const own: string[] = []
-            emitter.on('*', (event) => {
-                own.push(event.type)
-            })
-
-            await inContext(async () => {
-                const transaction = await Transaction.begin({ emitter })
-                await transaction.commit()
-                await Transaction.run(() => undefined, { emitter })
-            })
-
-            expect(events).toEqual([])
-            expect(own).toEqual([
-                'declaro::transaction.beforeBegin',
-                'declaro::transaction.afterBegin',
-                'declaro::transaction.beforeCommit',
-                'declaro::transaction.afterCommit',
-                'declaro::transaction.beforeBegin',
-                'declaro::transaction.afterBegin',
-                'declaro::transaction.beforeCommit',
-                'declaro::transaction.afterCommit',
-            ])
-        })
-
-        it('emits to the explicit context’s events', async () => {
+    describe('where events go', () => {
+        it('emits to the events of the context it began in, wherever it is finished', async () => {
             const other = new Context<ITransactionScope>()
             other.registerValue('transactionAdapter', adapter)
             other.registerValue('transactionStack', new TransactionStack())
@@ -442,13 +416,45 @@ describe('Transaction lifecycle events', () => {
                 otherEvents.push((event as TransactionLifecycleEvent).descriptor.action)
             })
 
-            await inContext(async () => {
-                const transaction = await Transaction.begin({ context: other })
-                await transaction.rollback()
-            })
+            const committed = await withContext(other, () => Transaction.begin())
+            await inContext(() => committed.commit())
+            const rolledBack = await withContext(other, () => Transaction.begin())
+            await rolledBack.rollback()
 
             expect(events).toEqual([])
-            expect(otherEvents).toEqual(['beforeBegin', 'afterBegin', 'beforeRollback', 'afterRollback'])
+            expect(otherEvents).toEqual([
+                'beforeBegin',
+                'afterBegin',
+                'beforeCommit',
+                'afterCommit',
+                'beforeBegin',
+                'afterBegin',
+                'beforeRollback',
+                'afterRollback',
+            ])
+        })
+
+        it('emits to the current context in stateless mode, when it has no stack', async () => {
+            const bare = new Context<ITransactionScope>()
+            bare.registerValue('transactionAdapter', adapter)
+            const bareEvents: string[] = []
+            bare.events.on('*', (event) => {
+                bareEvents.push((event as TransactionLifecycleEvent).descriptor.action)
+            })
+
+            const transaction = await withContext(bare, () => Transaction.begin())
+            await transaction.commit()
+
+            expect(bareEvents).toEqual(['beforeBegin', 'afterBegin', 'beforeCommit', 'afterCommit'])
+        })
+
+        it('emits nothing for a transaction begun with no context', async () => {
+            const transaction = await Transaction.begin({ adapter })
+            await inContext(() => transaction.commit())
+
+            expect(transaction.status).toBe(TransactionStatus.Committed)
+            expect(events).toEqual([])
+            expect(operations()).toEqual(['begin#1@0', 'commit#1@0'])
         })
     })
 

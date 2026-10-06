@@ -1,12 +1,11 @@
-import { Context, withContext, type EventManager } from '@declaro/core'
+import { withContext, type Context, type ContextAttribute } from '@declaro/core'
 import {
     TransactionStatus,
     type ITransaction,
-    type ITransactionAdapter,
     type TransactionCallback,
 } from '../../domain/transaction/transaction-interface'
 import type { ITransactionScope } from '../../types/transaction-context'
-import { Transaction, type TransactionOptions } from './transaction'
+import { Transaction } from './transaction'
 import { TransactionStack } from './transaction-stack'
 
 /**
@@ -30,28 +29,16 @@ export interface RollbackTestHooks {
  */
 export interface RollbackEachTestOptions {
     /**
-     * The adapter the test transactions use. It is also registered on the test context as `transactionAdapter`, so
-     * code under test nests in the test's transaction. Defaults to the one registered on `context`.
+     * The framework's `beforeEach` and `afterEach`. Defaults to the global `beforeEach` and `afterEach`, which Jest
+     * defines, and Vitest with `globals: true`. Bun's test globals are not on `globalThis`, so pass them with Bun.
      */
-    adapter?: ITransactionAdapter
-    /**
-     * The context the test context extends, usually the app context. Its dependencies and event listeners are copied
-     * into the test context when {@link rollbackEachTest} is called.
-     */
-    context?: Context
-    /** Where to emit the test transactions' lifecycle events. Defaults to the test context's `events`. */
-    emitter?: EventManager
+    hooks?: RollbackTestHooks
 }
 
 /**
- * What {@link rollbackEachTest} returns: the context to run each test's code in, and the test's transaction.
+ * What {@link rollbackEachTest} returns: a getter for the current test's transaction.
  */
 export interface RollbackTestSuite {
-    /**
-     * The test context. Run the code under test in it with `withContext(context, ...)`, so the test's transaction is
-     * current. It is the same context for every test in the suite, with a new {@link TransactionStack} each test.
-     */
-    readonly context: Context<ITransactionScope>
     /**
      * The current test's transaction.
      *
@@ -61,22 +48,41 @@ export interface RollbackTestSuite {
 }
 
 /**
- * Runs `fn` in a transaction that is always rolled back afterwards, so an integration test against a real database
- * leaves no data behind.
+ * The test transaction on a context, and the `transactionStack` registration it replaced.
+ */
+interface TestTransaction {
+    /** The test's top-level transaction. */
+    transaction: Transaction
+    /** What was registered as `transactionStack` on the context before the test, if anything. */
+    previousStack?: ContextAttribute<Context<ITransactionScope>, TransactionStack>
+}
+
+/**
+ * Runs `fn` in `context` (with `withContext(context, ...)`), in a top-level transaction that is always rolled back
+ * afterwards, so an integration test against a real database leaves no data behind.
  *
- * The transaction is top-level unless `parent` is passed. `fn` runs in a child context where it is current, so
- * `useTransaction()` returns it and transactions begun by the code under test nest in it.
+ * The transaction lives on `context` itself: a new {@link TransactionStack} is registered on it for the length of the
+ * call, and the previous `transactionStack` registration is restored afterwards (or, if there was none, an empty stack
+ * is left registered). The adapter and the event manager are the ones registered on `context`. So `useTransaction()`
+ * returns the test's transaction in `fn`, and everything that runs in `context` nests in it:
  *
  * - **Nested commits are rolled back too.** Code under test that commits a nested transaction only saves into the
  *   test's transaction, so the final rollback still undoes it.
+ * - **Requests nest too.** A request context created from `context` (`createRequestContext(context, ...)`, with
+ *   `transactionModule()`) starts nested under the test's transaction, so its transactions are rolled back with it,
+ *   including any it left open.
  * - **A new top-level transaction escapes.** Code that begins its own top-level transaction (`parent: null`, or a
- *   `Transaction.run()` outside the context `fn` runs in) commits for real.
+ *   `Transaction.run()` in a context that is not `context` and was not derived from it during the call) commits for
+ *   real.
  * - **`afterCommit` callbacks never run**, because the test's transaction never commits.
  *
+ * Since the transaction is registered on a shared context, tests using the same context must run one after another:
+ * concurrent tests (`test.concurrent`) are not supported.
+ *
+ * @param context - The context to run `fn` in, usually the app context. Its `transactionAdapter` runs the transaction.
  * @param fn - The test body. Receives the test's transaction.
- * @param options - Passed to `Transaction.run()`: `adapter`, `context`, `parent` (defaults to `null`, top-level) and
- *   `emitter`.
  * @returns Whatever `fn` returns, after the rollback.
+ * @throws {Error} If no adapter is registered on `context`, or the transaction fails to begin.
  * @throws {Error} Whatever `fn` throws, after the rollback.
  * @throws {Error} If `fn` committed the test's transaction itself, since its changes were not rolled back.
  * @throws {AggregateError} If `fn` throws and the rollback fails too. Holds both errors.
@@ -84,131 +90,135 @@ export interface RollbackTestSuite {
  * @example
  * ```ts
  * it('creates an order', () =>
- *     withRollback(async () => {
+ *     withRollback(app, async () => {
  *         const order = await orderService.create(input)
  *         expect(await orderService.load(order.id)).toBeDefined()
- *     }, { context: app }),
+ *     }),
  * )
  * ```
  */
-export function withRollback<TResult>(
+export async function withRollback<TScope extends ITransactionScope, TResult>(
+    context: Context<TScope>,
     fn: TransactionCallback<TResult>,
-    options: TransactionOptions = {},
 ): Promise<TResult> {
-    return Transaction.run(
-        async (transaction) => {
-            // If `fn` throws, `Transaction.run` rolls back and rethrows.
-            const result = await fn(transaction)
-            if (transaction.status === TransactionStatus.Active) {
-                await transaction.rollback()
-            }
-            assertNotCommitted(transaction)
+    const test = await beginTestTransaction(context)
 
-            return result
-        },
-        { ...options, parent: options.parent ?? null },
-    )
+    let result: TResult
+    try {
+        result = await withContext(context, () => fn(test.transaction))
+    } catch (error) {
+        try {
+            await endTestTransaction(context, test)
+        } catch (rollbackError) {
+            throw new AggregateError([error, rollbackError], 'Transaction failed, and so did its rollback')
+        }
+
+        throw error
+    }
+
+    await endTestTransaction(context, test)
+    assertNotCommitted(test.transaction)
+
+    return result
 }
 
 /**
- * Wraps a test body so it runs through {@link withRollback}: in a transaction that is always rolled back afterwards.
- * Pass the result straight to the test framework's `it` or `test`.
+ * Wraps a test body so it runs through {@link withRollback}: in `context`, in a transaction that is always rolled back
+ * afterwards. Pass the result straight to the test framework's `it` or `test`.
  *
  * The returned function takes no arguments, so frameworks don't mistake it for a `done`-callback test.
  *
+ * @param context - Same as {@link withRollback}.
  * @param fn - The test body. Receives the test's transaction.
- * @param options - Same as {@link withRollback}.
  * @returns A test function that returns a promise of `fn`'s result.
  *
  * @example
  * ```ts
- * it('creates an order', rollbackTest(async () => {
+ * it('creates an order', rollbackTest(app, async () => {
  *     const order = await orderService.create(input)
  *     expect(await orderService.load(order.id)).toBeDefined()
- * }, { context: app }))
+ * }))
  * ```
  */
-export function rollbackTest<TResult>(
+export function rollbackTest<TScope extends ITransactionScope, TResult>(
+    context: Context<TScope>,
     fn: TransactionCallback<TResult>,
-    options?: TransactionOptions,
 ): () => Promise<TResult> {
-    return () => withRollback(fn, options)
+    return () => withRollback(context, fn)
 }
 
 /**
- * Rolls back every test in a suite: registers a `beforeEach` hook that begins a top-level transaction, and an
- * `afterEach` hook that rolls it back, cascading to any transaction the test left open.
+ * Rolls back every test in a suite: registers a `beforeEach` hook that begins a top-level transaction on `context`,
+ * and an `afterEach` hook that rolls it back, cascading to any transaction the test left open, whether the test passed
+ * or failed.
  *
- * A `beforeEach` hook can't make a transaction current for the test body through the ambient context, so the
- * transaction lives on the {@link RollbackTestSuite.context | test context} instead: a child of `options.context` with
- * its own {@link TransactionStack}. Run the code under test with `withContext(suite.context, ...)` to see the
- * transaction as current.
+ * The transaction lives on `context` itself: `beforeEach` registers a new {@link TransactionStack} on it, and
+ * `afterEach` restores the previous `transactionStack` registration (or, if there was none, leaves an empty stack
+ * registered, since a context can't unregister a dependency). The adapter and the event manager are the ones
+ * registered on `context`. So code the test runs in `context` (`withContext(context, ...)`, or services resolved from
+ * it and called inside it) sees the test's transaction as current and nests in it:
  *
  * - **Nested commits are rolled back too.** Code under test that commits a nested transaction only saves into the
  *   test's transaction, so the final rollback still undoes it.
+ * - **Requests nest too.** A request context created from `context` during the test
+ *   (`createRequestContext(context, ...)`, with `transactionModule()`) starts nested under the test's transaction, so
+ *   its transactions are rolled back with it, including any it left open.
  * - **A new top-level transaction escapes.** Code that begins its own top-level transaction (`parent: null`, or a
- *   `Transaction.run()` outside the test context) commits for real.
+ *   `Transaction.run()` in a context that is not `context` and was not derived from it during the test) commits for
+ *   real.
  * - **`afterCommit` callbacks never run**, because the test's transaction never commits.
+ *
+ * Since the transaction is registered on a shared context, the tests using it must run one after another: concurrent
+ * tests (`test.concurrent`) are not supported.
  *
  * The `afterEach` hook throws if the test committed its transaction itself, since its changes were not rolled back.
  *
- * @param hooks - The framework's `beforeEach` and `afterEach`.
- * @param options - The context to extend, and the adapter and emitter for the test transactions.
- * @returns The test context and a getter for the current test's transaction.
- * @throws {Error} From `beforeEach`, if no adapter is passed and none is registered on `options.context`.
+ * @param context - The context the tests run their code in, usually the app context. Its `transactionAdapter` runs
+ *   the test transactions.
+ * @param options - Optional. `hooks` overrides the global `beforeEach` and `afterEach`.
+ * @returns A getter for the current test's transaction.
+ * @throws {Error} If no hooks are passed and the global `beforeEach` and `afterEach` are not defined.
+ * @throws {Error} From `beforeEach`, if no adapter is registered on `context`.
  *
  * @example
  * ```ts
  * import { afterEach, beforeEach, describe, it } from 'bun:test'
  *
  * describe('orders', () => {
- *     const suite = rollbackEachTest({ beforeEach, afterEach }, { context: app })
+ *     const suite = rollbackEachTest(app, { hooks: { beforeEach, afterEach } })
  *
  *     it('creates an order', () =>
- *         withContext(suite.context, async () => {
+ *         withContext(app, async () => {
  *             await orderService.create(input)
  *         }),
  *     )
  * })
  * ```
  */
-export function rollbackEachTest(hooks: RollbackTestHooks, options: RollbackEachTestOptions = {}): RollbackTestSuite {
-    const context = new Context<ITransactionScope>()
-    if (options.context) {
-        context.extend(options.context)
-    }
-    if (options.adapter) {
-        context.registerValue('transactionAdapter', options.adapter)
-    }
-    context.registerValue('transactionStack', new TransactionStack())
+export function rollbackEachTest<TScope extends ITransactionScope>(
+    context: Context<TScope>,
+    options: RollbackEachTestOptions = {},
+): RollbackTestSuite {
+    const hooks = options.hooks ?? useGlobalHooks()
 
-    let current: Transaction | undefined
+    let current: TestTransaction | undefined
 
     hooks.beforeEach(async () => {
-        context.registerValue('transactionStack', new TransactionStack())
-        current = await Transaction.begin({
-            adapter: options.adapter,
-            context,
-            emitter: options.emitter,
-            parent: null,
-        })
+        current = await beginTestTransaction(context)
     })
 
     hooks.afterEach(async () => {
-        const transaction = current
+        const test = current
         current = undefined
-        if (!transaction) {
+        if (!test) {
             return
         }
 
-        if (transaction.status === TransactionStatus.Active) {
-            await withContext(context, () => transaction.rollback())
-        }
-        assertNotCommitted(transaction)
+        await endTestTransaction(context, test)
+        assertNotCommitted(test.transaction)
     })
 
     return {
-        context,
         get transaction(): ITransaction {
             if (!current) {
                 throw new Error(
@@ -216,8 +226,80 @@ export function rollbackEachTest(hooks: RollbackTestHooks, options: RollbackEach
                 )
             }
 
-            return current
+            return current.transaction
         },
+    }
+}
+
+/**
+ * Gets the global `beforeEach` and `afterEach`.
+ *
+ * @throws {Error} If either is not defined globally.
+ */
+function useGlobalHooks(): RollbackTestHooks {
+    const globals = globalThis as { beforeEach?: unknown; afterEach?: unknown }
+    const { beforeEach, afterEach } = globals
+
+    if (typeof beforeEach !== 'function' || typeof afterEach !== 'function') {
+        throw new Error(
+            "rollbackEachTest() found no global beforeEach and afterEach. Pass them with rollbackEachTest(context, { hooks: { beforeEach, afterEach } }) (needed with Bun, whose test globals are not on globalThis), or enable your test framework's globals (Vitest: globals: true).",
+        )
+    }
+
+    return { beforeEach: beforeEach as TestHookRegistrar, afterEach: afterEach as TestHookRegistrar }
+}
+
+/**
+ * Registers a new transaction stack on `context` and begins a top-level transaction on it.
+ *
+ * @throws {Error} If the transaction fails to begin, after restoring the previous stack registration.
+ */
+async function beginTestTransaction<TScope extends ITransactionScope>(
+    scopedContext: Context<TScope>,
+): Promise<TestTransaction> {
+    const context = scopedContext as unknown as Context<ITransactionScope>
+    const previousStack = context.introspect('transactionStack')
+    context.registerValue('transactionStack', new TransactionStack())
+
+    try {
+        const transaction = await Transaction.begin({ context, parent: null })
+        return { transaction, previousStack }
+    } catch (error) {
+        restoreStack(context, previousStack)
+        throw error
+    }
+}
+
+/**
+ * Rolls back the test's transaction if it is still `Active`, cascading to whatever the test left open, then restores
+ * the previous stack registration, even if the rollback fails.
+ */
+async function endTestTransaction<TScope extends ITransactionScope>(
+    scopedContext: Context<TScope>,
+    test: TestTransaction,
+): Promise<void> {
+    const context = scopedContext as unknown as Context<ITransactionScope>
+    try {
+        if (test.transaction.status === TransactionStatus.Active) {
+            await withContext(context, () => test.transaction.rollback())
+        }
+    } finally {
+        restoreStack(context, test.previousStack)
+    }
+}
+
+/**
+ * Puts back the `transactionStack` registration a test replaced. A context can't unregister a dependency, so when
+ * there was none, an empty stack is registered instead.
+ */
+function restoreStack(
+    context: Context<ITransactionScope>,
+    previousStack: ContextAttribute<Context<ITransactionScope>, TransactionStack> | undefined,
+) {
+    if (previousStack) {
+        context.register('transactionStack', previousStack)
+    } else {
+        context.registerValue('transactionStack', new TransactionStack())
     }
 }
 

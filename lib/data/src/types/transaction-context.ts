@@ -14,10 +14,11 @@ export interface ITransactionScope {
      */
     transactionAdapter: ITransactionAdapter
     /**
-     * The active transactions of the current async flow. Never registered on a shared app-level context:
+     * The active transactions of the current async flow. Outside tests, never registered on a shared app-level context:
      * `transactionModule()` registers a new one on every request context, each `Transaction.run()` and
      * `transaction.run()` registers its own on the child context its callback runs in, and scripts can register one
-     * themselves.
+     * themselves. The test helpers (`rollbackEachTest()`, `withRollback()`) register one on the context they are given
+     * for the length of a test, and request contexts created from it start nested under the test's transaction.
      */
     transactionStack: TransactionStack
 }

@@ -54,7 +54,8 @@ type FinishOperation = Exclude<TransactionOperation, 'begin'>
 
 /**
  * Links each run's transaction stack to the stack of the context the run was started from, so a commit or rollback
- * called from inside nested runs can find the transactions those runs began.
+ * called from inside nested runs can find the transactions those runs began. (A stack created nested under another
+ * one, such as a request's stack in a test, links to it through {@link TransactionStack.outer} instead.)
  */
 const outerStacks = new WeakMap<TransactionStack, TransactionStack>()
 
@@ -76,9 +77,10 @@ let beginCount = 0
  *
  * The outer transaction takes precedence: `commit()` and `rollback()` first commit or roll back everything begun after
  * the transaction in the same flow, innermost first, then the transaction itself. That includes transactions begun on
- * its stack that aren't its children, and, when called from inside a nested run, the transactions of the runs between
- * the caller and the transaction. A child still open in a concurrent flow, which the cascade can't reach, makes both
- * throw before anything is touched.
+ * its stack that aren't its children, the transactions still open on stacks nested under it (see
+ * {@link TransactionStack}), and, when called from inside a nested run, the transactions of the runs between the
+ * caller and the transaction. A child still open in a concurrent flow, which the cascade can't reach, makes both throw
+ * before anything is touched.
  *
  * Most code should use {@link Transaction.run}, which begins, commits, and rolls back for you.
  *
@@ -108,6 +110,8 @@ export class Transaction implements ITransaction {
     private currentStatus = TransactionStatus.Pending
     private operationInProgress?: TransactionOperation
     private readonly openChildren = new Set<ITransaction>()
+    /** Stacks nested under this transaction (see {@link TransactionStack.base}) that transactions were begun on. */
+    private readonly nestedStacks = new Set<TransactionStack>()
     private beginOrder = 0
 
     /**
@@ -276,6 +280,10 @@ export class Transaction implements ITransaction {
         this.beginOrder = ++beginCount
         this.stack = stack
         stack.push(this)
+        // Lets a commit or rollback of the transaction the stack is nested under cascade into it.
+        if (stack.base instanceof Transaction) {
+            stack.base.nestedStacks.add(stack)
+        }
 
         await this.emit(TransactionEvent.AfterBegin)
     }
@@ -284,9 +292,11 @@ export class Transaction implements ITransaction {
      * Commits the transaction, and makes whatever was current before it current again.
      *
      * Everything begun after it in the same flow is committed first, innermost first, each through its own `commit()`:
-     * the transactions above it on its stack, whether or not they are its children, and, when called from inside a
-     * nested run, the transactions of the runs between the caller and this one. If one of those commits fails, the
-     * cascade stops there and this transaction stays `Active`, so it can still be rolled back.
+     * the transactions above it on its stack, whether or not they are its children, the transactions still open on
+     * stacks nested under it (such as a request context's stack created while it was current, see
+     * {@link TransactionStack}), and, when called from inside a nested run, the transactions of the runs between the
+     * caller and this one. If one of those commits fails, the cascade stops there and this transaction stays `Active`,
+     * so it can still be rolled back.
      *
      * Then it emits `beforeCommit`, commits through the adapter, and marks the transaction `Committed`. A nested
      * transaction hands its {@link Transaction.afterCommit | afterCommit} callbacks to its parent; a top-level one runs
@@ -537,7 +547,7 @@ export class Transaction implements ITransaction {
         this.assertStatus(TransactionStatus.Active, operation)
         this.assertIdle(operation)
 
-        const cascade = this.planCascade(useCurrentStack())
+        const cascade = this.planCascade(useCurrentStack(), true)
         const members = new Set<ITransaction>([this, ...cascade])
         for (const member of members) {
             if (member instanceof Transaction) {
@@ -589,16 +599,22 @@ export class Transaction implements ITransaction {
      * following the ambient stack outward), that is every transaction begun after this one on the stacks in between,
      * innermost stack first. Then come the transactions above this one on its own stack.
      *
+     * With `includeNestedStacks`, the transactions still open on stacks nested under this one, or under anything in
+     * the cascade, are added too, each before the transaction its stack is nested under. A commit or rollback reaches
+     * them; a new child's `begin()` doesn't count them as reachable, so the guard against parallel children still
+     * holds across nested stacks.
+     *
      * @param from - The caller's transaction stack, which the walk outward starts from.
+     * @param includeNestedStacks - Whether to add the transactions on nested stacks.
      */
-    private planCascade(from: TransactionStack | undefined): ITransaction[] {
+    private planCascade(from: TransactionStack | undefined, includeNestedStacks = false): ITransaction[] {
         const cascade: ITransaction[] = []
         const innerStacks: TransactionStack[] = []
         let stack = from
 
         while (stack && stack !== this.stack) {
             innerStacks.push(stack)
-            stack = outerStacks.get(stack)
+            stack = outerStacks.get(stack) ?? stack.outer
         }
 
         if (stack) {
@@ -611,7 +627,40 @@ export class Transaction implements ITransaction {
         }
 
         cascade.push(...(this.stack?.above(this) ?? []).reverse())
-        return cascade
+        if (!includeNestedStacks) {
+            return cascade
+        }
+
+        const planned = new Set<ITransaction>()
+        for (const member of cascade) {
+            if (member instanceof Transaction) {
+                member.collectNested(planned)
+            }
+            planned.add(member)
+        }
+        this.collectNested(planned)
+
+        return [...planned]
+    }
+
+    /**
+     * Adds the transactions still open on stacks nested under this one to `planned`, innermost first, each after the
+     * ones nested under it. Skips those already planned.
+     *
+     * @param planned - The cascade being planned, in order.
+     */
+    private collectNested(planned: Set<ITransaction>) {
+        for (const stack of this.nestedStacks) {
+            for (const entry of stack.all().reverse()) {
+                if (planned.has(entry)) {
+                    continue
+                }
+                if (entry instanceof Transaction) {
+                    entry.collectNested(planned)
+                }
+                planned.add(entry)
+            }
+        }
     }
 
     /**
@@ -648,10 +697,12 @@ export class Transaction implements ITransaction {
     }
 
     /**
-     * Records the final status, and takes the transaction off its stack and out of its parent's open children.
+     * Records the final status, takes the transaction off its stack and out of its parent's open children, and forgets
+     * the stacks nested under it.
      */
     private finish(status: TransactionStatus) {
         this.currentStatus = status
+        this.nestedStacks.clear()
         this.stack?.remove(this)
         if (this.currentParent instanceof Transaction) {
             this.currentParent.openChildren.delete(this)

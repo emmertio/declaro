@@ -209,7 +209,9 @@ await app.use(useDeclaro(), transactionModule({ adapter: new PgTransactionAdapte
 `transactionModule` does two things:
 
 - It registers the adapter on the app context under `transactionAdapter`. Request contexts extend the app context, so they see the same adapter, and `useTransactionAdapter()` returns it anywhere a context is active.
-- It adds request middleware that registers a **new** `TransactionStack` on each request context under `transactionStack`. That stack tracks which transaction is current in the request (see [Where the stack lives](#where-the-stack-lives)). The stack is never shared: the app context doesn't get one.
+- It adds request middleware that registers a **new** `TransactionStack` on each request context under `transactionStack`. That stack tracks which transaction is current in the request (see [Where the stack lives](#where-the-stack-lives)). The stack is never shared: the app context doesn't get one, and two requests always get separate stacks.
+
+If the context a request is created from does have a stack with an active current transaction, which outside tests it never does, the request's stack starts nested under that transaction: `useTransaction()` in the request returns it until the request begins its own, transactions the request begins nest in it, and committing or rolling it back cascades into whatever the request left open. That is how [the rollback test helpers](#rolling-back-integration-tests) cover requests.
 
 ## Using transactions
 
@@ -384,6 +386,7 @@ Each transaction has a `status` (`Pending`, `Active`, `Committed`, `RolledBack`)
 A few rules keep the stack consistent:
 
 - **The parent takes precedence.** Committing or rolling back a transaction first commits or rolls back everything begun after it in the same flow and still open, innermost first, then the transaction itself. That includes transactions that aren't its children, such as one begun with `parent: null` or with a different adapter. Each one goes through its own `commit()` or `rollback()`, so your adapter is called once per transaction, innermost first. This matches the database: a top-level `COMMIT` saves any savepoints that haven't been released, and `RELEASE SAVEPOINT` and `ROLLBACK TO SAVEPOINT` act on every savepoint created after the named one. A commit freezes the state as it is, open inner work included. The trade-off: a nested transaction whose `commit()` you forgot is saved silently when its parent commits, rather than raising an error.
+- **The cascade reaches into stacks nested under the transaction.** A stack created nested under a transaction, such as a request's stack in a [rolled-back test](#rolling-back-integration-tests), is finished with it: its open transactions are committed or rolled back first, innermost first, wherever you call it from.
 - **The cascade reaches into runs you're inside.** Each run has its own stack, so a transaction can have an open child on another stack, for example inside a `transaction.run()` or nested `Transaction.run()`. If you call `tx1.commit()` or `tx1.rollback()` from inside that run's callback (at any depth), the cascade finishes that run's open transactions first, innermost first, then its transaction, and so on outward to `tx1`. The runs whose transactions were finished this way leave them alone when their callbacks return.
 - **It can't reach into a concurrent flow.** If the transaction, or anything the cascade would finish, has an open child in a flow you are _not_ inside, such as a sibling `Transaction.run()` still running under `Promise.all`, `commit()` and `rollback()` throw before touching anything, for example `Cannot commit a transaction with 1 open child transaction(s) in another async flow`. Wait for that work to finish first.
 - **A failed step stops the cascade.** If one of the cascaded commits or rollbacks fails, the cascade stops there and throws that error. The transaction you called it on stays `Active` (so you can still roll it back), and the transactions already finished stay finished.
@@ -394,9 +397,9 @@ A few rules keep the stack consistent:
 
 ### Where the stack lives
 
-The current transaction is tracked by a `TransactionStack`, registered on a context under `transactionStack`. There is never one on the shared app context:
+The current transaction is tracked by a `TransactionStack`, registered on a context under `transactionStack`. Outside tests, there is never one on the shared app context:
 
-- **Each request context gets its own**, from `transactionModule`'s request middleware.
+- **Each request context gets its own**, from `transactionModule`'s request middleware. It starts nested under the current transaction of the context the request is created from, if that context has a stack with an active one (only the [rollback test helpers](#rolling-back-integration-tests) put one there).
 - **Every run gets its own.** `Transaction.run()` and `transaction.run()` run their callback in a child context with a fresh stack, whose first entry is the run's transaction. That is what keeps concurrent runs isolated.
 - **Scripts, jobs and tests outside both** either wrap their work in `Transaction.run()`, or register a stack on their own context:
 
@@ -416,6 +419,8 @@ await withContext(context, async () => {
 ```
 
 Its public API is read-only: `current` (the top of the stack, or `undefined`), `size`, and `has(transaction)`. Only `Transaction` pushes and removes entries.
+
+`new TransactionStack({ outer })` starts a stack nested under `outer`'s current transaction, if that one is active (otherwise it's an ordinary empty stack). While the new stack is empty, `current` returns that transaction; transactions begun on the stack nest in it; and committing or rolling it back cascades into whatever is still open on the new stack. `transactionModule` uses this for request contexts.
 
 `begin()` without a stack throws: `No transaction stack was found in the current context. Use Transaction.run(), or begin transactions inside a request context set up by transactionModule().` `Transaction.run()` never needs one, since it brings its own.
 
@@ -683,9 +688,9 @@ This is a test mock, not isolation. Each rollback restores the whole repository,
 
 ### Rolling back integration tests
 
-For integration tests against a real database, run each test in a transaction that is always rolled back, so it leaves no data behind. The helpers take no test-framework dependency, so they work with Bun, Vitest and Jest alike.
+For integration tests against a real database, run each test in a transaction that is always rolled back, so it leaves no data behind. The helpers take the context the code under test runs in, usually the app context, typed `Context<TScope extends ITransactionScope>` so the compiler checks it. The adapter and the event manager come from that context. The package never imports a test framework.
 
-**Per test**: `withRollback(fn, options?)` runs `fn` in a top-level transaction, rolls it back whether `fn` resolves or throws, then returns `fn`'s result or rethrows its error. `rollbackTest(fn, options?)` wraps the same thing as a test function to pass straight to `it`. Both take the `Transaction.run` options (`adapter`, `context`, `parent`, `emitter`); pass `parent` to nest in an existing transaction instead. The transaction is current inside `fn`, which receives it.
+**Per test**: `withRollback(context, fn)` registers a new `TransactionStack` on `context`, begins a top-level transaction on it, and runs `fn` inside `withContext(context, ...)`. Then it rolls the transaction back whether `fn` resolves or throws, and returns `fn`'s result or rethrows its error. `rollbackTest(context, fn)` wraps the same thing as a test function to pass straight to `it`. The transaction is current inside `fn`, which receives it.
 
 ```ts
 import { expect, it } from 'bun:test'
@@ -693,25 +698,21 @@ import { rollbackTest, withRollback } from '@declaro/data'
 
 it(
     'creates an order',
-    rollbackTest(
-        async () => {
-            const order = await orderService.create(input)
-            expect(await orderService.load(order.id)).toBeDefined()
-        },
-        { context: app },
-    ),
+    rollbackTest(app, async () => {
+        const order = await orderService.create(input)
+        expect(await orderService.load(order.id)).toBeDefined()
+    }),
 )
 
 it('reserves stock', () =>
-    withRollback(
-        async () => {
-            await inventoryService.reserve(items)
-        },
-        { context: app },
-    ))
+    withRollback(app, async () => {
+        await inventoryService.reserve(items)
+    }))
 ```
 
-**For a whole suite**: `rollbackEachTest({ beforeEach, afterEach }, options?)` registers the hooks through the functions you pass in. Before each test it begins a top-level transaction; after each test it rolls it back, cascading to any transaction the test left open. A `beforeEach` hook can't make a transaction current in the test body through the ambient context, so the transaction lives on a test context instead: a child of `options.context` with its own `TransactionStack` (a new one each test), and with `options.adapter` registered on it when passed. It returns `{ context, transaction }`: run the code under test with `withContext(suite.context, ...)`, and read `suite.transaction` inside a test for the current test's transaction.
+**For a whole suite**: `rollbackEachTest(context, options?)` registers a `beforeEach` hook that registers a new `TransactionStack` on `context` and begins a top-level transaction on it, and an `afterEach` hook that rolls it back, cascading to any transaction the test left open, whether the test passed or failed. Code the test runs in `context` (with `withContext(context, ...)`, or services resolved from it and called inside it) sees the test's transaction as current and nests in it. It returns `{ transaction }`: read `suite.transaction` inside a test for the current test's transaction.
+
+The hooks default to the global `beforeEach` and `afterEach`, which Jest defines, and Vitest with `globals: true`. Bun's test globals aren't on `globalThis`, so with Bun (or Vitest without `globals: true`) pass them as `options.hooks`. With neither, `rollbackEachTest` throws: `rollbackEachTest() found no global beforeEach and afterEach. Pass them with rollbackEachTest(context, { hooks: { beforeEach, afterEach } }) ...`.
 
 ```ts
 import { withContext } from '@declaro/core'
@@ -719,22 +720,26 @@ import { rollbackEachTest } from '@declaro/data'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 
 describe('orders', () => {
-    const suite = rollbackEachTest({ beforeEach, afterEach }, { context: app })
+    rollbackEachTest(app, { hooks: { beforeEach, afterEach } })
 
     it('creates an order', () =>
-        withContext(suite.context, async () => {
+        withContext(app, async () => {
             const order = await orderService.create(input)
             expect(await orderService.load(order.id)).toBeDefined()
         }))
 })
 ```
 
-What the rollback covers, in both forms:
+After each test (and after each `withRollback`), the context's previous `transactionStack` registration is restored. A context can't unregister a dependency, so when it had none, an empty stack is left registered, which no transaction is current on.
+
+What the rollback covers, in all three forms:
 
 - **Nested commits are undone.** Code under test that commits a nested transaction only saves into the test's transaction (see [What a nested commit means](#what-a-nested-commit-means)), so the final rollback still undoes it.
-- **A new top-level transaction escapes.** Code that begins its own top-level transaction, with `parent: null` or through a `Transaction.run` outside the test's context, commits for real, and the rollback can't undo it.
+- **Requests made from the context are undone too.** A request context created from it during the test, such as `createRequestContext(app, request)` with `transactionModule`, starts nested under the test's transaction (see [Registering it](#registering-it)). Its transactions nest in the test's, and the rollback cascades into any it left open.
+- **A new top-level transaction escapes.** Code that begins its own top-level transaction, with `parent: null`, or through a `Transaction.run` in a context that isn't the test's context and wasn't derived from it during the test, commits for real, and the rollback can't undo it.
 - **`afterCommit` callbacks never run**, because the test's transaction never commits.
 - **Don't commit the test's transaction itself.** Its changes would be saved, so `withRollback` and the `afterEach` hook throw when they find it `Committed`.
+- **Tests sharing a context must run one after another.** The test's transaction lives on the context itself, so concurrent tests (`test.concurrent`) are not supported.
 
 ## Reference
 
@@ -750,12 +755,12 @@ What the rollback covers, in both forms:
 | `TransactionEvent`          | enum       | The six lifecycle actions, `BeforeBegin` to `AfterRollback`. Event types are `declaro::transaction.<action>`.                               |
 | `TransactionLifecycleEvent` | class      | The lifecycle event: `data` (`ITransactionEventData`), non-enumerable `transaction`; statics `getType(action)` and `getDescriptor(action)`. |
 | `ITransactionEventData`     | interface  | The serializable event data: `id`, `depth`, `status`, `parentId?`.                                                                          |
-| `TransactionStack`          | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. Register one for scripts.                              |
-| `transactionModule`         | middleware | Registers the adapter on the app context, and gives each request context its own `TransactionStack`.                                        |
+| `TransactionStack`          | class      | The active transactions of one request or run: `current` (the top), `size`, `has()`. `new TransactionStack({ outer? })`.                    |
+| `transactionModule`         | middleware | Registers the adapter, and gives each request its own `TransactionStack`, nested under the outer context's active transaction if any.       |
 | `wrapWithTransaction`       | function   | Wraps any async work so every call runs through `Transaction.run`, with the same options.                                                   |
 | `useTransaction`            | function   | Synchronously gets the current transaction. Throws when none is active.                                                                     |
 | `useTransactionAdapter`     | function   | Synchronously gets the adapter registered in the current context. Its type parameter is a cast.                                             |
 | `MockTransactionAdapter`    | class      | In-memory adapter for tests, with `handle()`, an `operations` log and configurable `failures`.                                              |
-| `withRollback`              | function   | Runs a test body in a top-level transaction that is always rolled back. Takes the `Transaction.run` options.                                |
-| `rollbackTest`              | function   | Wraps a test body as an argument-less test function that runs through `withRollback`.                                                       |
-| `rollbackEachTest`          | function   | Registers `beforeEach`/`afterEach` hooks that roll back every test in a suite. Returns `{ context, transaction }` (`RollbackTestSuite`).    |
+| `withRollback`              | function   | `withRollback(context, fn)`: runs `fn` in `context`, in a top-level transaction that is always rolled back.                                 |
+| `rollbackTest`              | function   | `rollbackTest(context, fn)`: wraps a test body as an argument-less test function that runs through `withRollback`.                          |
+| `rollbackEachTest`          | function   | `rollbackEachTest(context, { hooks? })`: rolls back every test in a suite on `context`. Returns `{ transaction }` (`RollbackTestSuite`).    |

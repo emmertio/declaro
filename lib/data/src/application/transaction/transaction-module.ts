@@ -1,7 +1,7 @@
 import { provideRequestMiddleware, type Context, type DeclaroScope } from '@declaro/core'
 import type { ITransactionAdapter } from '../../domain/transaction/transaction-interface'
 import type { ITransactionScope } from '../../types/transaction-context'
-import { TransactionStack } from './transaction-stack'
+import { TransactionStack, type TransactionStackOptions } from './transaction-stack'
 
 /**
  * Options for {@link transactionModule}.
@@ -22,6 +22,12 @@ export interface TransactionModuleOptions {
  * - Adds request middleware that registers a new {@link TransactionStack} as `transactionStack` on each request
  *   context, so every request tracks its own transactions and `Transaction.begin()` works inside it.
  *
+ * If the context the request is created from has a transaction stack whose current transaction is `Active`, the
+ * request's stack starts nested under that transaction (see {@link TransactionStackOptions.outer}): `useTransaction()`
+ * in the request returns it until the request begins its own, transactions the request begins nest in it, and
+ * committing or rolling it back cascades into whatever the request left open. App contexts have no stack outside
+ * tests, so in production every request starts with an empty stack. Either way, each request gets a stack of its own.
+ *
  * It registers no stack on the app context itself, and begins no transaction.
  *
  * @param options - Module configuration.
@@ -37,7 +43,10 @@ export function transactionModule(options: TransactionModuleOptions) {
         context.registerValue('transactionAdapter', options.adapter)
 
         provideRequestMiddleware(context, (requestContext) => {
-            ;(requestContext as Context<ITransactionScope>).registerValue('transactionStack', new TransactionStack())
+            const scoped = requestContext as Context<ITransactionScope>
+            // Copied from the context the request was created from, if it had one.
+            const outer = scoped.resolve('transactionStack')
+            scoped.registerValue('transactionStack', new TransactionStack({ outer }))
         })
     }
 }
